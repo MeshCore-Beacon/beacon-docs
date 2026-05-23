@@ -16,4 +16,5 @@ It is meant for documents that help future code review, implementation planning,
 ## Useful Documents
 
 - [Initial baseline thoughts and suggestions](initial-baseline-thoughts.md)
+- [Initial tower-server baseline thoughts](initial-server-baseline-thoughts.md)
 - [PR and commit commenting operating model](pr-commenting-operating-model.md)
