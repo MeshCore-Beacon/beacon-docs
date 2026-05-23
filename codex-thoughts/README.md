@@ -17,4 +17,5 @@ It is meant for documents that help future code review, implementation planning,
 
 - [Initial baseline thoughts and suggestions](initial-baseline-thoughts.md)
 - [Initial tower-server baseline thoughts](initial-server-baseline-thoughts.md)
+- [Map page architecture](map-page-architecture/README.md)
 - [PR and commit commenting operating model](pr-commenting-operating-model.md)
