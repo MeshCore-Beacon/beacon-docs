@@ -58,6 +58,7 @@ Set every `CHANGE_*` value. The variables you must fill in:
 | Variable | Service | What to set |
 |---|---|---|
 | `POSTGRES_DSN` | `app` | Database connection string. Change the password (`CHANGE_DB_PASS`) to a strong one. |
+| `REDIS_ADDR` | `app` | `redis:6379` — points the API at the compose Redis service. Leave it out and the server runs uncached, so every read hits Postgres. |
 | `MQTT_BROKER_1_*` / `MQTT_BROKER_2_*` | `app` | URL, username, and password for your live MeshCore MQTT packet sources. |
 | `DOMAIN` | `caddy` | Your public domain (e.g. `beacon.example.com`). Caddy auto-provisions a Let's Encrypt cert for it. |
 | `VITE_API_BASE` | `web` | `https://<your-domain>/api/v1` — must be the **public** domain, never localhost. |

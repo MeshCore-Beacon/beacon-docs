@@ -742,10 +742,13 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
 ### Channels
 
 ```
-GET    /api/v1/channels?limit=50
+GET    /api/v1/channels?iata=YOW&limit=50
 GET    /api/v1/channels/{channelHash}
 GET    /api/v1/channels/{channelHash}/messages?since=<ts>&limit=50&cursor=<opaque>
 ```
+
+The list accepts a single `iata=` or comma-separated `iatas=YOW,YYZ` (case-insensitive)
+and returns channels heard in those IATAs within the packet retention window.
 
 Channel keys are configured via the server config file.
 
