@@ -1,0 +1,13 @@
+# Manual block list for /api/* and /ws.
+# @blocked_ip: one IP or CIDR per remote_ip line. Keep at least one line: 192.0.2.0/24 is TEST-NET
+#   (never routable) and is a safe placeholder.
+# @blocked_ua: one header_regexp line per scraper User-Agent signature (Go regexp; (?i) = case-insensitive).
+# Apply changes with:
+#   docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile
+#   docker compose exec caddy caddy reload   --config /etc/caddy/Caddyfile
+@blocked_ip {
+	remote_ip 192.0.2.0/24
+}
+@blocked_ua {
+	header_regexp User-Agent "(?i)mesh\.hansimgamr\.net"
+}

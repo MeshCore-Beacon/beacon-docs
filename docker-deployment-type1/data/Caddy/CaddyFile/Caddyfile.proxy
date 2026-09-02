@@ -1,13 +1,54 @@
 {$DOMAIN} {
-    handle /api/* {
-        reverse_proxy tower-app:8080
-    }
+	# defines @blocked_ip and @blocked_ua; edit conf.d/blocklist.caddy then `caddy reload`
+	import conf.d/blocklist.caddy
 
-    handle /ws {
-        reverse_proxy tower-app:8080
-    }
+	# JSON access log for the whole site (API, SPA and assets together, so per-IP joins are one file)
+	log {
+		output file /var/log/caddy/access.json {
+			mode 0644
+			roll_size 100MiB
+			roll_keep 20
+			roll_keep_for 720h
+		}
+		format json
+	}
 
-    handle {
-          reverse_proxy tower-web:80
-    }
+	# opt-in: 403 API calls whose Referer names another site. Spoofable; enable only if the
+	# logs show a specific foreign host with sustained volume.
+	# @foreign_referer {
+	#     header Referer *
+	#     not header Referer https://{$DOMAIN}/*
+	# }
+
+	handle /api/* {
+		respond @blocked_ip "Forbidden" 403 {
+			close
+		}
+		respond @blocked_ua "Forbidden" 403 {
+			close
+		}
+		# respond @foreign_referer "Forbidden" 403
+		reverse_proxy app:8080 {
+			# the app trusts these headers for the client IP, so only Caddy may set them
+			header_up -True-Client-IP
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle /ws {
+		respond @blocked_ip "Forbidden" 403 {
+			close
+		}
+		respond @blocked_ua "Forbidden" 403 {
+			close
+		}
+		reverse_proxy app:8080 {
+			header_up -True-Client-IP
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
 }

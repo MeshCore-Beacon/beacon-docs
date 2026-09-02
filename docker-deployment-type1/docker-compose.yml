@@ -53,6 +53,8 @@ services:
     env_file: .env
     volumes:
       - ./data/Caddy/CaddyFile/Caddyfile.proxy:/etc/caddy/Caddyfile
+      - ./data/Caddy/conf.d:/etc/caddy/conf.d:ro
+      - ./data/Caddy/logs:/var/log/caddy
       - ./data/Caddy/data:/data/caddy/
       - ./data/Caddy/config:/config/caddy/
     depends_on:
