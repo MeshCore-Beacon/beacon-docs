@@ -709,7 +709,9 @@ GET    /api/v1/observers/{observerId}/activity?range=24h&interval=15m
 GET    /api/v1/observers/{observerId}/adverts?limit=50&cursor=<opaque>
 ```
 
-Telemetry response is a time-bucketed array suitable for direct chart consumption:
+Telemetry response is a time-bucketed array suitable for direct chart consumption. `airtimeTxSecs` and
+`airtimeRxSecs` are seconds of radio time as reported by the observer: cumulative since boot on
+`interval=1h` points, and the per-bucket delta on `6h`/`24h`. Divide by the bucket length for a percentage.
 
 ```json
 {
@@ -719,8 +721,8 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
     {
       "t": 1747612800000,
       "batteryMv": 4180,
-      "airtimeTxPct": 0.37,
-      "airtimeRxPct": 1.05,
+      "airtimeTxSecs": 13.4,
+      "airtimeRxSecs": 37.8,
       "noiseFloorDb": -103.2,
       "uptimeSeconds": 86400,
       "queueLength": 0,
@@ -729,8 +731,8 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
     {
       "t": 1747613100000,
       "batteryMv": 4175,
-      "airtimeTxPct": 0.42,
-      "airtimeRxPct": 1.12,
+      "airtimeTxSecs": 15.1,
+      "airtimeRxSecs": 40.3,
       "noiseFloorDb": -102.8,
       "uptimeSeconds": 86700,
       "queueLength": 1,
