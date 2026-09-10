@@ -39,12 +39,13 @@ docker compose logs --tail 5 app
 
 ## 2. fail2ban
 
-Two jails per box, same thresholds:
+Three jails per box, same thresholds:
 
 | Jail | Counts | Trips at | Why |
 |---|---|---|---|
 | `beacon-api-flood` | every `/api/` request | 900 in 60 s | a browser session peaks ~150 in its first 30 s (auto-chained pages), then ~2/min; 15 req/s for a full minute is no browser |
 | `beacon-api-429` | `/api/` responses with status 429 | 300 in 10 min | only fires on clients that keep hammering through the server's throttle |
+| `beacon-api-sustained` | every `/api/` request | 1,000 in 1 h | a paced scraper (the day-0 Pi ran ~135/min for hours) never trips the flood rule; real sessions peak ~300/h |
 
 Both use `backend = polling` (the Debian default `systemd` cannot tail files) and a flat 10 min ban.
 Install:
