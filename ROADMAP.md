@@ -1,6 +1,6 @@
 # Beacon parity and analytics roadmap
 
-Updated 26 September 2026 UTC. This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
+Updated 27 September 2026 UTC. This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
 Refresh GitHub issues, PR feedback and branch state before starting a phase. This document is a snapshot, and linked issues/PRs are the current source of truth.
 
@@ -22,6 +22,16 @@ Current sites:
 | [beacon-web](https://github.com/MeshCore-Beacon/beacon-web) | Investigation tools and analytics pages | `dev` |
 | [beacon-docs](https://github.com/MeshCore-Beacon/beacon-docs) | Shared contracts, operator guidance and this roadmap | `main` |
 | [beacon-mobile](https://github.com/MeshCore-Beacon/beacon-mobile) | Mobile client; coordinate API compatibility | `main` |
+
+## Current observer-first release
+
+The observer-first release is implemented in four focused review candidates: [server #169](https://github.com/MeshCore-Beacon/beacon-server/pull/169) (`60ed339c`, closes #168), [web #79](https://github.com/MeshCore-Beacon/beacon-web/pull/79) (`3a0eb4c8`, closes #76), [web #80](https://github.com/MeshCore-Beacon/beacon-web/pull/80) (`b3a6b088`, closes #77) and [web #81](https://github.com/MeshCore-Beacon/beacon-web/pull/81) (`42ae09b7`, closes #78). All are out of draft. Server #169 follows #167; web order is #75 â†’ #79 â†’ #80 â†’ #81. Independent server #166 remains in the preview composition. Maintainers control acceptance and release; these issues remain open until their changes are accepted.
+
+The Pi preview now runs composed server `88c2c10c830034cee70a46fca717af518803a544` and web `42ae09b7c6be50cd0f617bad8aea35825be9f12e`, with the [updated changelog and exact source](https://canadaverse.org/beacon-dev/source.html). Raw packets remain 72 hours, archived hourly analytics 30 days, telemetry 720 hours. All four candidates passed their native Pi suites; the final web build passes 895 tests. Server tests use actual PostgreSQL. Windows server/full destination/dashboard validation and 48 focused final comparison/API tests also pass. Desktop, 390-pixel phone, English/French, keyboard, legacy/shared links and Back/search/sort/scroll were checked. Physical iPhone Safari and production-volume capacity remain separate gates.
+
+Migration 040 preserves original rows and repairs available archived unknown-payload counts without inventing signal samples. A restored clone passed the migration probe. A fresh private dump was copied off the Pi and its checksum verified; the original schema039 database and matching binary/config/source are retained for DB-aware rollback. Only the Beacon app restarted for the server change; 22 other containers were unchanged. Frontend publication restarted no services. Both MQTT feeds reconnected. Public admin, backup and foreign detection remain disabled.
+
+See the [observer implementation and subsequent UX releases](app_documentation/observer-monitoring-plan.md) and the separate [Mesh Scopes interoperability draft](app_documentation/mesh-scopes-plan.md).
 
 ## Accepted consolidation batch
 
@@ -46,7 +56,7 @@ Server #156/#158 and web #54/#56/#58/#60 are closed. Server #60/#72/#99/#116 and
 
 ## September 26 retention and endpoint fixes
 
-The Pi was first matched to accepted dev server `91b4b457` / web `54b5093a`, including native validation and a verified restore across migrations 037/038. It now runs composed server `a8394f10` and web `3a18e6d1`, adding three focused review candidates:
+The Pi was first matched to accepted dev server `91b4b457` / web `54b5093a`, including native validation and a verified restore across migrations 037/038. At that checkpoint it ran composed server `a8394f10` and web `3a18e6d1`, adding three focused review candidates:
 
 | PR | Head | Scope / closure |
 |---|---|---|
@@ -62,7 +72,7 @@ Full Windows and native Pi Go/PostgreSQL checks pass, including rollback on arch
 
 Migration 039 preserved fingerprints of all 23 original application tables. The actual prior schema038 database, exact binary/configuration and private dump remain available for rollback; older pre-038 recovery is retained separately. Only the Beacon preview app restarted (about 33 seconds); 22 other containers were unchanged and both MQTT feeds reconnected. Public admin/backup and foreign detection remain disabled. [Current changelog and corresponding source](https://canadaverse.org/beacon-dev/source.html).
 
-Current broader issues remain server #60 (admin), #72 (backup/import), #99 (packet summaries), #116 (MQTT investigation), and web #12 (remaining translations). Prioritize feedback and acceptance of these new fixes, then a focused Mesh/Talkers/Observer translation slice under #12. A measured month of accumulated history, production-scale capacity and physical Safari checks remain separate gates. Maintainers own stable releases and the owners handle production cutover.
+Current broader issues remain server #60 (admin), #72 (backup/import), #99 (packet summaries), #116 (MQTT investigation), and web #12 (remaining translations). Current priorities are the observer release and following investigation work described above. A measured month of accumulated history, production-scale capacity and physical Safari checks remain separate gates. Maintainers own stable releases and the owners handle production cutover.
 
 ## Delivered foundations
 
@@ -82,7 +92,7 @@ Current broader issues remain server #60 (admin), #72 (backup/import), #99 (pack
 
 The path page counts stored receptions, not unique devices. Flood paths accumulate entries, while direct routes carry remaining entries. Observed widths do not establish device capability or collision rates. Signal readings describe reception at the reporting observer rather than a complete end-to-end link.
 
-The September 20 review correction moves both new aggregate APIs onto materialized hourly snapshots, preserving reception/region semantics and normalizing polling windows to UTC hours. In a rolled-back million-row Pi fixture, Signal request queries took 1.8–77.5 ms and Paths 3.5–141.9 ms across custom/generic plans. Initial population took 14.4/8.4 seconds, refresh 16.8/6.2 seconds, and view/index storage was 6.5/11.3 MB respectively. These measurements cover the fixture, not the full production workload. See the [release consolidation checklist](RELEASE-CHECKLIST.md) for remaining gates.
+The September 20 review correction moves both new aggregate APIs onto materialized hourly snapshots, preserving reception/region semantics and normalizing polling windows to UTC hours. In a rolled-back million-row Pi fixture, Signal request queries took 1.8Ã¢â‚¬â€œ77.5 ms and Paths 3.5Ã¢â‚¬â€œ141.9 ms across custom/generic plans. Initial population took 14.4/8.4 seconds, refresh 16.8/6.2 seconds, and view/index storage was 6.5/11.3 MB respectively. These measurements cover the fixture, not the full production workload. See the [release consolidation checklist](RELEASE-CHECKLIST.md) for remaining gates.
 
 September 20 validation covered native Go/PostgreSQL/HTTP behavior and **786 web tests**, plus private backup compatibility, feature-only startup failure, TLS/password files, cancellation and schema/data/sequence restoration. That review update passed 390/1280px browser checks, with ten distinct glyphs and complete-hour text; earlier chart checks also covered 320/768px. This is historical evidence for the unchanged feature code. Current revisions and corresponding-source archives are on the preview's changelog page.
 
@@ -92,8 +102,10 @@ The September 24 consolidation check built accepted server `c02317a4` and retain
 
 The September 20 #116 investigation has a new [current-build result](https://github.com/MeshCore-Beacon/beacon-server/issues/116#issuecomment-5753626821): a 600-second unmodified Pi capture kept both feeds connected and retained 2,169 new observations, with no ping timeout, disconnect, deadline, SQLSTATE error or HTTP 5xx response. App/PostgreSQL CPU averaged 2.14%/3.96% of one core. The preceding 3h39 log likewise has no MQTT loss or deadline error. Timestamp warnings were classified separately. This did not measure callback or pool-acquisition duration and does not establish the original cause or production capacity. No application, ordering, acknowledgement or service change was made; #116 remains open. Further capture should follow a recurrence or meaningful workload change, rather than repeatedly sampling the same healthy state.
 
-1. **Review the retention/endpoint fixes, then publish coordinated releases.** Accepted dev including #162/#163/#73 is now Pi-validated; #166/#167/#75 are independent review candidates on that baseline. Maintainers choose versions, create signed release commits/tags, promote main and verify release artifacts. Follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md). Pause new analytics until this breakpoint; this release does not claim complete CoreScope parity.
-2. **Continue listed issue #12 in small screen groups.** Foundation, Signal, Paths, Traffic, Scopes, Clock Drift and shared Timestamp work are accepted. Talkers/Mesh fixes are accepted and #67/#71 are closed. After refreshing the Pi, start Mesh, Talkers or Observer analytics translation directly from fresh dev. Preserve measurement/data semantics; broader page, chart, dialog and formatting text remains.
+1. **Review the current retention/endpoint and observer candidates.** Keep the ordered server #167 â†’ #169 and web #75 â†’ #79 â†’ #80 â†’ #81 stacks; #166 is independent. Refresh with the existing workflow after acceptance. Maintainers choose the release breakpoint, versions, tags and main promotion.
+2. **Connected investigation.** Connect packets, exact observed paths/routes, reporting observers and map actions with reliable Back navigation and visibly ambiguous identities. Continue focused issue #99/#12 work where it overlaps this accepted scope.
+3. **Node/route/trace presentation, then distinct analytics questions and quality of life.** Follow the approved observer plan's subsequent releases; this phase does not claim full parity.
+4. **Mesh Scopes interoperability.** Draft optional public per-IATA catalogue import while MeshMapper publishes its endpoint/schema; retain manual names and separate observed/default/imported evidence. No speculative API calls or required API key.
 
 ## Listed work still open
 
@@ -105,7 +117,7 @@ The September 20 #116 investigation has a new [current-build result](https://git
 | [Server #72](https://github.com/MeshCore-Beacon/beacon-server/issues/72) | Download #154 and archive validation #160 are accepted; import, browser access, deployment-file coverage and remote/scheduled backup remain |
 | [Web #12](https://github.com/MeshCore-Beacon/beacon-web/issues/12) | Foundation and translations through #70 are accepted; Mesh/Talkers fixes are merged. Remaining analytics/screens/dialogs/formatting still need translation |
 
-The six completed analytics/icon/map issues are closed. Refresh the five currently open issues first at every continuation; accepted partial contributions are not grounds to close broader issues. Use closing references only when a PR completes the issue's accepted scope; use related references for partial work.
+The six completed analytics/icon/map issues are closed. Refresh all currently open issues and PR feedback first at every continuation; accepted partial contributions are not grounds to close broader issues. Use closing references only when a PR completes the issue's accepted scope; use related references for partial work.
 
 ## Production parity matrix
 
@@ -129,7 +141,7 @@ Matching tab names is not acceptance. Each capability needs verified semantics, 
 | Roles | Node-type census exists; activity and unknown-role interpretation need acceptance evidence |
 | Scopes | Regional API and new page exist; reconcile against populated retained data |
 | Prefix tool | Public-prefix inspection/simulation remains unverified |
-| Observer comparison | Merged backend/web; retain distinct-packet, time/region and zero-data tests |
+| Observer monitoring/comparison | Unified dashboard and contextual comparison in #169/#79/#80/#81; see the current release above. Shared windows and deduplication remain explicit; raw overlap can expire earlier than summaries |
 | Other workflows | Validate decoder/search/sharing, live map/replay, settings, optional clients and legacy links |
 
 ## Release gates
@@ -142,7 +154,7 @@ Matching tab names is not acceptance. Each capability needs verified semantics, 
 - Verify release artifacts from reviewed source and applicable CI. The upstream web CodeQL workflow is currently disabled; its skipped job does not count as a security scan.
 - Publish matching source, configuration guidance, known limitations and a verified rollback procedure. The deployment owner performs the production switch.
 
-The development preview currently has short retained history and no populated transport-scope records. Its public admin/backup and foreign detection are disabled. These limitations remain explicit until configuration and validation support enabling them.
+The development preview still has limited accumulated history; configured 30-day retention does not mean a measured month is available. MeshMapper catalogue import has not been enabled. Its public admin/backup and foreign detection are disabled. These limitations remain explicit until configuration and validation support enabling them.
 
 ## Keeping this roadmap useful
 

@@ -1,10 +1,20 @@
 # Server/web consolidation release
 
-Status: accepted-dev validation and release handoff, 24 September 2026. All ten application/CLI PRs in the consolidation batch are merged. Stable tags remain unchanged; this is not a published release or a full CoreScope parity claim.
+Status: observer-first development preview and review handoff, 27 September 2026. Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
+
+## Current observer release
+
+The observer-first release is implemented in four focused review candidates: [server #169](https://github.com/MeshCore-Beacon/beacon-server/pull/169) (`60ed339c`, closes #168), [web #79](https://github.com/MeshCore-Beacon/beacon-web/pull/79) (`3a0eb4c8`, closes #76), [web #80](https://github.com/MeshCore-Beacon/beacon-web/pull/80) (`b3a6b088`, closes #77) and [web #81](https://github.com/MeshCore-Beacon/beacon-web/pull/81) (`42ae09b7`, closes #78). All are out of draft. Server #169 follows #167; web order is #75 â†’ #79 â†’ #80 â†’ #81. Independent server #166 remains in the preview composition. Maintainers control acceptance and release; these issues remain open until their changes are accepted.
+
+The Pi preview now runs composed server `88c2c10c830034cee70a46fca717af518803a544` and web `42ae09b7c6be50cd0f617bad8aea35825be9f12e`, with the [updated changelog and exact source](https://canadaverse.org/beacon-dev/source.html). Raw packets remain 72 hours, archived hourly analytics 30 days, telemetry 720 hours. All four candidates passed their native Pi suites; the final web build passes 895 tests. Server tests use actual PostgreSQL. Windows server/full destination/dashboard validation and 48 focused final comparison/API tests also pass. Desktop, 390-pixel phone, English/French, keyboard, legacy/shared links and Back/search/sort/scroll were checked. Physical iPhone Safari and production-volume capacity remain separate gates.
+
+Migration 040 preserves original rows and repairs available archived unknown-payload counts without inventing signal samples. A restored clone passed the migration probe. A fresh private dump was copied off the Pi and its checksum verified; the original schema039 database and matching binary/config/source are retained for DB-aware rollback. Only the Beacon app restarted for the server change; 22 other containers were unchanged. Frontend publication restarted no services. Both MQTT feeds reconnected. Public admin, backup and foreign detection remain disabled.
+
+Use the [current roadmap](ROADMAP.md) and [observer release contract](app_documentation/observer-monitoring-plan.md) for the current queue. The sections below retain earlier dated validation; their old preview/rollback identities are historical and must not be used as current deployment instructions.
 
 ## September 26 retention and endpoint fixes
 
-The Pi was first matched to accepted dev server `91b4b457` / web `54b5093a`, including native validation and a verified restore across migrations 037/038. It now runs composed server `a8394f10` and web `3a18e6d1`, adding three focused review candidates:
+The Pi was first matched to accepted dev server `91b4b457` / web `54b5093a`, including native validation and a verified restore across migrations 037/038. At that checkpoint it ran composed server `a8394f10` and web `3a18e6d1`, adding three focused review candidates:
 
 | PR | Head | Scope / closure |
 |---|---|---|
@@ -22,7 +32,7 @@ Migration 039 preserved fingerprints of all 23 original application tables. The 
 
 Current broader issues remain server #60 (admin), #72 (backup/import), #99 (packet summaries), #116 (MQTT investigation), and web #12 (remaining translations). Prioritize feedback and acceptance of these new fixes, then a focused Mesh/Talkers/Observer translation slice under #12. A measured month of accumulated history, production-scale capacity and physical Safari checks remain separate gates. Maintainers own stable releases and the owners handle production cutover.
 
-## Scope and stop point
+## Historical consolidation scope (24 September)
 
 Release the accepted account/backup/analytics batch before Channel Activity or further parity expansion. Current public tags are server v1.6.0 and web v1.3.0; maintainers choose the next versions and perform signed release commits, main promotion and tags under each repository's contribution rules.
 
@@ -34,7 +44,7 @@ Accepted server: `c02317a4ac7228d19cab498edfa1d61186c84626`.
 Accepted web: `0f0a6ca51c7b2c3315db77954f61b30bbdeea5e2`.
 The web source tree is identical to tested preview `42ba5fcb`; preserve that artifact's actual revision/source instead of relabeling it. The server differs from preview `5848d200` only in the verifier CLI/library/tests/docs; its verifier code and tests are identical to separately tested `262eae96`. The documentation additionally contains the accepted protected-download section.
 
-## Review gates
+## Historical review gates (24 September)
 
 - [x] Workflow checks include every independent preview PR, not just the ordered stack. Status reports them; Check verifies their CI and source; Refresh/Publish reject changed prepared inputs. Server #161 and web #61 are covered by the normal preview checks. The standalone backup CLI #160 is checked with its separate manifest.
 - [x] Server #149: document POST/DELETE browser preflights and the full admin CORS method example. Keep public read-only defaults.
@@ -46,7 +56,7 @@ The web source tree is identical to tested preview `42ba5fcb`; preserve that art
 - [x] Refresh #55/#57 after the accepted #52/#53 squash. Their source trees were identical after the September 20 refresh; that history-only update needs no replacement Pi artifact.
 - [x] All eight application PRs pass their required checks on the published heads. Native PostgreSQL tests ran. The upstream web CodeQL job remains skipped under its existing policy and is not counted as a scan.
 
-All original six server and four web PRs are merged. The September 25 translation batch is accepted through web #70, with #63/#64/#65/#66/#69 closed as included; #68/#72 also merged and #67/#71 are closed. New server #162/#163 and web #73 are accepted. Only docs #5 remains open. Active application manifests are empty, acceptance history remains, and no application branch was rewritten.
+All original six server and four web PRs are merged. The September 25 translation batch is accepted through web #70, with #63/#64/#65/#66/#69 closed as included; #68/#72 also merged and #67/#71 are closed. New server #162/#163 and web #73 are accepted. At that checkpoint only docs #5 remained open. Active application manifests are empty, acceptance history remains, and no application branch was rewritten.
 
 ## Storage and retention boundary
 
@@ -71,18 +81,18 @@ Current dev is server `91b4b457` / web `54b5093a`, with passing CI/image builds 
 
 - [x] September 20 unmodified Pi stability sample: 600 seconds / 41 samples, both feeds connected, 2,169 retained observations and no MQTT disconnect/deadline or HTTP 5xx. App/PostgreSQL CPU averaged 2.14%/3.96% of one core. This is a bounded health sample, not callback timing, #116 root-cause proof or a production-volume gate. [Result and limits](https://github.com/MeshCore-Beacon/beacon-server/issues/116#issuecomment-5753626821).
 - [x] Native Pi build/test of server `6be0f762` and web `42ba5fc`, including real PostgreSQL-to-HTTP checks and migration retry/concurrent refresh; 786 web tests pass.
-- [x] One-million-row request/initial-population/refresh/storage measurements; request plans read only the new views. Signal: 1.8–77.5 ms reads, 14.4 s initial population, 16.8 s refresh, 6.5 MB. Paths: 3.5–141.9 ms reads, 8.4 s population, 6.2 s refresh, 11.3 MB.
+- [x] One-million-row request/initial-population/refresh/storage measurements; request plans read only the new views. Signal: 1.8Ã¢â‚¬â€œ77.5 ms reads, 14.4 s initial population, 16.8 s refresh, 6.5 MB. Paths: 3.5Ã¢â‚¬â€œ141.9 ms reads, 8.4 s population, 6.2 s refresh, 11.3 MB.
 - [ ] Measure the full operator workload and sustained refresh/ingest load before a production parity claim. The million-row fixture does not establish that limit.
 - [x] Backup client mismatch and unsupported-DSN cases leave the public API available; valid client export/restore used disposable data only and restored all 35 source migrations. Public preview admin/backup remains disabled.
 - [x] Real preview analytics reconcile with SQL for the materialized window. Browser charts, complete-hour text, small screens and error/empty/retry states are verified. Both MQTT feeds advance and the public browser reports LIVE.
 - [x] Current and rollback server/web artifacts, exact source offers and visible changelog match the running pair. Only the Beacon app restarted; the other 20 containers were preserved. Additive rollup migrations retain observations and are compatible with the previous binary.
 
-The current immediate rollback restores combined frontend `300ee974` with server `c02317a4`. Restore accepted frontend `42ba5fcb` before using the older consolidation server rollback to `5848d200`; its metadata describes the accepted frontend. The September 20 packet-reference rollback to `6be0f762` is an older recovery point. Exact artifacts/runners are retained; application rollback keeps additive rollup views and does not remove history.
+The historical pre-retention rollback restored combined frontend `300ee974` with server `c02317a4`. Restore accepted frontend `42ba5fcb` before using the older consolidation server rollback to `5848d200`; its metadata describes the accepted frontend. The September 20 packet-reference rollback to `6be0f762` is an older recovery point. Exact artifacts/runners are retained; application rollback keeps additive rollup views and does not remove history.
 
 ## Maintainer release handoff
 
-1. The application review queue is accepted. Current dev is server `91b4b457` / web `54b5093a`; choose an explicit release freeze and confirm its exact checks. The older `c02317a4` / `0f0a6ca5` proof does not validate newer schema changes.
-2. Validate migration 038 and database restore/rollback on the Pi before deployment; preserve the chosen retention policy. Deploy the accepted server before dependent pages and verify both endpoints on the intended deployment. The Pi is a development validation target; production cutover remains with the owner.
-3. Follow the server contribution guide for a signed version/Swagger commit, dev-to-main fast-forward, tag and release CI. Web main has the prior release squash `5ac36ce` outside dev ancestry; reconcile that stable history before promotion. Do not overwrite main.
-4. Verify the tag's Actions-built artifacts and matching source. Publish accurate notes, upgrade/retention guidance, known gaps and rollback instructions. Versions/tags have not been chosen by this contribution.
-5. Review the five open issues first when resuming development: server #60/#72/#99/#116 and web #12. Web #67/#71 are closed; broader issues remain partial. After the consolidation release, Channel Activity is the next analytics page; this milestone does not establish full CoreScope parity.
+1. Review current server #166/#167/#169 and web #75/#79/#80/#81. Preserve dependencies; choose an explicit release freeze and validate its actual heads. Ready for review is not owner approval or a published release.
+2. Review migration 039/040 and the verified database-aware recovery boundary. Deploy server metrics before dependent observer pages; retain packet/summary counting definitions and approved retention settings.
+3. Follow each contribution guide for signed version/API commits, main promotion, tags and release CI. Reconcile stable web history instead of overwriting main. No versions or tags were chosen by this contribution.
+4. Verify exact Actions-built release artifacts, corresponding source, upgrade/retention guidance and rollback on the intended deployment. Owners perform the eventual production switch.
+5. Keep broader #60/#72/#99/#116 and web #12 open for their remaining scope. Continue connected investigations after feedback, with the scope-import draft separate. Physical Safari, sustained production workload and a measured month of retained history remain validation gates.
