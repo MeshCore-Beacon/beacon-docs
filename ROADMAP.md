@@ -14,7 +14,11 @@ Opening an observer dashboard keeps one originating screen mounted under its ori
 
 The Pi now serves web `98f820d2b2af5a69faf3f9aaf30d5f14b45feea8` on unchanged server `99e623c5`. Final native build/lint and **929 tests in 106 files** pass; exact-head CI passes (web CodeQL remains skipped). All 18 public assets and both source archives match. Public LIVE, both MQTT feeds and return/keyboard journeys pass. A real packet-list regression is fixed: the retained origin stays invisible/inert with its layout intact. Final public checks preserve 442px scroll and 506px viewport height throughout the visit, plus the selected report URL. No containers restarted. Immediate web rollback is `5a261162` at `web-20260927T210108Z`; the phase-start `3b3abdcc` recovery remains at `web-20260927T202233Z`. Existing database recovery and 72h/30d/720h retention policies are unchanged. All prior review candidates remain included.
 
-**Next:** review feedback and listed issues first, then the next focused web #12 translation slice for the observer directory and quick-detail panels. Node/trace presentation and further reach/timing analytics follow the approved roadmap. MeshMapper scope import still waits for an agreed public endpoint/schema. Maintainers control merges, stable releases and production cutover.
+**Next:** review feedback and listed issues first, then the next focused web #12 translation slice for the observer directory and quick-detail panels. Node/trace presentation and further reach/timing analytics follow the approved roadmap. The public MeshMapper scopes contract is now verified; optional catalogue import is implementable as a separate follow-up, with manual scopes retained. Maintainers control merges, stable releases and production cutover.
+
+## MeshMapper scopes contract — 27 September
+
+The [public API](https://wiki.meshmapper.net/scopes-api/) is available. The documented YOW endpoint returned HTTP 200 and a successful conditional HTTP 304; it requires no API key. The [scope integration plan](app_documentation/mesh-scopes-plan.md) now specifies explicit per-IATA sources, cached refresh, durable last-known-good data, manual-name preservation and separate imported/observed evidence. Group results cannot be attributed to individual member IATAs. The former unpublished-endpoint blocker is removed; the importer and channel tags remain unimplemented. Review feedback and listed issues retain priority. This documentation update changes no application revision, Pi service or review-stack dependency.
 
 ## Saved-route evidence — 27 September
 
@@ -28,7 +32,7 @@ Current preview backend is composed `99e623c56477fd9b667d5f56bfb1a0eff34ecb2b`. 
 
 At the route-evidence checkpoint, the Pi served web `3b3abdcc5bfa85b60c8959715736ea42c3d0bbd8`. The final native build/lint and all **915 tests** pass; exact-head CI passes (web CodeQL remains skipped). Desktop and 390px phone, English/French, copied/shared links, Back, keyboard Close/focus, exact report/node/observer and selected-map journeys were verified. All 18 public assets and both source archives match the tested artifacts. The public page is LIVE; both MQTT feeds are connected. Frontend publication restarted no containers. Web rollback retains `1d5d65e` in `web-20260927T192154Z`; the [source/changelog](https://canadaverse.org/beacon-dev/source.html) lists the complete review composition.
 
-**Follow-up implemented above:** [web #86](https://github.com/MeshCore-Beacon/beacon-web/issues/86): observer quick-inspection Escape handling and broader cross-tab/overlay return navigation. That earlier Escape limitation is addressed by #87; acceptance remains with the maintainer. Node/trace evidence and additional reach/timing analytics follow that connection work. MeshMapper scope import remains a separate draft until the public endpoint/schema is agreed. Broad server #60/#72/#99/#116 and web #12 remain open; this phase does not claim full parity or production capacity. Maintainers retain merges, stable releases and production cutover.
+**Follow-up implemented above:** [web #86](https://github.com/MeshCore-Beacon/beacon-web/issues/86): observer quick-inspection Escape handling and broader cross-tab/overlay return navigation. That earlier Escape limitation is addressed by #87; acceptance remains with the maintainer. Node/trace evidence and additional reach/timing analytics follow that connection work. MeshMapper has now published its scopes contract; the separate import plan is updated, but the integration is not yet implemented. Broad server #60/#72/#99/#116 and web #12 remain open; this phase does not claim full parity or production capacity. Maintainers retain merges, stable releases and production cutover.
 
 ## Packet reception investigation — 27 September
 
@@ -38,7 +42,7 @@ Map projection omits ambiguous/unlocated identities and breaks lines at gaps. Li
 
 At the packet-investigation checkpoint, the Pi ran web `1d5d65e` with server `88c2c10c`. Native build/lint and all **906 tests** pass; focused Windows checks and desktop/390px phone/English/French/keyboard/Back/shared-link checks pass. Public assets and source match, both MQTT feeds are connected, and the frontend publication restarted no services. Earlier review candidates remain included. The [changelog/source](https://canadaverse.org/beacon-dev/source.html) identifies the running build. Maintainers still own merges, stable releases and production cutover.
 
-**Follow-up:** the saved-route evidence phase above implements this API and interface. Remaining work is observer return navigation. Non-packet overlay return navigation remains a separate follow-up. MeshMapper scope import remains a draft pending an agreed public endpoint/schema. Broader server #60/#72/#99/#116 and web #12 remain open; this is a first connected-investigation slice, not full parity.
+**Follow-up:** the saved-route evidence phase above implements this API and interface. Remaining work is observer return navigation. Non-packet overlay return navigation remains a separate follow-up. The separate MeshMapper scope plan now uses the published and verified API; implementation remains queued. Broader server #60/#72/#99/#116 and web #12 remain open; this is a first connected-investigation slice, not full parity.
 
 ## Direction
 
@@ -65,7 +69,7 @@ At the observer-release checkpoint the Pi ran composed server `88c2c10c830034cee
 
 Migration 040 preserves original rows and repairs available archived unknown-payload counts without inventing signal samples. A restored clone passed the migration probe. A fresh private dump was copied off the Pi and its checksum verified; the original schema039 database and matching binary/config/source are retained for DB-aware rollback. Only the Beacon app restarted for the server change; 22 other containers were unchanged. Frontend publication restarted no services. Both MQTT feeds reconnected. Public admin, backup and foreign detection remain disabled.
 
-See the [observer implementation and subsequent UX releases](app_documentation/observer-monitoring-plan.md) and the separate [Mesh Scopes interoperability draft](app_documentation/mesh-scopes-plan.md).
+See the [observer implementation and subsequent UX releases](app_documentation/observer-monitoring-plan.md) and the separate [Mesh Scopes interoperability plan](app_documentation/mesh-scopes-plan.md).
 
 ## Accepted consolidation batch
 
@@ -139,7 +143,7 @@ The September 20 #116 investigation has a new [current-build result](https://git
 1. **Review the current retention/endpoint and observer candidates.** Keep the ordered server #167 -> #169 and web #75 -> #79 -> #80 -> #81 stacks; #166 is independent. Refresh with the existing workflow after acceptance. Maintainers choose the release breakpoint, versions, tags and main promotion.
 2. **Connected investigation.** Connect packets, exact observed paths/routes, reporting observers and map actions with reliable Back navigation and visibly ambiguous identities. Continue focused issue #99/#12 work where it overlaps this accepted scope.
 3. **Node/route/trace presentation, then distinct analytics questions and quality of life.** Follow the approved observer plan's subsequent releases; this phase does not claim full parity.
-4. **Mesh Scopes interoperability.** Draft optional public per-IATA catalogue import while MeshMapper publishes its endpoint/schema; retain manual names and separate observed/default/imported evidence. No speculative API calls or required API key.
+4. **Mesh Scopes interoperability.** The published regional API is verified; implement the optional cached importer, then consistent channel scope tags, using the [integration plan](app_documentation/mesh-scopes-plan.md). Retain manual names and separate observed/default/imported evidence. No API key is required; the importer is not yet shipped.
 
 ## Listed work still open
 
