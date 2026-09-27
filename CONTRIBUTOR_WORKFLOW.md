@@ -14,6 +14,12 @@ Use this workflow to keep small Beacon changes reviewable while reducing manual 
 
 A source conflict still needs review. The helper automates routine history movement; it does not promise that overlapping edits can never conflict, merge upstream PRs, deploy services, or create scheduled jobs.
 
+## Current integration example
+
+The 27 September refresh moved #166 independently and #167 -> #169 together onto accepted server #170. Route evidence #172 then follows #169; its web consumer #85 follows #83. The Pi composition includes every current candidate. Refresh/Publish/Check handles this ancestry once; source conflicts still require review. A history-only change with an identical tree still needs no Pi rebuild.
+
+Current preview is server `99e623c5` / web `3b3abdcc`, validated natively and publicly. The route API must be deployed before its UI. Rollback retains the previous schema040 database plus previous web assets. Follow the [roadmap](ROADMAP.md) for current issues, evidence boundaries and the next navigation slice.
+
 ## Setup
 
 Requires Python 3.10+, Git and an authenticated GitHub CLI. Server validation needs Go and Swag; web validation needs Node/npm. Use the repository's pinned dependency/toolchain requirements.
