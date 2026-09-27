@@ -16,9 +16,9 @@ A source conflict still needs review. The helper automates routine history movem
 
 ## Current integration example
 
-The 27 September refresh moved #166 independently and #167 -> #169 together onto accepted server #170. Route evidence #172 then follows #169; its web consumer #85 follows #83, and navigation #87 follows #85. The Pi composition includes every current candidate. Refresh/Publish/Check handles this ancestry once; source conflicts still require review. A history-only change with an identical tree still needs no Pi rebuild.
+The 27 September refresh moved #166 independently and #167 -> #169 together onto accepted server #170. Route evidence #172 follows #169 and MeshMapper scope import #174 follows #172; its web consumer #85 follows #83, and navigation #87 follows #85. The Pi composition includes every current candidate. Refresh/Publish/Check handles this ancestry once; source conflicts still require review. A history-only change with an identical tree still needs no Pi rebuild.
 
-Current preview is server `99e623c5` / web `98f820d2`, validated natively (929 tests) and publicly. The route API must be deployed before its UI. Rollback retains the previous schema040 database plus previous web assets. Follow the [roadmap](ROADMAP.md) for current issues, evidence boundaries and the next navigation slice.
+Current preview is server `eb99f752` / web `98f820d2`, with native PostgreSQL and exact-head CI/race/security checks. Every existing candidate is retained; only YOW scope import is enabled. Rollback restores original schema041 database `beacon_pre042_20260927` and its matching server/configuration/source. The frontend is unchanged. Follow the [roadmap](ROADMAP.md) for issues, evidence and the next channel-scope slice.
 
 ## Setup
 
