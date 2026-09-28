@@ -1,6 +1,6 @@
 # Mesh Scopes interoperability plan
 
-Updated 27 September 2026 UTC. The [MeshMapper Scopes API](https://wiki.meshmapper.net/scopes-api/) is published and its regional endpoint and conditional caching were checked live. The API-contract blocker is removed. The first importer is implemented in [server PR #174](https://github.com/MeshCore-Beacon/beacon-server/pull/174), following #172 and closing issue #173 on acceptance. It defaults off; channel scope tags remain the next separate slice. Maintainers retain acceptance and release.
+Updated 27 September 2026 UTC. The [MeshMapper Scopes API](https://wiki.meshmapper.net/scopes-api/) is published and its regional endpoint and conditional caching were checked live. The API-contract blocker is removed. The first importer is implemented in [server PR #174](https://github.com/MeshCore-Beacon/beacon-server/pull/174), following #172 and closing issue #173 on acceptance. It defaults off; channel tags are implemented in server #176 / web #89, awaiting acceptance. Maintainers retain acceptance and release.
 
 ## Published contract
 
@@ -32,7 +32,7 @@ Use bounded HTTP timeouts, cached ETags and delayed retries respecting `Retry-Af
 ## Small delivery steps
 
 1. **Optional catalogue import — implemented in #174, awaiting acceptance.** Configuration, validation, cached conditional refresh, durable source membership and last-known-good handling are included. Reuse the existing scope store and name derivation, preserve manual values, and refresh the effective matching catalogue safely. Add operator-visible synchronization status. Import counts remain labelled MeshMapper catalogue counts, separate from Beacon's own observations.
-2. **Channel message scope tags.** Audit existing history/catch-up queries and live message events, then expose the matched packet scope consistently in REST and WebSocket payloads. Add English/French tags, filter context and an explicit unknown state. Importing names does not decrypt a channel or recover already-purged packets. Historical backfill is separate work, not an implicit full-table rescan.
+2. **Channel message scope tags — implemented in server #176 / web #89, awaiting acceptance.** REST history, hash/global lists, catch-up and live events share first-stored-packet metadata. English/French tags, retained-history/live filtering and distinct unscoped, unresolved and unavailable states are included. A later reception does not silently rewrite the first packet evidence. Importing names does not decrypt a channel or recover already-purged packets. Separately, the user enabled the standard Public key on the preview after a restored-copy backfill trial; private keys remain unconfigured.
 3. **Evidence and regional views.** Present advertised defaults, observed forwarding and observer-reported scopes with their own timestamps. Add group catalogues only with honest group-level attribution. Per-repeater imports or app-discovery evidence require a separate published contract; this API cannot supply them.
 
 Do not copy screenshot retention values or change MeshMapper's settings. Existing packet/analytics policies, public admin/backup restrictions and owner-controlled release/cutover remain in force.
@@ -43,4 +43,4 @@ Cover 200/304, empty and zero-count entries, overlapping sources, case/prefix pr
 
 Prove packet matching with a known fixture, including ambiguous candidates; catalogue membership alone is insufficient. For channel tags, reconcile history, catch-up and live delivery and verify English/French desktop/phone behavior. Run bounded native Pi tests and compare ingest CPU before enabling a source. Keep all current review candidates in the preview composition; update its changelog/source and preserve rollback for each application change.
 
-Review feedback and existing issues remain first priority. The importer is a review candidate; public channel tags, group catalogues and regional evidence UI are not implemented by #174. See the roadmap for the exact tested preview revision and retained rollback.
+Review feedback and existing issues remain first priority. The importer is a review candidate; channel tags are delivered by #176/#89; group catalogues and regional evidence UI remain future work. See the roadmap for the exact tested preview revision and retained rollback.
