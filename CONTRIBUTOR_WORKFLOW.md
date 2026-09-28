@@ -1,6 +1,20 @@
 # Contributor workflow
 
-Use this workflow to keep small Beacon changes reviewable while reducing manual branch maintenance. The executable helper is [tools/beacon_stack.py](tools/beacon_stack.py); a CI workflow is included for its [offline regression tests](tools/test_beacon_stack.py).
+Use this workflow to keep small Beacon changes reviewable while reducing manual branch maintenance. The optional contributor helper is [tools/beacon_stack.py](tools/beacon_stack.py); a CI workflow is included for its [offline regression tests](tools/test_beacon_stack.py). Beacon does not run this script during ingestion or at runtime. Maintainers can review and merge through GitHub without installing it.
+
+## Merge commits and when the helper is useful
+
+The current stacks include commits from still-unmerged parent PRs. Squash merging replaces a parent's commits with a new commit; GitHub's rebase-and-merge also creates new SHAs. Children still contain the old parents. The helper records each feature's exact delta so it can repair that history once for the whole queue. It also composes the preview with independent fixes and verifies source and CI identities.
+
+For dependent PRs, **merge commits are the recommended way to retain ancestry**. Merge the parent first, then inspect the child's updated diff and checks. The parent's original commits are now in `dev`, so that history alone no longer requires rewriting the child. Squashing an independent PR without pending descendants remains an option. GitHub documents these [merge methods and the long-running-branch tradeoff](https://docs.github.com/en/pull-requests/reference/pull-request-merges).
+
+This reduces routine stack maintenance; it does not remove source conflicts, API dependencies or required validation. A rule requiring branches to be current can still require an update, and a linear-history rule would prohibit merge commits. Enabling the repository option does not repair ancestors that were already squashed/rebased. Merge in dependency order and inspect each remaining PR; do not merge a child early merely because it includes its parent.
+
+At the 28 September check, both application repos allowed squash/rebase merging and disabled merge commits. Changing that repository setting is a maintainer decision. The visible `dev` rulesets did not list linear-history or up-to-date status-check requirements, but the legacy branch-protection endpoints returned 404; that response is not proof that no other policy applies.
+
+The helper remains useful for the existing queue's integration with new `dev` changes, squash/rebase recovery, conflict isolation, exact combined-preview validation and leased fork updates. It is not an extra GitHub merge gate. Its current `Check`/`Publish` modes deliberately require a refreshed `dev` base; enabling merge commits does not silently change that implementation or make an old preview current. Use ordinary GitHub merging when its checks and dependencies permit it, and use the helper when preparing a current composed candidate. There is no need to run Sync merely to let a maintainer click Merge.
+
+The normal long-term path is a short queue: finish the current review sequence, then start each independent change from fresh `dev`. Keep only real dependencies stacked. Retain the exact built source and existing rollback; a documentation or history-only change with the same source tree needs no application rebuild.
 
 ## Working loop
 
@@ -9,8 +23,8 @@ Use this workflow to keep small Beacon changes reviewable while reducing manual 
 3. Follow each repository's contribution rules. Prefer existing components and feature-owned files; keep shared startup/router/navigation changes in a declared order.
 4. Build and test the change, open its PR against `dev`, then record its exact parent, head, fork branch and worktree in the manifest. Link the parent-to-head comparison in the PR body.
 5. Keep current Beacon contribution PRs out of draft as requested by the contributor, with dependencies visible. Request MrAlders0n's review; if account permissions prevent formal assignment, use an explicit review-request comment instead.
-6. Keep cross-repository rollout order explicit: a new web page waits until its server endpoint is merged **and deployed**. Ready for review does not imply ready to merge.
-7. After merges, run Sync and Check. Rebuild/redeploy the preview only if the composed source changes, preserving the actual running revision and corresponding-source offer.
+6. Keep cross-repository rollout order explicit: deploy a required server API before its web consumer. Development previews may compose declared review candidates; maintainers decide acceptance and production release. Ready for review does not imply ready to merge.
+7. After merges, inspect status and the remaining dependencies. For a refreshed composed preview or history repair, run Sync and Check once for the queue. GitHub review/merge does not require this script. Rebuild/redeploy only if the composed source changes, preserving the actual running revision and corresponding-source offer.
 
 A source conflict still needs review. The helper automates routine history movement; it does not promise that overlapping edits can never conflict, merge upstream PRs, deploy services, or create scheduled jobs.
 
@@ -18,7 +32,10 @@ A source conflict still needs review. The helper automates routine history movem
 
 The 27 September refresh moved #166 independently and #167 -> #169 together onto accepted server #170. Route evidence #172 follows #169 and MeshMapper scope import #174 follows #172; its web consumer #85 follows #83, and navigation #87 follows #85. The Pi composition includes every current candidate. Refresh/Publish/Check handles this ancestry once; source conflicts still require review. A history-only change with an identical tree still needs no Pi rebuild.
 
-Current preview is server `eb99f752` / web `98f820d2`, with native PostgreSQL and exact-head CI/race/security checks. Every existing candidate is retained; only YOW scope import is enabled. Rollback restores original schema041 database `beacon_pre042_20260927` and its matching server/configuration/source. The frontend is unchanged. Follow the [roadmap](ROADMAP.md) for issues, evidence and the next channel-scope slice.
+The public preview manifest verified on 28 September is server `7c9599b1` / web `dfeb2777`, including all current review candidates, the Public key and 504 scope candidates. Its validation and layered recovery are recorded in the [roadmap](ROADMAP.md); use the exact deployed records rather than older examples in this document.
+
+Upstream subsequently accepted ingest buffering #179 and route-reconfirmation batching #180; current server `dev` is `db30c9b5`, and web `dev` is `17f48fb9`. These changes are not in that preview. Their integration and native ingest/route-lock regression checks take priority over the next feature. The helper still reports both queues as needing refresh. No runtime, repository merge setting or helper algorithm was changed by this documentation correction.
+
 
 ## Setup
 
@@ -103,3 +120,7 @@ python -m unittest discover -s tools -p test_beacon_stack.py -v
 ```
 
 Tests cover squash/drop-parent behavior, a fresh phase after all merges, cache reuse, environment changes, independent overlay CI/state/identity checks, missing or pending checks, skipped-job policy, publication races, dirty/default-branch rejection, source conflicts and upstream movement during validation. They use disposable local Git repositories and no GitHub or Pi credentials.
+
+## Document encoding
+
+Markdown is UTF-8. Read and write it with an explicit UTF-8 encoding in scripts, especially when moving between Windows tools. Check both the diff and rendered text before publication. Keep numeric ranges as en dashes and dependency arrows as arrows; do not round-trip the document through a legacy Windows code page.

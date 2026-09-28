@@ -1,6 +1,10 @@
 # Server/web consolidation release
 
-Status: observer-first development preview and review handoff, 27 September 2026. Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
+Status: development preview and review handoff, 28 September 2026. Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
+
+## Current integration gate — 28 September
+
+The preview remains server `7c9599b1` / web `dfeb2777`. Before the next release candidate, integrate upstream ingest buffering #179 and route-reconfirmation batching #180 (`dev` now `db30c9b5`), refresh the dependent queue once, and repeat native burst/route-lock contention checks on the resulting combination. Existing fixture results and the older checkpoints below do not establish lossless production ingestion. Consult the [current roadmap](ROADMAP.md) and [merge workflow](CONTRIBUTOR_WORKFLOW.md) for the queue and recovery boundaries.
 
 ## Packet reception investigation — 27 September
 
@@ -8,13 +12,13 @@ Status: observer-first development preview and review handoff, 27 September 2026
 
 Map projection omits ambiguous/unlocated identities and breaks lines at gaps. Live animations across uncertain chains are suppressed, so fewer speculative lines appear. Unavailable selected paths no longer silently show All paths. A shared-path loading race is fixed by checking the requested packet hash. Packet labels use the existing Noto Sans stack; external basemap emoji-glyph/sprite fallback warnings can still occur.
 
-The Pi now runs web `1d5d65e` with unchanged server `88c2c10c`. Native build/lint and all **906 tests** pass; focused Windows checks and desktop/390px phone/English/French/keyboard/Back/shared-link checks pass. Public assets and source match, both MQTT feeds are connected, and the frontend publication restarted no services. Earlier review candidates remain included. The [changelog/source](https://canadaverse.org/beacon-dev/source.html) identifies the running build. Maintainers still own merges, stable releases and production cutover.
+At the packet-investigation checkpoint, the Pi ran web `1d5d65e` with unchanged server `88c2c10c`. Native build/lint and all **906 tests** pass; focused Windows checks and desktop/390px phone/English/French/keyboard/Back/shared-link checks pass. Public assets and source match, both MQTT feeds are connected, and the frontend publication restarted no services. Earlier review candidates remain included. The [changelog/source](https://canadaverse.org/beacon-dev/source.html) identifies the running build. Maintainers still own merges, stable releases and production cutover.
 
-**Next:** review feedback/issues first, then define a bounded known-route-to-retained-packet/report API with exact-byte versus possible-identity semantics and pagination. Non-packet overlay return navigation remains a separate follow-up. MeshMapper scope import remains a draft pending an agreed public endpoint/schema. Broader server #60/#72/#99/#116 and web #12 remain open; this is a first connected-investigation slice, not full parity.
+**Historical follow-up:** route evidence, observer return navigation and MeshMapper scope import were subsequently delivered as review candidates; see the current roadmap. Broader server #60/#72/#99/#116 and web #12 remain open; this is a first connected-investigation slice, not full parity.
 
 ## Current observer release
 
-The observer-first release is implemented in four focused review candidates: [server #169](https://github.com/MeshCore-Beacon/beacon-server/pull/169) (`60ed339c`, closes #168), [web #79](https://github.com/MeshCore-Beacon/beacon-web/pull/79) (`3a0eb4c8`, closes #76), [web #80](https://github.com/MeshCore-Beacon/beacon-web/pull/80) (`b3a6b088`, closes #77) and [web #81](https://github.com/MeshCore-Beacon/beacon-web/pull/81) (`42ae09b7`, closes #78). All are out of draft. Server #169 follows #167; web order is #75 â†’ #79 â†’ #80 â†’ #81. Independent server #166 remains in the preview composition. Maintainers control acceptance and release; these issues remain open until their changes are accepted.
+The observer-first release is implemented in four focused review candidates: [server #169](https://github.com/MeshCore-Beacon/beacon-server/pull/169) (`91b21995`, closes #168), [web #79](https://github.com/MeshCore-Beacon/beacon-web/pull/79) (`3a0eb4c8`, closes #76), [web #80](https://github.com/MeshCore-Beacon/beacon-web/pull/80) (`b3a6b088`, closes #77) and [web #81](https://github.com/MeshCore-Beacon/beacon-web/pull/81) (`42ae09b7`, closes #78). All are out of draft. Server #169 follows #167; web order is #75 → #79 → #80 → #81. Independent server #166 remains in the preview composition. Maintainers control acceptance and release; these issues remain open until their changes are accepted.
 
 At the observer-release checkpoint the Pi ran composed server `88c2c10c830034cee70a46fca717af518803a544` and web `42ae09b7c6be50cd0f617bad8aea35825be9f12e`, with the [updated changelog and exact source](https://canadaverse.org/beacon-dev/source.html). Raw packets remain 72 hours, archived hourly analytics 30 days, telemetry 720 hours. All four candidates passed their native Pi suites; the final web build passes 895 tests. Server tests use actual PostgreSQL. Windows server/full destination/dashboard validation and 48 focused final comparison/API tests also pass. Desktop, 390-pixel phone, English/French, keyboard, legacy/shared links and Back/search/sort/scroll were checked. Physical iPhone Safari and production-volume capacity remain separate gates.
 
@@ -91,7 +95,7 @@ Current dev is server `91b4b457` / web `54b5093a`, with passing CI/image builds 
 
 - [x] September 20 unmodified Pi stability sample: 600 seconds / 41 samples, both feeds connected, 2,169 retained observations and no MQTT disconnect/deadline or HTTP 5xx. App/PostgreSQL CPU averaged 2.14%/3.96% of one core. This is a bounded health sample, not callback timing, #116 root-cause proof or a production-volume gate. [Result and limits](https://github.com/MeshCore-Beacon/beacon-server/issues/116#issuecomment-5753626821).
 - [x] Native Pi build/test of server `6be0f762` and web `42ba5fc`, including real PostgreSQL-to-HTTP checks and migration retry/concurrent refresh; 786 web tests pass.
-- [x] One-million-row request/initial-population/refresh/storage measurements; request plans read only the new views. Signal: 1.8Ã¢â‚¬â€œ77.5 ms reads, 14.4 s initial population, 16.8 s refresh, 6.5 MB. Paths: 3.5Ã¢â‚¬â€œ141.9 ms reads, 8.4 s population, 6.2 s refresh, 11.3 MB.
+- [x] One-million-row request/initial-population/refresh/storage measurements; request plans read only the new views. Signal: 1.8–77.5 ms reads, 14.4 s initial population, 16.8 s refresh, 6.5 MB. Paths: 3.5–141.9 ms reads, 8.4 s population, 6.2 s refresh, 11.3 MB.
 - [ ] Measure the full operator workload and sustained refresh/ingest load before a production parity claim. The million-row fixture does not establish that limit.
 - [x] Backup client mismatch and unsupported-DSN cases leave the public API available; valid client export/restore used disposable data only and restored all 35 source migrations. Public preview admin/backup remains disabled.
 - [x] Real preview analytics reconcile with SQL for the materialized window. Browser charts, complete-hour text, small screens and error/empty/retry states are verified. Both MQTT feeds advance and the public browser reports LIVE.

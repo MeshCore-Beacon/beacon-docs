@@ -6,7 +6,15 @@ Refresh GitHub issues, PR feedback and branch state before starting a phase. Thi
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
-Latest upstream is server `876d9970` (#177/#178) and web `17f48fb9` (#91). The tested preview retains its exact integrated bases; both review stacks require one helper-managed refresh before the next publication. Do not rebase children independently or relabel existing binaries.
+Latest upstream is server `db30c9b5` (#177–#180) and web `17f48fb9` (#91). The tested preview retains its exact integrated bases; both review stacks require one helper-managed refresh before the next publication. Do not rebase children independently or relabel existing binaries.
+
+## Maintainer feedback and ingest priority — 28 September
+
+The reported garbled ranges and dependency arrows were encoding mistakes in the shared docs. They are corrected as UTF-8 without changing the measurements. The [contributor workflow](CONTRIBUTOR_WORKFLOW.md) now explains why squash/rebase history required the helper and recommends merge commits for dependent PRs. The helper is a contributor integration tool, not part of Beacon ingestion or a maintainer merge prerequisite. Both application repos still have merge commits disabled; maintainers control that setting. No helper behavior or repository settings changed in this documentation update.
+
+Current accepted server `dev` is `db30c9b573357990c41166292e7cf42785c92cc4`, including [#179](https://github.com/MeshCore-Beacon/beacon-server/pull/179) and [#180](https://github.com/MeshCore-Beacon/beacon-server/pull/180). #179 uses bounded workers, preserves each observer’s message order and reduces database work. #180 limits reconfirmation transactions to 1,000 routes, uses a five-second batch timeout and skips busy rows after the maintainer identified ingest blocking. Their published replay/load results are maintainer evidence for those fixtures, not an independently verified production losslessness claim or an explanation of the older CoreScope counter difference.
+
+**Next:** integrate the latest ingest/route changes with the pending review stack once, resolve real source conflicts deliberately, and validate the resulting native Pi build under burst and route-lock contention before resuming feature work. The public preview remains server `7c9599b1` / web `dfeb2777`; it has not yet received #179/#180. Both queues still need a current-base refresh. Owners retain merges and production release.
 
 ## Canada/US scope coverage and packet layout — 28 September
 
@@ -166,7 +174,7 @@ Current broader issues remain server #60 (admin), #72 (backup/import), #99 (pack
 
 The path page counts stored receptions, not unique devices. Flood paths accumulate entries, while direct routes carry remaining entries. Observed widths do not establish device capability or collision rates. Signal readings describe reception at the reporting observer rather than a complete end-to-end link.
 
-The September 20 review correction moves both new aggregate APIs onto materialized hourly snapshots, preserving reception/region semantics and normalizing polling windows to UTC hours. In a rolled-back million-row Pi fixture, Signal request queries took 1.8Ã¢â‚¬â€œ77.5 ms and Paths 3.5Ã¢â‚¬â€œ141.9 ms across custom/generic plans. Initial population took 14.4/8.4 seconds, refresh 16.8/6.2 seconds, and view/index storage was 6.5/11.3 MB respectively. These measurements cover the fixture, not the full production workload. See the [release consolidation checklist](RELEASE-CHECKLIST.md) for remaining gates.
+The September 20 review correction moves both new aggregate APIs onto materialized hourly snapshots, preserving reception/region semantics and normalizing polling windows to UTC hours. In a rolled-back million-row Pi fixture, Signal request queries took 1.8–77.5 ms and Paths 3.5–141.9 ms across custom/generic plans. Initial population took 14.4/8.4 seconds, refresh 16.8/6.2 seconds, and view/index storage was 6.5/11.3 MB respectively. These measurements cover the fixture, not the full production workload. See the [release consolidation checklist](RELEASE-CHECKLIST.md) for remaining gates.
 
 September 20 validation covered native Go/PostgreSQL/HTTP behavior and **786 web tests**, plus private backup compatibility, feature-only startup failure, TLS/password files, cancellation and schema/data/sequence restoration. That review update passed 390/1280px browser checks, with ten distinct glyphs and complete-hour text; earlier chart checks also covered 320/768px. This is historical evidence for the unchanged feature code. Current revisions and corresponding-source archives are on the preview's changelog page.
 
