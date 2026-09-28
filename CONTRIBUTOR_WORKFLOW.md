@@ -30,12 +30,11 @@ A source conflict still needs review. The helper automates routine history movem
 
 ## Current integration example
 
-The 27 September refresh moved #166 independently and #167 -> #169 together onto accepted server #170. Route evidence #172 follows #169 and MeshMapper scope import #174 follows #172; its web consumer #85 follows #83, and navigation #87 follows #85. The Pi composition includes every current candidate. Refresh/Publish/Check handles this ancestry once; source conflicts still require review. A history-only change with an identical tree still needs no Pi rebuild.
+The 28 September coordinated refresh integrates server dev `db30c9b5` (#177–#180) and web dev `17f48fb9` (#91). Server #166 stays independent; #167 -> #169 -> #172 -> #174 -> #176 is the ordered server chain. Web #75 -> #79 -> #80 -> #81 -> #83 -> #85 -> #87 -> #89 -> #92 remains one declared chain. Only #166 had a source conflict; it was resolved with advert/repeat regressions before publication. Both full-stack Check commands pass for all fifteen exact published heads.
 
-The public preview manifest verified on 28 September is server `7c9599b1` / web `dfeb2777`, including all current review candidates, the Public key and 504 scope candidates. Its validation and layered recovery are recorded in the [roadmap](ROADMAP.md); use the exact deployed records rather than older examples in this document.
+The Pi runs composed server `2ed2e031` / web `6b688495`, retaining every current feature. Native database/queue/route-lock checks and all 935 web tests pass. All 18 rebuilt web assets are byte-identical to the prior geometry-tested build; the corresponding source offer identifies the actual refreshed source. Same-schema rollback preserves new rows. See [validation and exact PR heads](app_documentation/ingest-integration-20260928.md).
 
-Upstream subsequently accepted ingest buffering #179 and route-reconfirmation batching #180; current server `dev` is `db30c9b5`, and web `dev` is `17f48fb9`. These changes are not in that preview. Their integration and native ingest/route-lock regression checks take priority over the next feature. The helper still reports both queues as needing refresh. No runtime, repository merge setting or helper algorithm was changed by this documentation correction.
-
+Merge commits remain disabled in both application repos, and the contributor has READ access. A maintainer must enable that option. This integration changes no merge policy or helper algorithm; it uses the existing isolated conflict stop, cached validation, leased publication and exact-head checks. Native tests and public/runtime checks supplement CI when combined behavior changes.
 
 ## Setup
 

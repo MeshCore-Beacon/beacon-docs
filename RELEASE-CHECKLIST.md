@@ -4,7 +4,11 @@ Status: development preview and review handoff, 28 September 2026. Stable tags a
 
 ## Current integration gate — 28 September
 
-The preview remains server `7c9599b1` / web `dfeb2777`. Before the next release candidate, integrate upstream ingest buffering #179 and route-reconfirmation batching #180 (`dev` now `db30c9b5`), refresh the dependent queue once, and repeat native burst/route-lock contention checks on the resulting combination. Existing fixture results and the older checkpoints below do not establish lossless production ingestion. Consult the [current roadmap](ROADMAP.md) and [merge workflow](CONTRIBUTOR_WORKFLOW.md) for the queue and recovery boundaries.
+The Pi preview now runs server `2ed2e031` / web `6b688495`, integrating upstream server #177–#180 and web #91 with all fifteen pending candidates. Both queues pass current-base Check and actual published-head CI (web CodeQL skipped). Full native server/PostgreSQL and 935 web tests pass. The isolated 3,200-input/504-scope replay preserves expected rows and events under route-lock contention with zero drops; both actual inputs advanced during a 63-second observation. This does not establish universal lossless production ingestion or explain the historical counter difference.
+
+Fresh source/18-asset verification and desktop/French-phone smoke checks pass. Only the Beacon app restarted; other services and schema042/configuration stayed intact. A fresh dump restored and was verified off-Pi; current and rollback binary/frontend/source remain. See [exact heads, evidence and recovery](app_documentation/ingest-integration-20260928.md).
+
+Remaining before further feature work: review feedback, then [server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181) timestamp parsing. Input timestamp/region warnings remain. Physical iPhone Safari, production-volume capacity, broad partial issues and maintainer release acceptance remain distinct gates. Enabling merge commits requires a maintainer; the contributor's account is READ.
 
 ## Packet reception investigation — 27 September
 
@@ -16,7 +20,7 @@ At the packet-investigation checkpoint, the Pi ran web `1d5d65e` with unchanged 
 
 **Historical follow-up:** route evidence, observer return navigation and MeshMapper scope import were subsequently delivered as review candidates; see the current roadmap. Broader server #60/#72/#99/#116 and web #12 remain open; this is a first connected-investigation slice, not full parity.
 
-## Current observer release
+## Observer release checkpoint — 27 September
 
 The observer-first release is implemented in four focused review candidates: [server #169](https://github.com/MeshCore-Beacon/beacon-server/pull/169) (`91b21995`, closes #168), [web #79](https://github.com/MeshCore-Beacon/beacon-web/pull/79) (`3a0eb4c8`, closes #76), [web #80](https://github.com/MeshCore-Beacon/beacon-web/pull/80) (`b3a6b088`, closes #77) and [web #81](https://github.com/MeshCore-Beacon/beacon-web/pull/81) (`42ae09b7`, closes #78). All are out of draft. Server #169 follows #167; web order is #75 → #79 → #80 → #81. Independent server #166 remains in the preview composition. Maintainers control acceptance and release; these issues remain open until their changes are accepted.
 
