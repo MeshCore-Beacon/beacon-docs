@@ -6,6 +6,8 @@ Refresh GitHub issues, PR feedback and branch state before starting a phase. Thi
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
+Final upstream refresh note: server #177 merged as `90f9b506` during channel-phase verification. The published server candidates and Pi composition below remain based on `dec643a2`. Their exact-head CI passes, but the stack helper requires one batch refresh before the next server publication; the validated running artifacts have not been relabelled. Web Check is current.
+
 ## Channel scope investigation and Public channel — 27 September
 
 [Server #176](https://github.com/MeshCore-Beacon/beacon-server/pull/176) (`7fc631e8`, follows #174, closes #175) and [web #89](https://github.com/MeshCore-Beacon/beacon-web/pull/89) (`e7618fd7`, follows #87, closes #88) expose first-recorded packet scope consistently in history, catch-up and live messages. The interface adds scope filtering, packet inspection, distinct unknown/unavailable/unscoped states and English/French explanations. Duplicate broker messages and live arrivals during a history request preserve the existing page cursor and message counts. Imported catalogue names alone are not forwarding evidence.
