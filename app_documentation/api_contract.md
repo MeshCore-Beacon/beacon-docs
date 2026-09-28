@@ -910,6 +910,22 @@ All scope fields are optional. Omitted = no filter on that dimension. Empty arra
 
 Server replies with `pong { id: "p-1" }`. Client should ping every 30s; server closes idle connections after 90s.
 
+**`configure`**: connection-wide options, separate from subscriptions. Every `configure` sets all flags to exactly the values sent, so an omitted flag turns off. All default to false.
+
+```json
+{ "v": 1, "type": "configure", "id": "cfg-1", "resolvePath": true, "includeObserverKey": false, "includeRepeats": false }
+```
+
+- `resolvePath`: `packetObservation` events carry per-hop `observation.resolvedPath`.
+- `includeObserverKey`: `packetObservation` events carry `observation.observerPublicKey`.
+- `includeRepeats`: also stream later hearings of a packet by an observer that already reported it, when they arrive over a new path. See below.
+
+Server replies with `configured`, echoing all three flags:
+
+```json
+{ "v": 1, "type": "configured", "id": "cfg-1", "resolvePath": true, "includeObserverKey": false, "includeRepeats": false }
+```
+
 ### Server → Client events
 
 All server events have `v`, `type`, and `event` body. They carry no `id` since they're unsolicited (replies to client requests echo the original `id`).
@@ -952,6 +968,8 @@ All server events have `v`, `type`, and `event` body. They carry no `id` since t
 ```
 
 `isFirstObservation: true` means this is the first time this packet has been seen, so the UI should add a new row. `false` means UI should update the existing packet row's observation count and timestamp, and if the packet is currently expanded, append the new observation card.
+
+Connections with `includeRepeats` also get repeats, which have `packet.isRepeat: true`. A repeat is a later hearing of the packet by an observer that already reported it, arriving over a different path, for example after a repeater further out rebroadcast it. Repeats are never stored, so they don't appear in REST reads. They carry `observationCount: 0` and `isFirstObservation: false`, so don't treat them as count updates. Exact copies (the same path again, or the same hearing via another broker) are not sent. When the server is busy, repeats are dropped before any other event. Without `includeRepeats` the key is absent.
 
 **`observerStatus`**: emitted when an observer's `/status` message updates them. Used for the Observer Status grid (online/offline transitions, battery curves, etc.).
 
