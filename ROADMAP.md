@@ -1,12 +1,24 @@
 # Beacon parity and analytics roadmap
 
-Updated 27 September 2026 UTC. This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
+Updated 28 September 2026 UTC. This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
 Refresh GitHub issues, PR feedback and branch state before starting a phase. This document is a snapshot, and linked issues/PRs are the current source of truth.
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
-Final upstream refresh note: server #177 merged as `90f9b506` during channel-phase verification. The published server candidates and Pi composition below remain based on `dec643a2`. Their exact-head CI passes, but the stack helper requires one batch refresh before the next server publication; the validated running artifacts have not been relabelled. Web Check is current.
+Latest upstream is server `876d9970` (#177/#178) and web `17f48fb9` (#91). The tested preview retains its exact integrated bases; both review stacks require one helper-managed refresh before the next publication. Do not rebase children independently or relabel existing binaries.
+
+## Canada/US scope coverage and packet layout — 28 September
+
+The preview now has **504 exact-case scope candidates**: 261 distinct names from all 237 published Canadian/US regional scope catalogues, plus lowercase IATA/group, province/state, district/territory and country fallbacks. It covers 244 currently known region codes, all 13 Canadian province/territory codes, all 50 US states, DC and five US territories, and includes `#ca`, `#can`, `#us`, `#usa` and `#na`. Counts overlap; do not add these categories together. Published mixed-case names are preserved because case changes the key. Named scopes are not geographic boundaries or evidence of repeater use.
+
+The reported “Test 4” packet uniquely matches `#ykf`; its original unresolved label remains unchanged. Fresh “Ykf test” and “This is scoped to ykf only” messages now resolve as `#ykf`. A read-only audit of 932 retained transport packets found 670 unique candidate matches, 255 without a known match and seven short-code collisions. Unknown custom names cannot be recovered from these codes alone. Observer/neighbor reports currently contained only the wildcard `*`, so they supplied no additional names. No historical labels were rewritten. The native Pi matcher passes the captured-packet regression and measured a median 0.55ms for a full 504-name scan; this is not a production-capacity claim.
+
+See the [candidate snapshot and provenance](app_documentation/north-american-scope-candidates.json). This is a recorded catalogue snapshot, with the existing automatic YOW importer still active. For subsequent scope work, refresh Canadian/US published catalogues and observed IATA/report names within API cache/rate limits, retain manual fallbacks and surface unresolved/ambiguous codes. Do not claim an undisclosed recurring all-region discovery service. Arbitrary private names still require a published catalogue or an explicit supplied/reported name.
+
+[Web #92](https://github.com/MeshCore-Beacon/beacon-web/pull/92), `dfeb2777`, follows #89 and closes #90. It gives the route label and scope separate lines within a 128px track, preserving 37px rows and exact scope case. Long tags remain inside phone cards. A real browser geometry check reproduced the spill before the fix and passed afterward, including the user's `BB2F2752` row. Desktop, 768px table, 390px phone, keyboard and English/French public checks pass. All 935 tests pass on Windows and the Pi, as does exact-head CI; existing warnings remain and web CodeQL is skipped.
+
+The Pi now serves web `dfeb277756b1a9b230d7e7e0f2d45d62713bf45b` with unchanged server `7c9599b1`, every prior candidate, and the updated [source/changelog](https://canadaverse.org/beacon-dev/source.html). All 18 assets and both source archives match. Both inputs and public LIVE are verified; frontend publication restarted no containers. Application merges/releases remain owner-controlled. New upstream server #177/#178 and web #91 require the next single helper-managed stack refresh; the running source is not relabelled as those newer heads.
 
 ## Channel scope investigation and Public channel — 27 September
 
