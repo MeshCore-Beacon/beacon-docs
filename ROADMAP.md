@@ -1,12 +1,24 @@
 # Beacon parity and analytics roadmap
 
-Updated 28 September 2026 UTC. This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
+Updated 29 September 2026 (Toronto). This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
 Refresh GitHub issues, PR feedback and branch state before starting a phase. This document is a snapshot, and linked issues/PRs are the current source of truth.
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
-Latest integrated upstream is server `db30c9b5` (#177–#180) and web `17f48fb9` (#91). One coordinated Refresh/Publish/Check pass is complete. The Pi now runs composed server `2ed2e031` / web `6b688495`, including all fifteen review candidates; use the current heads below rather than historical checkpoint SHAs. Recheck upstream before new work.
+Accepted and integrated bases remain server `db30c9b5` / web `17f48fb9`. The current tested preview is server `a35cba1d` / web `e1133ab5`, with all seventeen application review candidates. The sections below retain dated historical checkpoints; use the September 29 record for current heads and rollback.
+
+## Review corrections and history windows — 29 September
+
+All six server reviews are addressed in their existing PR sequence. The fixes restore analytics indexes, consolidate unmerged migrations, preserve current partial activity buckets, align cache windows, narrow the route index, keep manual scope priority and simplify channel insertion metadata. Independent server #184 fixes RFC3339 offsets; new web #95 follows #92 and matches time choices to retained data. Existing candidates remain included.
+
+The Pi runs server `a35cba1d` / web `e1133ab5`. All seventeen published application heads pass Check/CI (web CodeQL skipped); native Go/PostgreSQL and Windows/Pi web build/lint/all 940 tests pass. The restored-copy repair preserved raw rows and archive fingerprints, and rollback index restoration passed. A 3,200-input/504-scope replay had all expected rows/events and zero fixture drops. The one-minute live sample had no parser fallbacks, queue overflows, SQL errors, restarts or reconnects; malformed-IATA and clock-skew warnings remain.
+
+Visible periods are **24h / 3d** for observer monitoring and route evidence, and **24h / 3d / 30d** for summary-backed Analytics. Seven-day buttons are removed. Raw comparison spans are capped at three days. Durable hourly aggregates already preserve expired packet counts; materialized views combine them with live rows. Older summaries accumulate after archiving starts, and packet detail remains unavailable after expiry. Revised labels and notes are English/French.
+
+Current acceptance still requires maintainer re-review, especially #167/#169/#174. No upstream merge, stable release or production cutover was performed. The next focused issue is server #183 (saved-route prefix-width changes); broad partial issues remain open. External server #182 and web #93 are unmerged and not in this tested composition. Owners decide the release breakpoint and production switch.
+
+[Exact current heads, validation and recovery](app_documentation/review-release-20260929.md).
 
 ## Ingest integration delivered — 28 September
 
@@ -14,9 +26,9 @@ The upstream ingest queue and bounded route-reconfirmation changes are integrate
 
 All fifteen published application heads pass checks (web CodeQL remains skipped). The composed native Pi server/PostgreSQL suite passes. With 504 scope candidates and blocked route maintenance, an isolated 3,200-input replay preserved the expected 100 packets, 800 observations, 100 decrypted messages and 2,400 opt-in live events with zero queue drops. Native web build/lint and all 935 tests pass. All 18 public assets and both source archives match; English desktop, French phone, scoped packet rows, Public history and packet inspection pass. This is bounded fixture evidence, not proof of universal production losslessness.
 
-Both real MQTT feeds advanced during the 63-second runtime observation with no restarts or queue-overflow errors. Malformed region and timestamp warnings remain. Valid whole-second timestamps with numeric UTC offsets expose a pre-existing parser gap, now [server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181). Fix that next, after checking new reviews/issues; then resume optional MeshMapper boundaries. The older CoreScope legacy-counter gap remains unexplained.
+Both real MQTT feeds advanced during the 63-second runtime observation with no restarts or queue-overflow errors. Malformed region and timestamp warnings remain. Valid whole-second timestamps with numeric UTC offsets expose a pre-existing parser gap, now [server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181). That parser correction is now in #184; see the September 29 record for current priority. The older CoreScope legacy-counter gap remains unexplained.
 
-Current preview: server `2ed2e03117f6c88795d446456e6d74c20c485d28` / web `6b6884951a3dac01b592dfec83f0191879c5696c`. Configuration, schema042, Public key, 504 exact-case candidates, YOW importer and 72h/30d/720h retention are unchanged. A fresh dump restored successfully and was checksum-verified off the Pi. Only Beacon restarted; the other 22 containers were unchanged. Same-schema rollback retains new data and restores server `7c9599b1` / web `dfeb2777` from `ingest-cutover-20260928T222830Z`; frontend-only recovery is `web-20260928T224458Z` paired with the new backend. Exact procedures and current PR heads are in the integration record below.
+September 28 checkpoint: server `2ed2e03117f6c88795d446456e6d74c20c485d28` / web `6b6884951a3dac01b592dfec83f0191879c5696c`. Configuration, schema042, Public key, 504 exact-case candidates, YOW importer and 72h/30d/720h retention are unchanged. A fresh dump restored successfully and was checksum-verified off the Pi. Only Beacon restarted; the other 22 containers were unchanged. Same-schema rollback retains new data and restores server `7c9599b1` / web `dfeb2777` from `ingest-cutover-20260928T222830Z`; frontend-only recovery is `web-20260928T224458Z` paired with the new backend. Exact procedures and current PR heads are in the integration record below.
 
 The shared UTF-8 corrections and merge guidance remain in place. Both application repos still disable merge commits; the contributor has READ access, so a maintainer must enable that setting. The helper remains optional for maintainers and unrelated to ingestion. Owners retain upstream merges and production release.
 
@@ -190,8 +202,8 @@ The September 24 consolidation check built accepted server `c02317a4` and retain
 
 The September 20 #116 investigation has a new [current-build result](https://github.com/MeshCore-Beacon/beacon-server/issues/116#issuecomment-5753626821): a 600-second unmodified Pi capture kept both feeds connected and retained 2,169 new observations, with no ping timeout, disconnect, deadline, SQLSTATE error or HTTP 5xx response. App/PostgreSQL CPU averaged 2.14%/3.96% of one core. The preceding 3h39 log likewise has no MQTT loss or deadline error. Timestamp warnings were classified separately. This did not measure callback or pool-acquisition duration and does not establish the original cause or production capacity. No application, ordering, acknowledgement or service change was made; #116 remains open. Further capture should follow a recurrence or meaningful workload change, rather than repeatedly sampling the same healthy state.
 
-1. **Reviews and listed issues first.** Fix [server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181), accepting valid numeric-offset packet timestamps with explicit regressions and unchanged time guards. Recheck feedback before starting; broad partial issues remain open.
-2. **Accept the current queue in dependency order.** Server #167 -> #169 -> #172 -> #174 -> #176; independent #166. Web #75 -> #79 -> #80 -> #81 -> #83 -> #85 -> #87 -> #89 -> #92. Use the published-head table in the integration record. Maintainers choose merges, the release breakpoint, versions, tags and main promotion.
+1. **Reviews and listed issues first.** The #181 correction is submitted as #184. Next address [server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183), preserving honest saved-route evidence when prefix widths change. Recheck maintainer feedback first; broad partial issues remain open.
+2. **Accept the current queue in dependency order.** Server #167 -> #169 -> #172 -> #174 -> #176; independent #166. Web #75 -> #79 -> #80 -> #81 -> #83 -> #85 -> #87 -> #89 -> #92 -> #95. Independent server #184 follows dev. Use the published-head table in the integration record. Maintainers choose merges, the release breakpoint, versions, tags and main promotion.
 3. **Optional MeshMapper boundaries.** Scope import and channel tags are already implemented in #174/#176/#89. Next use the [boundary plan](app_documentation/meshmapper-boundaries-plan.md), preserving manual boundary priority, cached valid geometry and separate scope/forwarding evidence. Crossing analytics remain a later focused slice.
 4. **Connected investigation and presentation.** Packet/route/observer links and return navigation are delivered for review. Continue node/trace presentation, distinct analytics questions and quality of life under the approved observer plan; address #99/#12 where the work overlaps. Full parity is not yet claimed.
 
@@ -199,7 +211,9 @@ The September 20 #116 investigation has a new [current-build result](https://git
 
 | Issue | Remaining scope |
 |---|---|
-| [Server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181) | Whole-second RFC3339 numeric-offset packet timestamps fall back to server time; add parser correction and regressions |
+| [Server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181) | Fixed by #184; awaits maintainer acceptance |
+| [Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) | Saved-route hash-prefix metadata can lag a change of width; next focused issue |
+| [Web #94](https://github.com/MeshCore-Beacon/beacon-web/issues/94) | Corrected periods/labels in #95; awaits acceptance |
 | [Server #116](https://github.com/MeshCore-Beacon/beacon-server/issues/116) | #179/#180 are integrated and pass bounded replay/route-lock checks; attributing the historical incident still requires matching evidence |
 | [Server #99](https://github.com/MeshCore-Beacon/beacon-server/issues/99) | Advert names and ACK/TRACE/PING references are accepted; define any remaining packet-type formats |
 | [Server #60](https://github.com/MeshCore-Beacon/beacon-server/issues/60) | Remaining administration/worker/persistence behavior; account records do not establish login sessions |

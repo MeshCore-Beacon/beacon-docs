@@ -1,14 +1,18 @@
 # Server/web consolidation release
 
-Status: development preview and review handoff, 28 September 2026. Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
+Status: development preview and review handoff, 29 September 2026 (Toronto). Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
 
-## Current integration gate — 28 September
+## Current integration gate — 29 September
 
-The Pi preview now runs server `2ed2e031` / web `6b688495`, integrating upstream server #177–#180 and web #91 with all fifteen pending candidates. Both queues pass current-base Check and actual published-head CI (web CodeQL skipped). Full native server/PostgreSQL and 935 web tests pass. The isolated 3,200-input/504-scope replay preserves expected rows and events under route-lock contention with zero drops; both actual inputs advanced during a 63-second observation. This does not establish universal lossless production ingestion or explain the historical counter difference.
+All six server reviews are addressed in their existing PR sequence. The fixes restore analytics indexes, consolidate unmerged migrations, preserve current partial activity buckets, align cache windows, narrow the route index, keep manual scope priority and simplify channel insertion metadata. Independent server #184 fixes RFC3339 offsets; new web #95 follows #92 and matches time choices to retained data. Existing candidates remain included.
 
-Fresh source/18-asset verification and desktop/French-phone smoke checks pass. Only the Beacon app restarted; other services and schema042/configuration stayed intact. A fresh dump restored and was verified off-Pi; current and rollback binary/frontend/source remain. See [exact heads, evidence and recovery](app_documentation/ingest-integration-20260928.md).
+The Pi runs server `a35cba1d` / web `e1133ab5`. All seventeen published application heads pass Check/CI (web CodeQL skipped); native Go/PostgreSQL and Windows/Pi web build/lint/all 940 tests pass. The restored-copy repair preserved raw rows and archive fingerprints, and rollback index restoration passed. A 3,200-input/504-scope replay had all expected rows/events and zero fixture drops. The one-minute live sample had no parser fallbacks, queue overflows, SQL errors, restarts or reconnects; malformed-IATA and clock-skew warnings remain.
 
-Remaining before further feature work: review feedback, then [server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181) timestamp parsing. Input timestamp/region warnings remain. Physical iPhone Safari, production-volume capacity, broad partial issues and maintainer release acceptance remain distinct gates. Enabling merge commits requires a maintainer; the contributor's account is READ.
+Visible periods are **24h / 3d** for observer monitoring and route evidence, and **24h / 3d / 30d** for summary-backed Analytics. Seven-day buttons are removed. Raw comparison spans are capped at three days. Durable hourly aggregates already preserve expired packet counts; materialized views combine them with live rows. Older summaries accumulate after archiving starts, and packet detail remains unavailable after expiry. Revised labels and notes are English/French.
+
+Current acceptance still requires maintainer re-review, especially #167/#169/#174. No upstream merge, stable release or production cutover was performed. The next focused issue is server #183 (saved-route prefix-width changes); broad partial issues remain open. External server #182 and web #93 are unmerged and not in this tested composition. Owners decide the release breakpoint and production switch.
+
+See [review corrections, source heads and recovery](app_documentation/review-release-20260929.md). No stable release is claimed until maintainers accept the reviewed application heads and choose the release artifacts.
 
 ## Packet reception investigation — 27 September
 

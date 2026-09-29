@@ -30,11 +30,11 @@ A source conflict still needs review. The helper automates routine history movem
 
 ## Current integration example
 
-The 28 September coordinated refresh integrates server dev `db30c9b5` (#177–#180) and web dev `17f48fb9` (#91). Server #166 stays independent; #167 -> #169 -> #172 -> #174 -> #176 is the ordered server chain. Web #75 -> #79 -> #80 -> #81 -> #83 -> #85 -> #87 -> #89 -> #92 remains one declared chain. Only #166 had a source conflict; it was resolved with advert/repeat regressions before publication. Both full-stack Check commands pass for all fifteen exact published heads.
+The September 29 review pass preserves the accepted dev bases and updates each affected server PR through the existing helper. Two authored merges kept both the new observer documentation and route section, and both query groups in queries.sql. SQLc/Swagger outputs were regenerated. Server #166/#184 remain independent; the ordered chain is #167 -> #169 -> #172 -> #174 -> #176. Web #95 is a new child of #92; none of the nine existing web parents needed rebasing.
 
-The Pi runs composed server `2ed2e031` / web `6b688495`, retaining every current feature. Native database/queue/route-lock checks and all 935 web tests pass. All 18 rebuilt web assets are byte-identical to the prior geometry-tested build; the corresponding source offer identifies the actual refreshed source. Same-schema rollback preserves new rows. See [validation and exact PR heads](app_documentation/ingest-integration-20260928.md).
+Both full-stack Check commands pass for all seventeen actual application heads. The Pi runs server a35cba1d / web e1133ab5 with validated database repair/rollback and 940 web tests. See [current heads and evidence](app_documentation/review-release-20260929.md). All candidates are out of draft; requested-change reviews still need maintainer re-review.
 
-Merge commits remain disabled in both application repos, and the contributor has READ access. A maintainer must enable that option. This integration changes no merge policy or helper algorithm; it uses the existing isolated conflict stop, cached validation, leased publication and exact-head checks. Native tests and public/runtime checks supplement CI when combined behavior changes.
+Merge commits remain disabled and contributor permission remains READ. A maintainer must enable that repository option. No helper algorithm or repository policy changed in this phase. Continue from fresh dev after acceptance and stack only real dependencies.
 
 ## Setup
 
