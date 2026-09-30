@@ -16,6 +16,8 @@ The helper remains useful for the existing queue's integration with new `dev` ch
 
 The normal long-term path is a short queue: finish the current review sequence, then start each independent change from fresh `dev`. Keep only real dependencies stacked. Retain the exact built source and existing rollback; a documentation or history-only change with the same source tree needs no application rebuild.
 
+The My Atlas phase is one feature PR, web #97 after #95. It reused the published tip without rebasing earlier parents; source, checks and recovery are recorded in [the My Atlas handoff](app_documentation/my-atlas-20260929.md).
+
 ## Working loop
 
 1. Refresh issues, review feedback and the [roadmap](ROADMAP.md). Choose one logical API, page or correction.

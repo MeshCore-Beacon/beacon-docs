@@ -6,9 +6,25 @@ Refresh GitHub issues, PR feedback and branch state before starting a phase. Thi
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
-Accepted and integrated bases remain server `db30c9b5` / web `17f48fb9`. The current tested preview is server `a35cba1d` / web `e1133ab5`, with all seventeen application review candidates. The sections below retain dated historical checkpoints; use the September 29 record for current heads and rollback.
+Accepted and integrated bases remain server `db30c9b5` / web `17f48fb9`. The current tested preview is server `a35cba1d` / web `4fd4b0de`, with all eighteen application review candidates. The sections below retain dated historical checkpoints; use the My Atlas September 29 record for current heads and rollback.
 
-## Review corrections and history windows — 29 September
+## My Atlas delivered for review — 29 September
+
+[Exact feature, validation and recovery](app_documentation/my-atlas-20260929.md).
+
+[Web #97](https://github.com/MeshCore-Beacon/beacon-web/pull/97), `4fd4b0de`, is the single My Atlas feature PR requested by the contributor. It follows #95 at `e1133ab5` and closes [web #96](https://github.com/MeshCore-Beacon/beacon-web/issues/96) on acceptance. Earlier application PRs remain included; no parent was rebased for this feature.
+
+My Atlas sits in the desktop tab row and the phone More menu. Visitors save up to twelve full-key node identities, order and a 24h/3d window in this browser. Compact cards show reception bars, SNR/RSSI meters and server freshness; Heard by and statistics expand on demand. Search collapses on return visits. Node, observer/dashboard and exact packet/path investigation reuse the existing navigation. English and French ship together.
+
+Counts are explicitly the latest **200 retained origin-key reports per node**, filtered to the selected period. Companion requests and other identified-origin packets are included as well as adverts. This is not a complete node-traffic total. Heard by describes the latest loaded packet, not lifetime reach. Missing readings, expired details and incomplete samples remain visible; no radio-health or packet-loss score is invented.
+
+The Pi now runs unchanged server `a35cba1d` with web `4fd4b0de`. Windows and native Pi build/lint/all **960 tests** pass, along with the actual published-head CI (web CodeQL skipped). Desktop, French 390px phone, keyboard, persistence/order/removal, packet/observer links and dashboard Back checks pass. The public 19 assets and both source archives match, both MQTT feeds are connected, and all 24 container identities/restart counts are unchanged. Physical iPhone Safari and full production capacity remain separate release gates.
+
+[My Atlas preview](https://canadaverse.org/beacon-dev/?tab=MyAtlas) · [Changelog and source](https://canadaverse.org/beacon-dev/source.html). Frontend rollback restores `e1133ab5` with server `a35cba1d`, from `web-20260930T004937Z`. For an older backend rollback, restore this frontend first, then use the existing September 29 backend recipe; its guard intentionally rejects an unknown newer frontend.
+
+The contributor explicitly prioritized My Atlas for this phase. Next: refresh maintainer feedback and issues, then server #183 before optional MeshMapper boundaries. Broader issues and remaining parity work stay open. All eighteen application candidates are out of draft; maintainers retain acceptance, merges, stable releases and production cutover.
+
+## Earlier review corrections and history windows — 29 September
 
 All six server reviews are addressed in their existing PR sequence. The fixes restore analytics indexes, consolidate unmerged migrations, preserve current partial activity buckets, align cache windows, narrow the route index, keep manual scope priority and simplify channel insertion metadata. Independent server #184 fixes RFC3339 offsets; new web #95 follows #92 and matches time choices to retained data. Existing candidates remain included.
 
