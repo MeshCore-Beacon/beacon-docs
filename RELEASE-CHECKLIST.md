@@ -23,7 +23,9 @@ record](app_documentation/release-132-preparation.md) and dated evidence documen
 - [x] Both deployment templates accept explicit production/development image references
   and matching URLs; missing image selection fails before deployment.
 - [x] Native server/PostgreSQL tests, restored-copy migration and bounded ingestion
-  replay pass. These checks do not establish production capacity.
+  replay pass, together with all 1,035 Windows/Pi web tests. Migration 045
+  preserves raw counts and retained telemetry; removed partial rows are privately
+  backed up. These checks do not establish production capacity.
 - [x] Source/assets, public reads, fresh packets and 26 boundaries are verified on
   the review preview. Active revisions and the frontend receipt are in the
   [candidate manifest](app_documentation/release-140-heads.json).
@@ -33,8 +35,8 @@ record](app_documentation/release-132-preparation.md) and dated evidence documen
 ## Alderson's release gates
 
 - [ ] Review/accept server #189, web #105 and docs #5. Verify CI on the actual
-  accepted commits, including changes after the recorded candidate. Web #108/#109
-  landed after the #107 cutoff and are not included in this preview.
+  accepted commits, including changes after the recorded candidate. The preview
+  now includes web #108–#111 and server dev 14354b03, plus our release PRs.
 - [ ] Resolve the earlier 24h/3d raw-history requirement against upstream's restored
   7d/30d controls and the conversion of old 3d observer links to 7d.
 - [ ] Verify desktop and physical iPhone Safari, English/French, keyboard, Back,

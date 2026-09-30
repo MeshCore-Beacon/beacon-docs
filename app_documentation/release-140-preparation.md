@@ -1,7 +1,5 @@
 # Beacon 1.4.0 release and CoreScope cutover
 
-Later development: web #108/#109 landed after the validated #107 cutoff. They are not in preview 23945d59. Its own CI remains green and the PR is mergeable, but the current-base stack check flags the newer development head. Alderson must choose the release cutoff and validate any additions before tagging.
-
 The planned Beacon/web release is **1.4.0**, replacing the earlier 1.3.2 proposal.
 Alderson reviews and releases the candidate, then controls the production switch.
 This document prepares that switch; it does not claim that either MeshCore Canada
@@ -26,8 +24,8 @@ before starting a second stack; the Type 1 defaults assume one standalone stack.
 
 | Repository | Candidate | Scope |
 |---|---|---|
-| Server | [#189](https://github.com/MeshCore-Beacon/beacon-server/pull/189), `9054acd89f96fa3e117db954c384b778a33f7aad`, based on `0e242574` | Stable image publishing and rollout documentation; includes the accepted Zones API importer and migration 044 |
-| Web | [#105](https://github.com/MeshCore-Beacon/beacon-web/pull/105), `23945d5907b031345f8bc5e85b926532272d238b`, based on `b1f41dea` | Package/lock version 1.4.0, explicit deployment image selection and stable publishing; includes accepted Analytics #104 and phone/header/channel polish #106/#107 |
+| Server | [#189](https://github.com/MeshCore-Beacon/beacon-server/pull/189), `61b0322a5d2041987f154b7cea3870e848723890`, based on `14354b03` | Stable image publishing and rollout documentation; includes accepted Zones API, partial-telemetry cleanup 045 and corrected counter buckets; drains readiness probes in the shared test helper |
+| Web | [#105](https://github.com/MeshCore-Beacon/beacon-web/pull/105), `157525ef3dd517e74cd40a404d5512ef14603845`, based on `e2d272e0` | Package/lock version 1.4.0, explicit deployment image selection and stable publishing; includes accepted observer/sidebar/device and packet-analyzer changes through #111 |
 | Docs | [#5](https://github.com/MeshCore-Beacon/beacon-docs/pull/5) | Environment roles, pinned deployment inputs, release checklist, validation and recovery |
 | Web, deferred | [My Atlas #97](https://github.com/MeshCore-Beacon/beacon-web/pull/97) | Excluded until after 1.4.0; retains its single feature PR and saved-card design, but requires conflict resolution against current dev |
 
@@ -44,10 +42,12 @@ join the production candidate. No Atlas changes belong in either release artifac
 ## Release notes draft
 
 - Observer monitoring combines packet activity, device telemetry and comparison,
-  with the observer list alongside the dashboard and an Observer view in Analytics.
+  with the shared observer sidebar and labelled device details. The duplicate
+  Observer page in Analytics is removed; comparison remains available there.
 - Packet, observer, node, route and map links provide retained evidence for
   investigation. Endpoint and path ambiguity remain visible rather than implying
-  a uniquely identified sender, relay or delivery path.
+  a uniquely identified sender, relay or delivery path. Packet analysis uses a
+  single observations list.
 - MeshMapper scope metadata and optional boundary imports improve regional views;
   configured fallbacks and missing/unknown scope states remain explicit.
 - Hourly analytics preserve summaries after raw packet expiry. Raw packet detail
@@ -55,7 +55,8 @@ join the production candidate. No Atlas changes belong in either release artifac
 - English/French navigation, compact phone controls and on-demand packet maps
   improve presentation. Atlas remains outside this release.
 - Ingestion, route maintenance, cache invalidation, location reset handling and
-  deployment image separation include the accepted reliability/performance fixes.
+  partial-telemetry filtering, counter bucketing and deployment image separation
+  include the accepted reliability/performance fixes.
   Production capacity still needs validation on its intended host.
 
 ## Image publishing and configuration
@@ -115,7 +116,10 @@ history. The historical counter discrepancy is not resolved by changing products
 
 The agreed candidate policy remains **72-hour raw packets, 30-day hourly summaries
 and 720-hour telemetry**. Migration 043 clears stale zero/omitted advert positions;
-044 adds separate imported zone-boundary storage. Test migrations on a restored
+044 adds separate imported zone-boundary storage; 045 deletes partial telemetry
+rows where noise floor and both airtime counters are zero. Preserve those rows in
+a private export before migrating. The code skips uptime-only radio-stat updates
+and ignores invalid counter dips/replays/spikes. Test migrations on a restored
 copy before applying them to the production Beacon database. Verify raw counts,
 retained summaries and unaffected node locations. Keep the pre-change dump,
 application images, configuration and proxy route available for rollback.
@@ -159,34 +163,49 @@ public backup and foreign-node classification are not enabled by this release pr
 ## Validation and remaining release decisions
 
 The exact PR heads are deployed at the review site and its footer shows 1.4.0.
-The web cutoff is accepted #107 at `b1f41dea`; the refreshed web #105 is
-`23945d5907b031345f8bc5e85b926532272d238b`. Windows and Pi tests match.
-Published-head CI, the native PostgreSQL suite (including zone-boundary storage),
-restored migration 044 and the 3,200-input replay pass. The replay retained 100
-packets / 800 observations / 100 decrypted messages and the expected 800 ordinary
-and 2,400 opted-in events, with zero fixture drops. Native frontend build/lint and
-all **1029 tests** pass. Eight tag-generation cases, six configuration-rendering
-cases, public asset/source/boundary checks and desktop/phone English/French browser
-checks pass. See the [exact candidate record](release-140-heads.json).
+The refreshed pair is server **61b0322a** on accepted dev **14354b03**, and web
+**157525ef** on accepted dev **e2d272e0** through #111. This replaces the earlier
+#107 cutoff at the contributor's request. Current-base checks and published-head
+CI pass; web CodeQL remains skipped under existing policy.
 
-The current private checkpoint is `release140-cutover-20260930T174802Z`.
-The combined Pi recovery is `python3 evidence/release-140-final-20260930/rollback.py`.
-It first restores frontend 79c09864, then invokes the guarded backend recovery to
-restore server 689bc232 / web 00d859d9. New traffic and the compatible additive
-044 table are preserved. Do not skip the newest frontend rollback when using
-an older phase's recovery script.
+Native PostgreSQL tests, restored-copy migration 045 and the 3,200-input replay
+pass. The restored copy removed 485 partial telemetry rows while preserving raw
+counts, retained telemetry and node fingerprints. All 489 matching live rows were
+saved separately before migration. The replay retained 100 packets / 800
+observations / 100 decrypted messages and 800 ordinary / 2,400 opted-in events,
+with zero fixture drops in 12.51 seconds. The readiness-test race is fixed in the
+shared helper and both affected tests passed 100 repetitions.
 
-Frontend-only recovery is `python3 evidence/release-140-final-20260930/deploy-beacon-web.py rollback --evidence-dir release-140-final-20260930`, checkpoint `web-20260930T183247Z`;
-it keeps server 9054acd8 and restores frontend 79c09864. The private dump was
-restored and checksum-verified on and off the Pi. The server update left 23 other
-containers unchanged; each frontend publication left all 24 unchanged.
+Windows and Pi frontend build/lint and all **1,035 tests** pass. Prior eight
+tag-generation and six configuration-rendering receipts apply to unchanged
+workflow/template content. All 21 public assets, source archives and 26 boundaries
+match. Desktop/French phone browser checks and live delivery pass. The 40-second
+runtime sample had fresh traffic and no recorded queue overflow, SQL error,
+fallback, reconnect or panic; it does not establish production capacity.
+See the [exact candidate record](release-140-heads.json).
+
+The private checkpoint is `sync140-cutover-20260930T204913Z`, restored and
+checksum-verified on and off the Pi. The matching partial-row export is retained
+alongside it. Combined recovery is
+`python3 evidence/sync-140-20260930/deploy-server.py rollback`.
+It first restores the previous frontend when necessary, then restores server
+**9054acd8 / web 23945d59**. New traffic and the compatible telemetry cleanup stay
+in place; use the private row export for selective recovery if needed. Do not
+overwrite newly received traffic with the old full database dump.
+
+Frontend-only recovery is
+`python3 evidence/sync-140-20260930/deploy-beacon-web.py rollback --evidence-dir sync-140-20260930`,
+checkpoint `web-20260930T211410Z`. It keeps server 61b0322a and restores web
+23945d59. The backend update left 23 other containers unchanged; frontend
+publication left all 24 unchanged. Configuration and retention were preserved.
 
 The current upstream UI has 24h/7d/30d controls, including raw-evidence views, and
 old 3d observer links select 7d. This conflicts with the earlier requested 24h/3d
 raw-history controls. Alderson must resolve that requirement or explicitly accept
 the changed behavior before release; the version change does not resolve it.
 
-The existing test readiness-message race, any native validation retries and replay
-timing limits remain recorded. Production-host capacity, the actual CoreScope
-cutover and physical Safari validation stay explicit owner acceptance steps.
-The earlier [1.3.2 preparation record](release-132-preparation.md) is historical.
+Production-host capacity, the actual CoreScope cutover and physical Safari
+validation remain owner acceptance steps. No official host, stable tag or upstream
+merge was changed by this refresh. The earlier
+[1.3.2 preparation record](release-132-preparation.md) and dated receipts remain
+historical; use the current recovery commands for this deployed pair.

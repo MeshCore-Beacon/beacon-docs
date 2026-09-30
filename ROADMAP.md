@@ -1,22 +1,20 @@
 # Beacon parity and analytics roadmap
 
-Later development: web #108/#109 landed after the validated #107 cutoff. They are not in preview 23945d59. Its own CI remains green and the PR is mergeable, but the current-base stack check flags the newer development head. Alderson must choose the release cutoff and validate any additions before tagging.
+## Beacon 1.4.0 combined candidate — 30 September
 
-## Beacon 1.4.0 candidate — 30 September
+The requested refresh now includes Alderson's latest accepted server **14354b03** and web **e2d272e0**, plus our release PRs. The Pi review site runs **server 61b0322a / web 157525ef**, from server #189 and web #105. This supersedes the earlier #107 cutoff. Web #108–#111 provide the shared observer sidebar, labelled device details, unified packet observations and removal of the duplicate Observer page in Analytics. The server includes the partial-telemetry and counter-bucketing corrections.
 
-**1.4.0 replaces the planned 1.3.2 release.** Alderson reviews and releases it, then switches `live.meshcore.ca` from CoreScope to production Beacon. `dev.meshcore.ca` stays online for development testing only, with separate application/data/configuration and matching development endpoints. Neither host was changed by this preparation. The server retains its independent version history.
+**Beacon/web remains 1.4.0**, replacing the planned 1.3.2 release. My Atlas #97 is excluded until after 1.4.0 and still needs conflict resolution against the accepted release head. Alderson controls acceptance, stable tags and the production switch from CoreScope at `live.meshcore.ca`; `dev.meshcore.ca` remains development-only. Neither official host was changed. Server versions remain independent.
 
-The review preview is server **9054acd8 / web 23945d59**, from server #189 and web #105. The frontend displays **1.4.0**. Atlas #97 remains excluded until after 1.4.0 and requires conflict resolution against the accepted release head. The active queues contain only these two release-preparation PRs; accepted parents are not restacked. The separate future Atlas manifest is `planning/review-stack-web-post140.json`.
+Current-base checks and published-head CI pass. Native Go/PostgreSQL tests, restored-copy migration 045, the 3,200-input replay, and Windows/Pi web build/lint/**1,035 tests** pass. All **21 public assets**, both sources, **26 boundaries**, live packet delivery and desktop/French phone checks pass. The test-helper readiness race was fixed by draining probes through a unique marker; 100 repetitions of each affected test passed. Live ingestion behavior is unchanged by that helper fix. Existing image-tag and Compose receipts remain applicable to unchanged workflow/template content.
 
-Published-head CI, native Go/PostgreSQL tests, restored-copy migration 044, the 3,200-input replay, and native web build/lint/**1029 tests** pass. Eight actual metadata-action tag cases and six Compose rendering cases pass. Development pushes cannot publish `latest`; stable release tags own it, and production deployment inputs must be pinned. All 20 public assets, both sources, 26 boundaries and desktop/phone English/French checks pass. The server update preserved the other 23 containers; the frontend preserved all 24.
+Migration 045 removed **485 partial telemetry rows on the restored copy**, preserving raw counts, retained telemetry and node fingerprints. Immediately before live migration, **489 matching rows** were separately saved in the private checkpoint. The full restored/checksummed dump and this row export are retained on and off the Pi.
 
-Backend recovery is `evidence/release-140-final-20260930/rollback.py`, checkpoint `release140-cutover-20260930T174802Z`, restoring 689bc232 / 00d859d9 while preserving new traffic and the compatible additive boundary table. It restores the frontend first if needed. Frontend-only recovery is `evidence/release-140-final-20260930/deploy-beacon-web.py rollback --evidence-dir release-140-final-20260930`, checkpoint `web-20260930T183247Z`. A restored/checksummed private dump is retained on and off the Pi. Configuration remains b3d96f52 / mode 0644; automatic zones, public admin/backup and foreign classification stay disabled.
+Backend recovery is `evidence/sync-140-20260930/deploy-server.py rollback`, checkpoint `sync140-cutover-20260930T204913Z`. It restores **9054acd8 / 23945d59**, rolling back the new frontend first when needed. It preserves new traffic and the compatible telemetry cleanup; the private row export retains deleted rows for selective recovery. Frontend-only recovery is `evidence/sync-140-20260930/deploy-beacon-web.py rollback --evidence-dir sync-140-20260930`, checkpoint `web-20260930T211410Z`. Configuration remains b3d96f52 / mode 0644. The server update preserved the other 23 containers; the frontend preserved all 24. Automatic zones, public admin/backup and foreign classification stay disabled.
 
-**Remaining owner gates:** review/acceptance, the 24h/3d raw-history requirement versus upstream 7d/30d controls, physical Safari, production-host capacity/data verification, approved Actions images/tags and the CoreScope route switch. The bounded replay and brief live sample do not certify production capacity. The earlier readiness-test race remains historical evidence.
+**Remaining owner gates:** review/acceptance, the requested 24h/3d raw-history controls versus upstream 7d/30d controls, physical Safari, production-host capacity/data verification, approved Actions images/tags and the CoreScope switch. The bounded replay and 40-second live sample do not establish production capacity.
 
 [Current release/cutover plan](app_documentation/release-140-preparation.md) · [Exact candidate record](app_documentation/release-140-heads.json).
-
-The final web cutoff includes #106/#107; later development is outside this recorded candidate until reviewed.
 
 ## Historical 1.3.2 preparation
 
