@@ -1,6 +1,8 @@
 # Optional MeshMapper boundary synchronization
 
-A reviewed snapshot workflow is available for the 1.3.2 preparation; see [installation and recovery](meshmapper-border-snapshots.md). Automatic synchronization remains a later phase from the maintainer discussion supplied on 27 September. The [published Zones API](https://wiki.meshmapper.net/zones-api/) already supplies the required catalogue and polygons; no scraping or new endpoint is needed.
+Automatic synchronization landed in server dev `0e242574` and is included in the [1.4.0 candidate](release-140-preparation.md). It is independently opt-in through `meshmapper.zones.enabled`, refreshes at a minimum of one hour and uses migration 044's separate boundary table. Imported boundaries override manual shapes; manual `borderFile` remains the fallback where the API supplies no boundary. The contributor preview still uses its reviewed snapshot without enabling this importer. See [snapshot installation and recovery](meshmapper-border-snapshots.md).
+
+The following paragraphs preserve the earlier design discussion; the accepted override order above supersedes the proposed manual-first order below. The [published Zones API](https://wiki.meshmapper.net/zones-api/) supplies the catalogue and polygons; no scraping or new endpoint is needed.
 
 Verified public reads: `https://meshmapper.net/get_zones.php?country=CA` lists enabled regions, and `https://yow.meshmapper.net/get_geojson.php` returns YOW's FeatureCollection. Both are unauthenticated and support ETag caching with a one-hour minimum polling period. Coordinates use longitude, latitude. A missing boundary is explicitly null; group collections contain separate member features. Region codes can be 2–6 alphanumeric characters, so check compatibility with Beacon identifiers before importing or mapping them. Never truncate codes.
 

@@ -1,0 +1,66 @@
+{
+  "release": "Beacon/web 1.4.0",
+  "verified_at": "2026-09-30T18:37:14.975711+00:00",
+  "release_published": false,
+  "production_switched": false,
+  "roles": {
+    "production": "https://live.meshcore.ca/",
+    "development": "https://dev.meshcore.ca/",
+    "review": "https://canadaverse.org/beacon-dev/"
+  },
+  "server": {
+    "pr": 189,
+    "revision": "9054acd89f96fa3e117db954c384b778a33f7aad",
+    "base": "0e242574fb5ff852412c8c741877e104c59c4c6d",
+    "tree": "81335e7cdb2d9e19d81d547ffa2001e959f73782",
+    "binary_sha256": "870773fa64a8ce7179a1afda21e69ed830f331eaa56a75679bbadc45c1fb4fd9",
+    "source_sha256": "954bd52cebf9cd5024eb21400004e1e128c6a8e855ceb2d6f2f334eb32e6fba1",
+    "version_policy": "Independent server version; do not downgrade to web 1.4.0."
+  },
+  "web": {
+    "pr": 105,
+    "revision": "23945d5907b031345f8bc5e85b926532272d238b",
+    "base": "b1f41dea1d471a2d26941401cbe1b2d446995754",
+    "tree": "59293351133115673dd1770ba03cb4c5067482b6",
+    "version": "1.4.0",
+    "tests": 1029,
+    "source_sha256": "83b72731fc6c0dadf1b9cbd270a43fc9ccb2a66be869efb8caf7fce320344e38",
+    "dist_sha256": "b92255556988a538cd8961d44b3dfe53c9527de8e3d5bb4722cf40bfe547174b",
+    "index_sha256": "134093571a33bf3209ade58face8f38114a08f573fe8a4c6629d498a2df5172a",
+    "public_assets": 20
+  },
+  "atlas": {
+    "pr": 97,
+    "head": "66ae0cc222a6580b52f62051025453a992956cc6",
+    "hold": "After 1.4.0",
+    "deployed": false,
+    "needs_rebase": true
+  },
+  "validation": {
+    "native_postgres": true,
+    "restored_migration": "044_meshmapper_zones.sql",
+    "replay_inputs": 3200,
+    "replay_fixture_drops": 0,
+    "image_tag_cases": 8,
+    "compose_cases": 6,
+    "public_boundaries": 26,
+    "windows_and_pi_web_tests": 1029
+  },
+  "recovery": {
+    "server_checkpoint": "release140-cutover-20260930T174802Z",
+    "web_checkpoint": "web-20260930T183247Z",
+    "config_sha256": "b3d96f52b25e38a0f3ecfb15cd2e492db1d4f494b18774598a4cfad295e2d62f",
+    "server_recipe": "evidence/release-140-final-20260930/rollback.py",
+    "web_recipe": "evidence/release-140-final-20260930/deploy-beacon-web.py rollback --evidence-dir release-140-final-20260930",
+    "frontend_only_restores": "79c09864bdf671ab19d203c07c60f6d23091c3d2 with server 9054acd8"
+  },
+  "remaining": [
+    "Alderson review/acceptance and exact accepted-head CI",
+    "24h/3d raw-history requirement versus upstream 7d/30d controls",
+    "Physical iPhone Safari and production-host load/data validation",
+    "Stable image/tag publication and owner-controlled CoreScope cutover"
+  ],
+  "web_cutoff": "Accepted web #107 at b1f41dea; later changes require a release decision.",
+  "web_validation_evidence": "release-140-final-20260930",
+  "server_validation_evidence": "release-140-20260930"
+}

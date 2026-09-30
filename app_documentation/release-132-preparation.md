@@ -1,5 +1,7 @@
 # Beacon 1.3.2 preparation
 
+**Historical proposal:** the release is now [Beacon 1.4.0](release-140-preparation.md). The source and recovery records below describe earlier checkpoints.
+
 ## Latest merged candidate — 30 September
 
 The test site now runs exact merged dev server **689bc232** and web **00d859d9**. Atlas #97 remains excluded and needs a post-release conflict refresh. All release web changes landed through #99, followed by #100–#103; their closed parent PRs are recorded as included via #99 rather than independently merged. Server #182 and the maintainer follow-ups are included.

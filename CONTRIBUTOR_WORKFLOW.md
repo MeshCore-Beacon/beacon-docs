@@ -126,9 +126,15 @@ Tests cover squash/drop-parent behavior, a fresh phase after all merges, cache r
 
 Markdown is UTF-8. Read and write it with an explicit UTF-8 encoding in scripts, especially when moving between Windows tools. Check both the diff and rendered text before publication. Keep numeric ranges as en dashes and dependency arrows as arrows; do not round-trip the document through a legacy Windows code page.
 
-## 1.3.2 release cut
+## 1.4.0 release cut
 
-Keep the active web manifest through #99 and keep Atlas #97 in a separate post-release manifest. Refresh the entire declared dependency sequence after review edits; publish with the recorded remote heads, then check the actual published revisions. The Atlas manifest can include the verified release parents to reuse identical-tree receipts, but must not change the active preview composition. Build and publish the release web archive without Atlas, preserve the prior archive/assets and browser-local saved cards, and keep Atlas based on the release tip for the owner's next phase.
+Server #189 and web #105 are the active release-preparation PRs on fresh accepted
+dev bases. The earlier feature stacks are accepted; do not rebase them again.
+Keep Atlas #97 outside the release and in the separate post-1.4.0 manifest. It
+needs conflict resolution and fresh validation after the release head is accepted.
+Refresh/publish/check the declared active queues when their bases or heads change.
+Keep production at live.meshcore.ca pinned to approved releases and dev.meshcore.ca
+online for development only. See the [owner cutover plan](app_documentation/release-140-preparation.md).
 
 The bounded border snapshot tool is independent of the stack helper and never deploys or changes configuration. The contributor CI runs all `test_*.py` files, including the stack safety checks and exact-member/null/invalid-polygon coverage (26 tests at this checkpoint).
 

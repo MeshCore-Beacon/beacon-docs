@@ -1,5 +1,23 @@
 # Beacon parity and analytics roadmap
 
+## Beacon 1.4.0 candidate — 30 September
+
+**1.4.0 replaces the planned 1.3.2 release.** Alderson reviews and releases it, then switches `live.meshcore.ca` from CoreScope to production Beacon. `dev.meshcore.ca` stays online for development testing only, with separate application/data/configuration and matching development endpoints. Neither host was changed by this preparation. The server retains its independent version history.
+
+The review preview is server **9054acd8 / web 23945d59**, from server #189 and web #105. The frontend displays **1.4.0**. Atlas #97 remains excluded until after 1.4.0 and requires conflict resolution against the accepted release head. The active queues contain only these two release-preparation PRs; accepted parents are not restacked. The separate future Atlas manifest is `planning/review-stack-web-post140.json`.
+
+Published-head CI, native Go/PostgreSQL tests, restored-copy migration 044, the 3,200-input replay, and native web build/lint/**1029 tests** pass. Eight actual metadata-action tag cases and six Compose rendering cases pass. Development pushes cannot publish `latest`; stable release tags own it, and production deployment inputs must be pinned. All 20 public assets, both sources, 26 boundaries and desktop/phone English/French checks pass. The server update preserved the other 23 containers; the frontend preserved all 24.
+
+Backend recovery is `evidence/release-140-final-20260930/rollback.py`, checkpoint `release140-cutover-20260930T174802Z`, restoring 689bc232 / 00d859d9 while preserving new traffic and the compatible additive boundary table. It restores the frontend first if needed. Frontend-only recovery is `evidence/release-140-final-20260930/deploy-beacon-web.py rollback --evidence-dir release-140-final-20260930`, checkpoint `web-20260930T183247Z`. A restored/checksummed private dump is retained on and off the Pi. Configuration remains b3d96f52 / mode 0644; automatic zones, public admin/backup and foreign classification stay disabled.
+
+**Remaining owner gates:** review/acceptance, the 24h/3d raw-history requirement versus upstream 7d/30d controls, physical Safari, production-host capacity/data verification, approved Actions images/tags and the CoreScope route switch. The bounded replay and brief live sample do not certify production capacity. The earlier readiness-test race remains historical evidence.
+
+[Current release/cutover plan](app_documentation/release-140-preparation.md) · [Exact candidate record](app_documentation/release-140-heads.json).
+
+The final web cutoff includes #106/#107; later development is outside this recorded candidate until reviewed.
+
+## Historical 1.3.2 preparation
+
 ## 1.3.2 release preparation — 30 September
 
 The Pi now serves exact merged dev server `689bc232` / web `00d859d9`, with Atlas excluded. The web stack landed through #99, followed by #100–#103. Server #182 and the maintainer ingestion, caching and location fixes are included. Native PostgreSQL tests, the 3,200-input replay, and web build/lint/all **1,017 tests** pass. All 21 public assets, both source archives and 26 boundaries match.
