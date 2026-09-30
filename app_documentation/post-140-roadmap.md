@@ -12,12 +12,14 @@ or merge changes automatically. Version assignments remain with maintainers. The
 from this development queue; My Atlas remains excluded from that release, but is explicitly included in the
 experimental branch and Pi preview at the contributor's request.
 
+[Current experimental build, validation and recovery](n30nex-test-preview.md).
+
 ## Delivery order
 
 | Phase | Deliverable | Completion evidence | Status |
 |---|---|---|---|
-| 1 — correctness suitable for 1.4.x | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Implemented in experimental server PR #192 and the web branch; final Pi checks in progress |
-| 2 — first feature after 1.4.0 | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Integrated into n30nex-test from the two feature commits; combined validation in progress |
+| 1 — correctness suitable for 1.4.x | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Delivered to the experimental Pi preview; server PR #192 stays draft |
+| 2 — first feature after 1.4.0 | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Delivered in n30nex-test; all 1,066 native frontend tests and public checks pass |
 | 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued |
 | 4 — find and compare | Bounded global entity search, saved views/filters, Atlas-node filters, channel activity and hearing context | Search/paging/share links agree; channel key/history availability is explicit; comparisons use aligned windows | Queued |
 | 5 — network structure | Observed route segments/alternatives, topology, distance, hash ambiguity and prefix/path inspection | Count evidence at the correct grain; separate observed ambiguity from static conflicts; use valid coordinates and show unresolved hops | Queued |

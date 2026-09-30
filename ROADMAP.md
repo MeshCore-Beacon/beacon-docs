@@ -6,15 +6,15 @@ The contributor approved proceeding toward and beyond CoreScope feature parity.
 The sequence is **saved-route correctness (#183) → My Atlas (#97, experimental now; release after 1.4.0)
 → node/trace dashboards and investigation → search/saved views/channel analytics
 → topology/distance/hash tools → bounded replay/reach/timing → regional crossing evidence**.
-Phases 1 and 2 are combined on the requested `n30nex-test` branches in server, web and docs. The Pi preview will run this experimental composition, with daily upstream dev/main compatibility checks and no review pings. Each phase ends in focused reviewable PRs, exact Pi validation,
+Phases 1 and 2 are combined on the requested `n30nex-test` branches in server, web and docs. The Pi preview runs this experimental composition, with daily upstream dev/main compatibility checks and no review pings. The route fix and Atlas are validated; node/trace dashboards and deeper investigation are next. Each phase ends in focused reviewable PRs, exact Pi validation,
 updated source/changelog and retained rollback; release numbers remain a maintainer decision.
 The current 1.4.0 handoff remains recorded below, with Atlas excluded.
 
-[Phases, contracts and acceptance](<app_documentation/post-140-roadmap.md>).
+[Phases, contracts and acceptance](app_documentation/post-140-roadmap.md) · [Current experimental preview](app_documentation/n30nex-test-preview.md).
 
-## Beacon 1.4.0 combined candidate — 30 September
+## Recorded 1.4.0 checkpoint — superseded on the Pi by the experiment
 
-The requested refresh now includes Alderson's latest accepted server **14354b03** and web **e2d272e0**, plus our release PRs. The Pi review site runs **server 61b0322a / web 157525ef**, from server #189 and web #105. This supersedes the earlier #107 cutoff. Web #108–#111 provide the shared observer sidebar, labelled device details, unified packet observations and removal of the duplicate Observer page in Analytics. The server includes the partial-telemetry and counter-bucketing corrections.
+The requested refresh now includes Alderson's latest accepted server **14354b03** and web **e2d272e0**, plus our release PRs. At that checkpoint, the Pi review site ran **server 61b0322a / web 157525ef**, from server #189 and web #105. This supersedes the earlier #107 cutoff. Web #108–#111 provide the shared observer sidebar, labelled device details, unified packet observations and removal of the duplicate Observer page in Analytics. The server includes the partial-telemetry and counter-bucketing corrections.
 
 **Beacon/web remains 1.4.0**, replacing the planned 1.3.2 release. My Atlas #97 is excluded until after 1.4.0 and still needs conflict resolution against the accepted release head. Alderson controls acceptance, stable tags and the production switch from CoreScope at `live.meshcore.ca`; `dev.meshcore.ca` remains development-only. Neither official host was changed. Server versions remain independent.
 
