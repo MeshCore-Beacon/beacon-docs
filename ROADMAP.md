@@ -1,17 +1,5 @@
 # Beacon parity and analytics roadmap
 
-## Active post-1.4 phased work — 30 September
-
-The contributor approved proceeding toward and beyond CoreScope feature parity.
-The sequence is **saved-route correctness (#183) → My Atlas (#97, after 1.4.0)
-→ node/trace dashboards and investigation → search/saved views/channel analytics
-→ topology/distance/hash tools → bounded replay/reach/timing → regional crossing evidence**.
-Phase 1 is active. Each phase ends in focused reviewable PRs, exact Pi validation,
-updated source/changelog and retained rollback; release numbers remain a maintainer decision.
-The current 1.4.0 handoff remains recorded below, with Atlas excluded.
-
-[Phases, contracts and acceptance](<app_documentation/post-140-roadmap.md>).
-
 ## Beacon 1.4.0 combined candidate — 30 September
 
 The requested refresh now includes Alderson's latest accepted server **14354b03** and web **e2d272e0**, plus our release PRs. The Pi review site runs **server 61b0322a / web 157525ef**, from server #189 and web #105. This supersedes the earlier #107 cutoff. Web #108–#111 provide the shared observer sidebar, labelled device details, unified packet observations and removal of the duplicate Observer page in Analytics. The server includes the partial-telemetry and counter-bucketing corrections.
@@ -254,18 +242,20 @@ The September 24 consolidation check built accepted server `c02317a4` and retain
 
 ## Next phases
 
-Use the [active post-1.4 sequence](app_documentation/post-140-roadmap.md). The
-older dependency queue and optional-boundary implementation are delivered in the
-current candidate and must not be scheduled again. The next focused implementation
-is server #183; Atlas follows separately after 1.4.0. Scope/route crossing analysis,
-node/trace presentation and new analytics retain their own acceptance contracts.
+The September 20 #116 investigation has a new [current-build result](https://github.com/MeshCore-Beacon/beacon-server/issues/116#issuecomment-5753626821): a 600-second unmodified Pi capture kept both feeds connected and retained 2,169 new observations, with no ping timeout, disconnect, deadline, SQLSTATE error or HTTP 5xx response. App/PostgreSQL CPU averaged 2.14%/3.96% of one core. The preceding 3h39 log likewise has no MQTT loss or deadline error. Timestamp warnings were classified separately. This did not measure callback or pool-acquisition duration and does not establish the original cause or production capacity. No application, ordering, acknowledgement or service change was made; #116 remains open. Further capture should follow a recurrence or meaningful workload change, rather than repeatedly sampling the same healthy state.
+
+1. **Reviews and listed issues first.** The #181 correction is submitted as #184. Next address [server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183), preserving honest saved-route evidence when prefix widths change. Recheck maintainer feedback first; broad partial issues remain open.
+2. **Accept the current queue in dependency order.** Server #167 -> #169 -> #172 -> #174 -> #176; independent #166. Web #75 -> #79 -> #80 -> #81 -> #83 -> #85 -> #87 -> #89 -> #92 -> #95. Independent server #184 follows dev. Use the published-head table in the integration record. Maintainers choose merges, the release breakpoint, versions, tags and main promotion.
+3. **Optional MeshMapper boundaries.** Scope import and channel tags are already implemented in #174/#176/#89. Next use the [boundary plan](app_documentation/meshmapper-boundaries-plan.md), preserving manual boundary priority, cached valid geometry and separate scope/forwarding evidence. Crossing analytics remain a later focused slice.
+4. **Connected investigation and presentation.** Packet/route/observer links and return navigation are delivered for review. Continue node/trace presentation, distinct analytics questions and quality of life under the approved observer plan; address #99/#12 where the work overlaps. Full parity is not yet claimed.
 
 ## Listed work still open
 
 | Issue | Remaining scope |
 |---|---|
-| [Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) | Active first post-1.4 phase: saved-route metadata and evidence consistency across width changes |
-| [Web #94](https://github.com/MeshCore-Beacon/beacon-web/issues/94) | The 24h/3d correction landed through #95/#99, then upstream restored 7d/30d; the retention-window decision remains open |
+| [Server #181](https://github.com/MeshCore-Beacon/beacon-server/issues/181) | Fixed by #184; awaits maintainer acceptance |
+| [Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) | Saved-route hash-prefix metadata can lag a change of width; next focused issue |
+| [Web #94](https://github.com/MeshCore-Beacon/beacon-web/issues/94) | Corrected periods/labels in #95; awaits acceptance |
 | [Server #116](https://github.com/MeshCore-Beacon/beacon-server/issues/116) | #179/#180 are integrated and pass bounded replay/route-lock checks; attributing the historical incident still requires matching evidence |
 | [Server #99](https://github.com/MeshCore-Beacon/beacon-server/issues/99) | Advert names and ACK/TRACE/PING references are accepted; define any remaining packet-type formats |
 | [Server #60](https://github.com/MeshCore-Beacon/beacon-server/issues/60) | Remaining administration/worker/persistence behavior; account records do not establish login sessions |
