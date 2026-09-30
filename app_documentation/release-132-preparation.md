@@ -1,5 +1,24 @@
 # Beacon 1.3.2 preparation
 
+## Latest merged candidate — 30 September
+
+The test site now runs exact merged dev server **689bc232** and web **00d859d9**. Atlas #97 remains excluded and needs a post-release conflict refresh. All release web changes landed through #99, followed by #100–#103; their closed parent PRs are recorded as included via #99 rather than independently merged. Server #182 and the maintainer follow-ups are included.
+
+Upstream CI, native Go/PostgreSQL tests, the 3,200-input replay, and native web build/lint/**1017 tests** pass. Migration 043 was tested on a restored backup: it cleared 273 stale location records and preserved all raw counts and other located-node fingerprints. Public sources/assets, both MQTT feeds, 26 boundaries, desktop/phone and English/French browser checks pass. Only the Beacon app restarted; the other 23 containers are unchanged.
+
+Current recovery: `evidence/latest-candidate-20260930/deploy-server.py rollback` on the Pi restores server 397d76b3 / web eb241ca7, preserving newer traffic and the compatible 043 location cleanup. It rolls the frontend back first if necessary. Checkpoint `latest-cutover-20260930T152333Z` is restored/checksummed on and off the Pi. Frontend-only recovery uses the same phase's `deploy-beacon-web.py rollback --evidence-dir latest-candidate-20260930` and checkpoint `web-20260930T155009Z`.
+
+The initial f6fe177a validation exposed an existing readiness-message race in TestChannelMessageScopeLive; its failed/repeated runs are retained. The current 689bc232 native suite passed. The first replay under concurrent frontend work timed out; the final serialized replay passed in 13.26 seconds with 100 packets, 800 observations, 100 decrypted messages, 800 ordinary / 2,400 opted-in events, and zero fixture drops. These are bounded fixture results, not a claim of universal packet-loss absence or production capacity.
+
+**Release follow-up:** upstream web #101 restored 24h/7d/30d controls on Observers, Routes and Analytics, and old 3d observer links now select 7d. This differs from the contributor's requested 24h/3d raw-history controls. The test site intentionally matches the exact merged source; this discrepancy remains open for the release decision. Passing tests and smoke checks do not resolve that product requirement.
+
+Maintainers retain production rollout, physical iPhone/Safari validation and stable release tags.
+
+## Historical preparation record
+
+The following records describe the earlier candidate and are superseded by the snapshot above.
+
+
 30 September 2026. Maintainers choose acceptance, the release commit, tags and the production switch. **1.3.2 is the web version**; the server currently has a v1.6.0 release and needs its own version decision. The dev interface reports 1.3.1, while the latest published web GitHub release remains v1.3.0.
 
 The release composition stops at [web #99](https://github.com/MeshCore-Beacon/beacon-web/pull/99). [My Atlas #97](https://github.com/MeshCore-Beacon/beacon-web/pull/97) is held for after 1.3.2, as one feature PR based on the release work. Removing Atlas from this preview does not clear saved browser cards.

@@ -2,9 +2,9 @@
 
 ## 1.3.2 release preparation — 30 September
 
-The Pi now serves server `397d76b3` / web `eb241ca7`, with Atlas excluded. All seven server release PRs are accepted in dev `89a376c2`, whose source tree exactly matches the running server; no rebuild or relabel was needed. Web #75 → #79 → #80 → #81 → #83 → #85 → #87 → #89 → #92 → #95 → #99 is published and passes checks. The native/Windows release build passes all 955 tests, and all 21 public assets and source archives match.
+The Pi now serves exact merged dev server `689bc232` / web `00d859d9`, with Atlas excluded. The web stack landed through #99, followed by #100–#103. Server #182 and the maintainer ingestion, caching and location fixes are included. Native PostgreSQL tests, the 3,200-input replay, and web build/lint/all **1,017 tests** pass. All 21 public assets, both source archives and 26 boundaries match.
 
-My Atlas #97 is held for after 1.3.2 at `66ae0cc2`, directly after #99. Its requested copy/order changes, Windows/Pi 975 tests, CI and browser checks pass; it is not deployed. External server #182 and web #93 remain separate gates.
+My Atlas #97 remains held at `66ae0cc2` for after 1.3.2 and needs conflict resolution against the new dev branch. Web #93 is closed without merge. Upstream #101 restored 7d/30d controls and maps old 3d observer links to 7d; this conflicts with the requested 24h/3d raw-history controls and remains a release follow-up. Migration 043 was restore-tested: 273 stale location records cleared, raw counts and other located nodes preserved. The prior server/frontend and a verified on/off-Pi dump remain recoverable.
 
 [Current audit, exact heads, validation and recovery](app_documentation/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
 

@@ -2,18 +2,19 @@
 
 ## 1.3.2 release preparation — 30 September
 
-The Pi now serves server `397d76b3` / web `eb241ca7`, with Atlas excluded. All seven server release PRs are accepted in dev `89a376c2`, whose source tree exactly matches the running server; no rebuild or relabel was needed. Web #75 → #79 → #80 → #81 → #83 → #85 → #87 → #89 → #92 → #95 → #99 is published and passes checks. The native/Windows release build passes all 955 tests, and all 21 public assets and source archives match.
+The Pi now serves exact merged dev server `689bc232` / web `00d859d9`, with Atlas excluded. The accepted web stack and #100–#103, server #182 and later maintainer fixes are included. Native PostgreSQL tests, the 3,200-input replay, web build/lint/all 1,017 tests and public/browser checks pass. Migration 043 passed on the restored backup without changing raw counts; all 21 assets, source archives and 26 boundaries match.
 
-My Atlas #97 is held for after 1.3.2 at `66ae0cc2`, directly after #99. Its requested copy/order changes, Windows/Pi 975 tests, CI and browser checks pass; it is not deployed. External server #182 and web #93 remain separate gates.
+My Atlas #97 is held post-release at `66ae0cc2` and needs a conflict refresh against current dev. Web #93 was closed without merge. The known test-readiness race and first replay timeout are preserved in the validation record; the final serialized replay passed in 13.26 seconds. These checks do not certify sustained production capacity.
 
 [Current audit, exact heads, validation and recovery](app_documentation/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
 
 ## Owner release gates for 1.3.2
 
-- [x] Accept the seven server release PRs. Accepted dev `89a376c2` has passing CI and the same tree as the validated running server.
-- [ ] Re-review and accept the eleven release web PRs through #99; check CI on the accepted merge result.
-- [ ] Accept docs #5 so the canonical operator links in server #172/#174 resolve. Merge the remaining web sequence in dependency order.
-- [ ] Decide separately whether server #182 and web #93 belong in the cut. The current tested composition excludes them; do not silently label an untested combination as this candidate.
+- [x] Accept the server release work and verify the current dev head `689bc232`; CI and native tests pass on the deployed source.
+- [x] Accept the release web stack via #99 and follow-ups #100–#103; CI and native tests pass on deployed `00d859d9`.
+- [ ] Accept docs #5 so the canonical operator links in server #172/#174 resolve.
+- [x] Record the additional dispositions: server #182 is merged and tested, profiling remains disabled on the preview, and web #93 is closed without merge.
+- [ ] Resolve the restored 7d/30d UI controls from #101 against the earlier 24h/3d raw-history requirement. Old 3d observer links currently select 7d.
 - [ ] Confirm the deployed source/binary pair on the affected MeshMapper host, its packet/summary retention, broker inputs, bounded queues, and private rollback. Apply reviewed border files only where manual boundaries are missing.
 - [ ] Compare matched busy periods for accepted/dropped inputs, database work, process CPU/RSS and request latency. The Pi replay and short runtime sample do not certify production capacity. If using #182, keep profiles private and bounded.
 - [ ] Check the main operator journeys on desktop and physical iPhone Safari, including English/French, Back, dialogs, maps and expired records.
