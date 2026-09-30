@@ -125,3 +125,9 @@ Tests cover squash/drop-parent behavior, a fresh phase after all merges, cache r
 ## Document encoding
 
 Markdown is UTF-8. Read and write it with an explicit UTF-8 encoding in scripts, especially when moving between Windows tools. Check both the diff and rendered text before publication. Keep numeric ranges as en dashes and dependency arrows as arrows; do not round-trip the document through a legacy Windows code page.
+
+## 1.3.2 release cut
+
+Keep the active web manifest through #99 and keep Atlas #97 in a separate post-release manifest. Refresh the entire declared dependency sequence after review edits; publish with the recorded remote heads, then check the actual published revisions. The Atlas manifest can include the verified release parents to reuse identical-tree receipts, but must not change the active preview composition. Build and publish the release web archive without Atlas, preserve the prior archive/assets and browser-local saved cards, and keep Atlas based on the release tip for the owner's next phase.
+
+The bounded border snapshot tool is independent of the stack helper and never deploys or changes configuration. The contributor CI runs all `test_*.py` files, including the stack safety checks and exact-member/null/invalid-polygon coverage (26 tests at this checkpoint).

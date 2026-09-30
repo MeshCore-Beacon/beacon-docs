@@ -1,5 +1,11 @@
 # Server/web consolidation release
 
+## 1.3.2 preparation — 30 September
+
+The current phase prepares web 1.3.2 and holds My Atlas #97 for after release. The release web queue ends at #99; Atlas will remain a separate feature based on that cut. Server review fixes are published and the Pi runs `397d76b3`; the final web review stack and preview are still being validated. Earlier dated preview/rollback descriptions below are historical.
+
+See [the organisation audit, candidate scope, remaining gates and recovery](app_documentation/release-132-preparation.md), and the [boundary snapshot guide](app_documentation/meshmapper-border-snapshots.md). All four organisation repositories and their open issues/PRs were inspected. Owners retain merges, release tags and production deployment.
+
 Status: development preview and review handoff, 29 September 2026 (Toronto). Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
 
 ## My Atlas delivered for review — 29 September

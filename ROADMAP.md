@@ -1,5 +1,11 @@
 # Beacon parity and analytics roadmap
 
+## 1.3.2 preparation — 30 September
+
+The current phase prepares web 1.3.2 and holds My Atlas #97 for after release. The release web queue ends at #99; Atlas will remain a separate feature based on that cut. Server review fixes are published and the Pi runs `397d76b3`; the final web review stack and preview are still being validated. Earlier dated preview/rollback descriptions below are historical.
+
+See [the organisation audit, candidate scope, remaining gates and recovery](app_documentation/release-132-preparation.md), and the [boundary snapshot guide](app_documentation/meshmapper-border-snapshots.md). All four organisation repositories and their open issues/PRs were inspected. Owners retain merges, release tags and production deployment.
+
 Updated 29 September 2026 (Toronto). This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
 Refresh GitHub issues, PR feedback and branch state before starting a phase. This document is a snapshot, and linked issues/PRs are the current source of truth.

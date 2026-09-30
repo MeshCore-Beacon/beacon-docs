@@ -1,0 +1,11 @@
+# Saved-route observation evidence
+
+Known-route responses include `pathKey`, a stable identity within the route's IATA. Use `GET /api/v1/routes/{iata}/{pathKey}/observations` to fetch the **full saved route** and retained report references. Search results can contain a subsegment while sharing the full route's key; the evidence response always describes the complete saved sequence.
+
+The match requires the complete saved `pathBytes`, `hashSize`, hop count and IATA. A compact digest index narrows candidates, but full bytes are still compared. Other hash widths, TRACE readings/intended routes and unclassified legacy observations are excluded. Matching short prefixes does not confirm historical node identities, forwarding or delivery. The stored route counter can include repeated processing and outlive raw reports; it is not a retained-result total.
+
+The web interface offers **24h / 3d** and caps raw route/comparison selections at 72 hours to match the preview's packet retention. The API retains its bounded 30-day maximum for deployments with longer retention; it cannot recover expired reports.
+
+`range` defaults to `24h` and accepts durations up to `720h`, anchored on the server. Alternatively supply both `since` and exclusive `until` in epoch milliseconds, with a maximum 30-day span and no future end. `limit` defaults to 50 and is capped at 200. Follow `nextPageCursor` as `pageCursor`; its route, window and microsecond/ID boundary are pinned. Do not combine it with another range, or change its explicit window. Numeric legacy `cursor` is unsupported. Responses include effective window bounds, `matchAvailable`, an empty `items` array when no matching raw evidence remains, and `hasMore`; no total-count scan or packet/message body is added. Malformed saved path metadata is explicitly unavailable, and missing routes return 404.
+
+Migration 041 builds the compact observation index concurrently. Keep it as a single statement outside a transaction; the existing runner handles an interrupted or already-built index before recording completion. It does not alter retained rows or expiry configuration. Native PostgreSQL tests cover ties below millisecond precision, cursor scope, different widths/sites, TRACE/unknown exclusions, raw expiry, index retry and custom/generic indexed plans.
