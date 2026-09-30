@@ -1,10 +1,12 @@
 # Beacon parity and analytics roadmap
 
-## 1.3.2 preparation — 30 September
+## 1.3.2 release preparation — 30 September
 
-The current phase prepares web 1.3.2 and holds My Atlas #97 for after release. The release web queue ends at #99; Atlas will remain a separate feature based on that cut. Server review fixes are published and the Pi runs `397d76b3`; the final web review stack and preview are still being validated. Earlier dated preview/rollback descriptions below are historical.
+The Pi now serves server `397d76b3` / web `eb241ca7`, with Atlas excluded. All seven server release PRs are accepted in dev `89a376c2`, whose source tree exactly matches the running server; no rebuild or relabel was needed. Web #75 → #79 → #80 → #81 → #83 → #85 → #87 → #89 → #92 → #95 → #99 is published and passes checks. The native/Windows release build passes all 955 tests, and all 21 public assets and source archives match.
 
-See [the organisation audit, candidate scope, remaining gates and recovery](app_documentation/release-132-preparation.md), and the [boundary snapshot guide](app_documentation/meshmapper-border-snapshots.md). All four organisation repositories and their open issues/PRs were inspected. Owners retain merges, release tags and production deployment.
+My Atlas #97 is held for after 1.3.2 at `66ae0cc2`, directly after #99. Its requested copy/order changes, Windows/Pi 975 tests, CI and browser checks pass; it is not deployed. External server #182 and web #93 remain separate gates.
+
+[Current audit, exact heads, validation and recovery](app_documentation/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
 
 Updated 29 September 2026 (Toronto). This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
@@ -12,9 +14,9 @@ Refresh GitHub issues, PR feedback and branch state before starting a phase. Thi
 
 Release-check correction, 21 September UTC: the workflow now includes independent preview PRs in Status and Check, applies the same CI/head/fork/target requirements to them, and rechecks the prepared independent inputs before publication. This covers packet summaries #161 and map correction #61 without adding them to the ordered stacks. The backup CLI #160 retains its separate check. Twenty-three offline regressions cover these gates and the existing no-rebase/cache behavior. See [the contributor workflow](CONTRIBUTOR_WORKFLOW.md).
 
-Accepted and integrated bases remain server `db30c9b5` / web `17f48fb9`. The current tested preview is server `a35cba1d` / web `4fd4b0de`, with all eighteen application review candidates. The sections below retain dated historical checkpoints; use the My Atlas September 29 record for current heads and rollback.
+The following sections preserve dated historical checkpoints. Use the 30 September release record above for current source, acceptance and rollback.
 
-## My Atlas delivered for review — 29 September
+## Historical Atlas preview — 29 September
 
 [Exact feature, validation and recovery](app_documentation/my-atlas-20260929.md).
 

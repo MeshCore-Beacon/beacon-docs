@@ -362,8 +362,10 @@ def main(mode, manifest_path=MANIFEST, state=STATE, branch=None):
         # Refresh the independent inputs too, after potentially lengthy builds.
         overlays = active_overlays(manifest)
         combined_tree = preview_tree(repo, parent, [overlay['head'] for overlay in overlays])
+        preview = manifest.get('preview', {})
+        deployed_tree = preview.get(kind + '_tree', preview.get('server_tree'))
         plan = dict(base=base, entries=entries, preview_overlays=overlays, squash_merge_proof=proof, preview_tree=combined_tree,
-                    pi_rebuild_needed=combined_tree != manifest.get('preview', {}).get('server_tree'))
+                    pi_rebuild_needed=combined_tree != deployed_tree)
         verify_publish_state(manifest, plan)
         write(state/'prepared.json', plan)
         print('Stack merge order verified. Pi rebuild needed: '+str(plan['pi_rebuild_needed']), flush=True)

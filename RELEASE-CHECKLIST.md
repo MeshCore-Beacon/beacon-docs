@@ -1,14 +1,26 @@
 # Server/web consolidation release
 
-## 1.3.2 preparation — 30 September
+## 1.3.2 release preparation — 30 September
 
-The current phase prepares web 1.3.2 and holds My Atlas #97 for after release. The release web queue ends at #99; Atlas will remain a separate feature based on that cut. Server review fixes are published and the Pi runs `397d76b3`; the final web review stack and preview are still being validated. Earlier dated preview/rollback descriptions below are historical.
+The Pi now serves server `397d76b3` / web `eb241ca7`, with Atlas excluded. All seven server release PRs are accepted in dev `89a376c2`, whose source tree exactly matches the running server; no rebuild or relabel was needed. Web #75 → #79 → #80 → #81 → #83 → #85 → #87 → #89 → #92 → #95 → #99 is published and passes checks. The native/Windows release build passes all 955 tests, and all 21 public assets and source archives match.
 
-See [the organisation audit, candidate scope, remaining gates and recovery](app_documentation/release-132-preparation.md), and the [boundary snapshot guide](app_documentation/meshmapper-border-snapshots.md). All four organisation repositories and their open issues/PRs were inspected. Owners retain merges, release tags and production deployment.
+My Atlas #97 is held for after 1.3.2 at `66ae0cc2`, directly after #99. Its requested copy/order changes, Windows/Pi 975 tests, CI and browser checks pass; it is not deployed. External server #182 and web #93 remain separate gates.
 
-Status: development preview and review handoff, 29 September 2026 (Toronto). Stable tags and production cutover remain owner-managed. This is not a complete CoreScope parity claim.
+[Current audit, exact heads, validation and recovery](app_documentation/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
 
-## My Atlas delivered for review — 29 September
+## Owner release gates for 1.3.2
+
+- [x] Accept the seven server release PRs. Accepted dev `89a376c2` has passing CI and the same tree as the validated running server.
+- [ ] Re-review and accept the eleven release web PRs through #99; check CI on the accepted merge result.
+- [ ] Accept docs #5 so the canonical operator links in server #172/#174 resolve. Merge the remaining web sequence in dependency order.
+- [ ] Decide separately whether server #182 and web #93 belong in the cut. The current tested composition excludes them; do not silently label an untested combination as this candidate.
+- [ ] Confirm the deployed source/binary pair on the affected MeshMapper host, its packet/summary retention, broker inputs, bounded queues, and private rollback. Apply reviewed border files only where manual boundaries are missing.
+- [ ] Compare matched busy periods for accepted/dropped inputs, database work, process CPU/RSS and request latency. The Pi replay and short runtime sample do not certify production capacity. If using #182, keep profiles private and bounded.
+- [ ] Check the main operator journeys on desktop and physical iPhone Safari, including English/French, Back, dialogs, maps and expired records.
+- [ ] Promote the accepted web source to main and cut **web v1.3.2** under the repository's release process. Choose the server version independently of its existing v1.6.0 tag. Publish matching source and retain rollback artifacts.
+- [ ] Leave My Atlas #97 out of the release. Keep its one feature branch based on the accepted release work and refresh it after any squash/rebase merge before post-release acceptance.
+
+## Historical Atlas preview — 29 September
 
 [Web #97](https://github.com/MeshCore-Beacon/beacon-web/pull/97), `4fd4b0de`, is the single My Atlas feature PR requested by the contributor. It follows #95 at `e1133ab5` and closes [web #96](https://github.com/MeshCore-Beacon/beacon-web/issues/96) on acceptance. Earlier application PRs remain included; no parent was rebased for this feature.
 
