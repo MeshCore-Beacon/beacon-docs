@@ -58,9 +58,19 @@
     "Alderson review/acceptance and exact accepted-head CI",
     "24h/3d raw-history requirement versus upstream 7d/30d controls",
     "Physical iPhone Safari and production-host load/data validation",
-    "Stable image/tag publication and owner-controlled CoreScope cutover"
+    "Stable image/tag publication and owner-controlled CoreScope cutover",
+    "Decide whether to add web #108/#109 and validate the final accepted combination."
   ],
   "web_cutoff": "Accepted web #107 at b1f41dea; later changes require a release decision.",
   "web_validation_evidence": "release-140-final-20260930",
-  "server_validation_evidence": "release-140-20260930"
+  "server_validation_evidence": "release-140-20260930",
+  "later_development": {
+    "head": "61ab6697d9c727379e1de0e54aa18811a4b4bba6",
+    "prs": [
+      108,
+      109
+    ],
+    "included_in_preview": false,
+    "current_base_check": "refresh_required"
+  }
 }

@@ -1,5 +1,7 @@
 # Beacon parity and analytics roadmap
 
+Later development: web #108/#109 landed after the validated #107 cutoff. They are not in preview 23945d59. Its own CI remains green and the PR is mergeable, but the current-base stack check flags the newer development head. Alderson must choose the release cutoff and validate any additions before tagging.
+
 ## Beacon 1.4.0 candidate — 30 September
 
 **1.4.0 replaces the planned 1.3.2 release.** Alderson reviews and releases it, then switches `live.meshcore.ca` from CoreScope to production Beacon. `dev.meshcore.ca` stays online for development testing only, with separate application/data/configuration and matching development endpoints. Neither host was changed by this preparation. The server retains its independent version history.

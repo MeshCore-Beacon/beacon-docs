@@ -1,5 +1,7 @@
 # Beacon 1.4.0 release and CoreScope cutover
 
+Later development: web #108/#109 landed after the validated #107 cutoff. They are not in preview 23945d59. Its own CI remains green and the PR is mergeable, but the current-base stack check flags the newer development head. Alderson must choose the release cutoff and validate any additions before tagging.
+
 The planned Beacon/web release is **1.4.0**, replacing the earlier 1.3.2 proposal.
 Alderson reviews and releases the candidate, then controls the production switch.
 This document prepares that switch; it does not claim that either MeshCore Canada

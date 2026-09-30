@@ -33,7 +33,8 @@ record](app_documentation/release-132-preparation.md) and dated evidence documen
 ## Alderson's release gates
 
 - [ ] Review/accept server #189, web #105 and docs #5. Verify CI on the actual
-  accepted commits, including changes after the recorded candidate.
+  accepted commits, including changes after the recorded candidate. Web #108/#109
+  landed after the #107 cutoff and are not included in this preview.
 - [ ] Resolve the earlier 24h/3d raw-history requirement against upstream's restored
   7d/30d controls and the conversion of old 3d observer links to 7d.
 - [ ] Verify desktop and physical iPhone Safari, English/French, keyboard, Back,
