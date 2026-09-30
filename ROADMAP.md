@@ -6,7 +6,7 @@ The contributor approved proceeding toward and beyond CoreScope feature parity.
 The sequence is **saved-route correctness (#183) → My Atlas (#97, after 1.4.0)
 → node/trace dashboards and investigation → search/saved views/channel analytics
 → topology/distance/hash tools → bounded replay/reach/timing → regional crossing evidence**.
-Phase 1 is active. Each phase ends in focused reviewable PRs, exact Pi validation,
+Phase 1 is active on the requested `n30nex-test` branches in server, web and docs. Each phase ends in focused reviewable PRs, exact Pi validation,
 updated source/changelog and retained rollback; release numbers remain a maintainer decision.
 The current 1.4.0 handoff remains recorded below, with Atlas excluded.
 

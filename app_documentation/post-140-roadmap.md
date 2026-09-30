@@ -2,6 +2,8 @@
 
 Approved direction, 30 September 2026: deliver useful CoreScope feature parity in
 small validated phases, then extend Beacon's regional and evidence-based analysis.
+Post-1.4 work lives on the explicitly requested `n30nex-test` branches in server,
+web and docs, with focused pull requests and the Pi preview as validation.
 Version assignments remain with maintainers. The 1.4.0 release handoff is separate
 from this development queue; My Atlas remains excluded from that release.
 
@@ -9,7 +11,7 @@ from this development queue; My Atlas remains excluded from that release.
 
 | Phase | Deliverable | Completion evidence | Status |
 |---|---|---|---|
-| 1 — correctness suitable for 1.4.x | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | **Active: server #183** |
+| 1 — correctness suitable for 1.4.x | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | **Active: server #183 / PR #192** |
 | 2 — first feature after 1.4.0 | My Atlas saved-node monitoring | Refresh single web PR #97; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Held until the release; conflict refresh required |
 | 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued |
 | 4 — find and compare | Bounded global entity search, saved views/filters, Atlas-node filters, channel activity and hearing context | Search/paging/share links agree; channel key/history availability is explicit; comparisons use aligned windows | Queued |
@@ -26,7 +28,7 @@ needs a separately agreed authentication and ownership contract.
 ## First implementation: saved-route evidence
 
 [Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) remains
-open. The same fully resolved node chain can arrive with different hash widths,
+open, with the server correction in [PR #192](https://github.com/MeshCore-Beacon/beacon-server/pull/192). The same fully resolved node chain can arrive with different hash widths,
 while its saved prefix metadata currently stays at the first representation.
 That can omit newer exact-path observations from route evidence.
 
