@@ -8,6 +8,9 @@ has no new pull request. The earlier 1.4.0 handoff remains a separate historical
 checkpoint. The maintainer's proposed 2.0 baseline and synchronized version policy
 are recorded in the [roadmap](post-140-roadmap.md); they have not changed this
 running build or authorized a database reset.
+The later 24-hour dev / 7-day production raw-retention proposal is also not applied
+to this Pi preview; its recorded policy remains 72-hour raw packets and 30-day
+summaries pending an explicit configuration decision.
 
 [Open My Atlas](https://canadaverse.org/beacon-dev/?tab=MyAtlas) ·
 [Corresponding source and changelog](https://canadaverse.org/beacon-dev/source.html)

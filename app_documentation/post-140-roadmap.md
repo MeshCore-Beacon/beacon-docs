@@ -29,6 +29,23 @@ node/trace work. Atlas stays enabled in the experiment; its inclusion in the sta
 2.0 release has not been decided. The existing daily job checks and reports only;
 it does not automatically rebase, push, deploy or reset databases.
 
+A follow-up maintainer discussion proposes **24-hour raw packets on dev** and
+**7-day raw packets in production**, to keep development data and migrations
+smaller. These are environment-specific proposals, not applied settings. They do
+not authorize shortening the Pi preview's existing 72-hour raw retention or
+purging its data. The previously agreed 30-day summary policy has not been changed
+by this discussion. Validate the eventual configuration per deployment; offer raw
+history windows that match that retention, with longer windows only where durable
+summaries support them. The old fixed 24h/3d decision must be reconciled with this
+proposed deployment split rather than applied globally.
+
+The maintainer also reports that dev now uses rotational storage. Treat that as
+reported environment context, not a measured cause of any latency change; compare
+performance with storage, data volume and workload identified. Keep the source/
+changelog as the release audit trail. When a new baseline is accepted, distinguish
+its included work from later experimental changes while retaining older history
+and matching source downloads.
+
 ## Experimental delivery scope
 
 Approved direction, 30 September 2026: deliver useful CoreScope feature parity in

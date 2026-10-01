@@ -9,6 +9,11 @@ is to validate that published baseline on a separate database before extending t
 feature work. The discussion is not authorization to wipe the Pi or reuse an old
 migration journal with a new baseline. See the [version and migration direction](app_documentation/post-140-roadmap.md#maintainer-direction--30-september-2026).
 
+A follow-up proposes 24-hour raw retention on dev and 7 days in production, and
+reports that dev has moved to rotational storage. No retention change is applied
+to the Pi by this discussion. Chart windows need to follow the effective retention
+of their deployment; summary-backed history remains distinct from raw records.
+
 The contributor approved proceeding toward and beyond CoreScope feature parity.
 The sequence is **validate the upcoming 2.0 baseline → preserve saved-route correctness (#183) and experimental My Atlas (#97)
 → node/trace dashboards and investigation → search/saved views/channel analytics
