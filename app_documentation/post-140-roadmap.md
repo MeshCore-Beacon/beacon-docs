@@ -2,14 +2,20 @@
 
 ## Current checkpoint — 1 October 2026
 
-Mesh Pulse is deployed on the experimental Pi with Atlas and route evidence. The
-node-list scope field is restored so stored defaults can enrich neighbour links.
-Upstream server `3ac4035` and web `6de673b` landed during this phase. The 2.0
-integration is prepared separately and validated on a fresh test database; the live
-preview keeps its legacy database and retained history. Promoting that integration
-and choosing history availability is the next decision, before new baseline-dependent
-features. The dated proposal below is retained as history and is superseded by
-this implementation state. [Exact preview and recovery](n30nex-test-preview.md).
+Mesh Pulse includes Atlas, route evidence and the connected-layout/camera patch
+`117ee99`. Regions and nodes are placed using actual connections; larger groups get
+more space. All loaded paths remain visible by default. Region focus, isolation,
+pan/orbit/zoom, top view and full screen work alongside live packet animation.
+The topology now includes resolved saved routes, with 15-minute (default), one-hour
+and 24-hour windows, plus 60-second live trails. Static drawing is cached separately.
+
+The 2.0 baseline has landed upstream. The latest compatibility check found source
+conflicts with dev, including the separately prepared 2.0 integration; its earlier
+clean-merge receipt is no longer current. This focused frontend patch applies cleanly
+to that prepared checkout and still trial-merges cleanly with main. Refreshing the
+overall integration and choosing a fresh-database/history cutover remain separate.
+The live experiment keeps its legacy database and retained history.
+[Exact preview, validation and recovery](n30nex-test-preview.md).
 
 ## Maintainer direction — 30 September 2026
 
@@ -91,10 +97,12 @@ The implementation is original; CartoLite is a design reference, not an embedded
 |---|---|---|---|
 | Now | Stable area packing and transient packet overlays | Mesh Pulse: deterministic IATA clusters, orbit/zoom, node shapes, packet-type colours; preserve unknown hops instead of drawing invented links | Delivered on the experimental Pi preview |
 | Now | Finder and neighbour spotlight | Search loaded full identities, highlight existing neighbour links, inspect nodes/packets/reporting observers through Beacon panels | Included in this phase |
-| Now | Compact controls and bounded drawing work | Lazy tab, 2,000 nodes/5,000 links, at most 64 animated paths, 30 fps ceiling, reduced motion, pause/background cleanup, keyboard controls, English/French | Included in this phase |
+| Now | Compact controls and bounded drawing work | Lazy tab, 20,000 nodes, 60,000 recent routes, 100,000 links/live segments, 10,000 reports and 512 animations; static ink cache, 30 fps ceiling, reduced motion, pause/background cleanup, English/French | Included in connected-layout patch |
 | Now | Regional context | Differentiate cross-IATA links and matching advertised default scopes; show cached MeshMapper catalogue counts/freshness separately | Included in this phase |
-| Next | Route focus and constrained live follow | Follow a selected node/observer/region without camera jumps; retain explicit exit and keyboard return | Planned after first topology feedback |
-| Next | Display preferences | Declutter labels at overview scale; save topology camera/detail preferences, clear reset, cache static ink separately from traffic, measured adaptive quality and a reusable motion setting | Planned; measure before increasing rendering complexity |
+| Now | Connected layout and regional camera | Pull linked regions together, separate islands, spread connected nodes, preserve all paths, focus/isolate regions and fit/pan/orbit/zoom; full screen and shared focus URLs | Included in connected-layout patch |
+| Now | Observed route coverage | Load adjacent resolved route segments for a selected window; keep missing-hop gaps, distinguish these from neighbour records and live reports | Included in connected-layout patch |
+| Next | Constrained live follow | Follow a selected node/observer/region without camera jumps; retain explicit exit and keyboard return | Planned |
+| Next | Display preferences | Save camera/detail preferences and add measured adaptive quality; static ink caching and label collision handling are implemented | Planned; measure before adding rendering complexity |
 | Later | Retained traffic replay | Bounded server cursor/window, visible gaps and retention, one time controller shared by map/topology | Requires retained-evidence API contract |
 | Later | Cross-view selection and discovery | Shared node/route focus between Atlas, topology, map and investigation; bounded global search | Align with phases 3–4 |
 | Optional | Sound and exhibition views | Opt-in sound only after accessibility/performance feedback; no automatic audio or copied decorative Labs assets | Deferred |

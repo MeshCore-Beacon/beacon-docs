@@ -12,14 +12,16 @@ web PR, stable release or production-host change.
 | Repository | Preview source |
 |---|---|
 | Server | `644960e4a6d6a1c02e10ace182f6d335358d3f44` — cached catalogue API and the node-list default-scope mapping correction |
-| Web | `4b2497dfc6e8adba145c6c660daebfe0fec5e648` — Mesh Pulse, Atlas and route evidence |
+| Web | `117ee99a60e6f7da352bb27a442eaae7f056706d` — connected layout, regional camera, saved routes and live trails; Atlas retained |
 | Docs | `n30nex-test`, draft #7 — roadmap, contracts and this record |
 
 ## Mesh Pulse
 
-- Native canvas perspective projection, stable IATA groups, orbit/zoom, keyboard
-  controls and node-type colours. Unlocated nodes are included. The finder searches
-  loaded names and public keys; selection highlights known neighbours.
+- Native canvas perspective projection with connection-driven regional placement,
+  separate islands sized for their populations, and connected-node spacing. Region
+  labels and the camera selector focus a region; Isolate loads it alone. Pan/orbit,
+  pinch/scroll zoom, keyboard controls, top/3D views and full screen are included.
+  Focus and isolation survive shared URLs and Back/reload.
 - Live packet reports animate only adjacent, single-candidate resolved hops. Missing
   or ambiguous identities leave gaps. Packet, node and reporting-observer actions
   open Beacon's existing investigation panels.
@@ -31,24 +33,42 @@ web PR, stable release or production-host change.
 - The node-list correction exposes a field its SQL already selected. It adds no
   query per node. `/scope-catalogues` serves the existing importer's immutable cache;
   viewing or refreshing this page does not initiate upstream MeshMapper HTTP.
-- Bounded to 2,000 nodes, 5,000 stored neighbour links, 2,000 reports per browser
-  60-second window and 64 simultaneous animated paths. Drawing is capped at 30 fps,
-  UI updates are coalesced, and the tab is lazy-loaded with no new dependencies.
-  Pause, reduced motion, hidden-tab cleanup and English/French controls are included.
+- All paths is the default: every loaded neighbour link plus adjacent resolved
+  saved-route segments. The route window is 15 minutes by default, with one-hour
+  and 24-hour choices. Live trails persist for 60 seconds. Region bundles and
+  selected-node views are optional; live animations continue in every display mode.
+- Bounded to 20,000 nodes, 60,000 recent routes, 100,000 links/live segments,
+  10,000 reports per browser 60-second window and 512 simultaneous animations.
+  A reached limit is visible. Static ink is cached separately from live motion,
+  animation targets 30 fps, UI updates are coalesced and queries are cancellable.
+  Pause, reduced motion, hidden-tab cleanup and English/French controls remain.
+  No rendering dependency or database migration was added.
 
-Groups use the latest receiving IATA, not geographic position. Stored neighbour
+Groups use the latest receiving IATA, not geographic position; isolation includes
+all loaded nodes heard in that IATA. Connection-driven placement reduces clutter
+but does not guarantee zero projected crossings in a dense, fully visible graph.
+Curve height is presentation only, not physical altitude. Stored neighbour
 links have no selected time window. Motion illustrates a path, not measured RF
 travel time, delivery or loss. Reports count packet/observer pairs received in this
 view, with windowed deduplication and explicit pauses/reconnect gaps.
 
 ## Validation
 
-The deployed frontend passed native Pi build/lint and **1,073 tests in 122 files**.
-Windows tests and focused lifecycle, ambiguity, capacity, cancellation and unknown
-payload tests pass. Desktop and French phone layouts, keyboard orbit, reduced motion,
-node/observer return, retained packet drill-down, pause/resume and live motion were
-checked. At the full-mesh browser check, 1,958 loaded nodes and 4,015 links were shown.
-These are a dated observation, not permanent totals.
+The exact frontend passed native Pi build/lint and **1,078 tests in 122 files**.
+The final native assets passed desktop and French 390px browser checks: all-path
+visibility, 160 simultaneous report animations, no static redraws during a sampled
+second of animation, full screen, regional camera, pan/zoom/fit, isolation,
+Back/reload and reduced motion. The public site returned 1,991 nodes and 4,220
+connections in the default window, or 5,041 connections after the 24-hour query
+completed, with no cap warning. A fresh browser loaded the default view in 2.31s;
+loading the longer route history took about 11s. These are observations, not a
+load-capacity guarantee. The live check received 112 real reports, including 84
+with resolved paths, and no page errors.
+
+Windows builds and browser checks passed. One local Node 22 validation process
+exited with an access violation; the unfinished Windows full suite was stopped.
+The exact candidate's complete suite passed using Node 24.15.0 on the Pi.
+Physical iPhone/Safari and sustained production-load qualification are not claimed.
 
 Native Go/PostgreSQL tests pass for the server, including scope cache freshness,
 concurrent snapshot readers, disabled/invalid sources and node-list scope projection.
@@ -66,6 +86,23 @@ visible. The short initial runtime sample showed app CPU of 3.22–6.25% and abo
 follow-up sample was lower. A 355-second full-mesh browser sample measured about
 19.5% main-thread task time and 19.3 MB JS heap. These samples are not a controlled
 before/after benchmark or a physical-phone performance certification.
+
+## Current frontend recovery — 1 October
+
+The connected-layout update changes only static frontend files. All 24 published
+files and both corresponding-source archives match; the source/changelog is current.
+Every existing container identity and restart count was unchanged by deployment.
+Server `644960e4`, schema 045, configuration and the 72h raw/30d summary policy remain.
+
+Latest rollback is `evidence/topology-camera-20261001/deploy-beacon-web.py rollback
+--evidence-dir topology-camera-20261001`, checkpoint `web-20261001T231151Z`. It restores
+web `4b2497df` while keeping the server and new traffic. Use this frontend rollback
+before the older backend recovery recipes below.
+
+The new patch applies cleanly to the prepared 2.0 web checkout. The whole experimental
+branch still has 14 dev merge conflicts inherited from the 2.0 transition; main
+trial-merges cleanly. The earlier prepared-integration receipts below apply to their
+recorded upstream revisions and do not establish compatibility with newer dev.
 
 ## Upstream 2.0 landed during this phase
 
@@ -100,7 +137,7 @@ To undo the whole Mesh Pulse phase, run that recovery first, then
 `evidence/mesh-topology-20261001/deploy-server.py rollback`, checkpoint
 `mesh-topology-20261001T010811Z`, restoring `af2604a6` / `b99b6e77`.
 
-The latest frontend-only recovery is
+The previous frontend-only recovery is
 `evidence/topology-scope-list-20261001/deploy-beacon-web.py rollback --evidence-dir topology-scope-list-20261001`,
 checkpoint `web-20261001T022604Z`, restoring web `c5265037` with server `644960e4`.
 The backend rollback above applies that frontend recovery first when necessary.
