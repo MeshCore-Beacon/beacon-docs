@@ -24,3 +24,20 @@ Operator logs under `component=meshmapper.scopes` show the IATA, source, active 
 Catalogue counts remain source metadata. They never create Beacon packet counts, observer associations or node defaults. Actual packet-code matching supplies those associations through the existing ingest path. New names affect subsequent packets; no historical scan is started. Channel message tags and import-status UI are separate follow-ups. An invalid saved catalogue is logged and excluded until a valid refresh; other sources and manual keys still load. Database access failures remain startup errors. Disabling the importer restores manual-only matching. Previously imported identities remain visible in `/scopes` and historical records; visibility does not imply an active matcher candidate.
 
 Validate and back up PostgreSQL before applying the migration. Rollback to an older server must restore its matching pre-import database and configuration as well as its binary; an older matcher does not understand imported-only ownership or regional candidate limits.
+
+## Experimental catalogue view
+
+`GET /api/v1/scope-catalogues` returns only currently configured importer sources,
+with normalized case-sensitive names, regional counts, monitored/wardriving flags,
+source URL and generation/check/freshness times. No HTTP fetch or database query is
+triggered by this endpoint. Disabled imports return an empty list; failed refreshes
+retain the previous valid metadata with `lastError`. A past `freshUntil`, an error
+or `checkedAt=0` must be shown as stale/unavailable. This response never assigns a
+scope to individual nodes or links. Mesh Pulse separately shows Beacon's advertised
+node defaults and packet-matched scopes. Older servers may return 404; the topology
+continues without catalogue enrichment.
+
+The experimental node-list response now preserves `defaultScope`, which the list
+query already selected. This is packet-derived node metadata, distinct from the
+regional catalogue and its repeater counts. No per-node request or history scan is
+needed for topology scope context.

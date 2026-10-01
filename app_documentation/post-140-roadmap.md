@@ -1,5 +1,16 @@
 # Beacon experimental roadmap: 2.0 baseline and feature parity
 
+## Current checkpoint — 1 October 2026
+
+Mesh Pulse is deployed on the experimental Pi with Atlas and route evidence. The
+node-list scope field is restored so stored defaults can enrich neighbour links.
+Upstream server `3ac4035` and web `6de673b` landed during this phase. The 2.0
+integration is prepared separately and validated on a fresh test database; the live
+preview keeps its legacy database and retained history. Promoting that integration
+and choosing history availability is the next decision, before new baseline-dependent
+features. The dated proposal below is retained as history and is superseded by
+this implementation state. [Exact preview and recovery](n30nex-test-preview.md).
+
 ## Maintainer direction — 30 September 2026
 
 The contributor shared a maintainer discussion whose final proposed target is
@@ -24,8 +35,8 @@ needs a separate cutover decision after the candidate is concrete and tested.
 Any retained history/import requirements must be decided explicitly; a new empty
 database does not contain the old 30-day summaries.
 
-The next step is baseline compatibility and recovery validation, then the queued
-node/trace work. Atlas stays enabled in the experiment; its inclusion in the stable
+Baseline compatibility and recovery validation still gate database-dependent
+node/trace work. The contributor has since prioritized the frontend topology phase below. Atlas stays enabled in the experiment; its inclusion in the stable
 2.0 release has not been decided. The existing daily job checks and reports only;
 it does not automatically rebase, push, deploy or reset databases.
 
@@ -62,16 +73,63 @@ My Atlas is explicitly included in the experimental branch and Pi preview.
 
 [Current experimental build, validation and recovery](n30nex-test-preview.md).
 
+## CartoLite-inspired preview phase — 1 October 2026
+
+The contributor moved a graphical, animated topology experiment ahead of the
+node/trace dashboards. Work stays on `n30nex-test`, including Atlas, without review
+pings. This phase reuses existing node, neighbour and live packet data; it does not
+need the proposed 2.0 database reset. Baseline compatibility remains a separate gate.
+
+Reference audit: [CartoLite](https://github.com/n30nex/CartoLite/tree/f2b4bdff314094c22749819ddc6817d545aa0fa0),
+particularly [Netgraph](https://github.com/n30nex/CartoLite/blob/f2b4bdff314094c22749819ddc6817d545aa0fa0/docs/netgraph.md),
+`netgraph/layout.ts`, `quality.ts`, `follow.ts`, `nodeInspector.ts` and `routeFocus.ts`.
+CartoLite currently uses layered 2D canvases. Beacon adds a real perspective camera
+and 3D node positions with native canvas drawing, without a new rendering dependency.
+The implementation is original; CartoLite is a design reference, not an embedded app.
+
+| Priority | Useful CartoLite idea | Beacon adaptation and evidence boundary | State |
+|---|---|---|---|
+| Now | Stable area packing and transient packet overlays | Mesh Pulse: deterministic IATA clusters, orbit/zoom, node shapes, packet-type colours; preserve unknown hops instead of drawing invented links | Delivered on the experimental Pi preview |
+| Now | Finder and neighbour spotlight | Search loaded full identities, highlight existing neighbour links, inspect nodes/packets/reporting observers through Beacon panels | Included in this phase |
+| Now | Compact controls and bounded drawing work | Lazy tab, 2,000 nodes/5,000 links, at most 64 animated paths, 30 fps ceiling, reduced motion, pause/background cleanup, keyboard controls, English/French | Included in this phase |
+| Now | Regional context | Differentiate cross-IATA links and matching advertised default scopes; show cached MeshMapper catalogue counts/freshness separately | Included in this phase |
+| Next | Route focus and constrained live follow | Follow a selected node/observer/region without camera jumps; retain explicit exit and keyboard return | Planned after first topology feedback |
+| Next | Display preferences | Declutter labels at overview scale; save topology camera/detail preferences, clear reset, cache static ink separately from traffic, measured adaptive quality and a reusable motion setting | Planned; measure before increasing rendering complexity |
+| Later | Retained traffic replay | Bounded server cursor/window, visible gaps and retention, one time controller shared by map/topology | Requires retained-evidence API contract |
+| Later | Cross-view selection and discovery | Shared node/route focus between Atlas, topology, map and investigation; bounded global search | Align with phases 3–4 |
+| Optional | Sound and exhibition views | Opt-in sound only after accessibility/performance feedback; no automatic audio or copied decorative Labs assets | Deferred |
+
+[MeshMapper Scopes API](https://wiki.meshmapper.net/scopes-api/) was rechecked.
+It is public, uses a five-minute cache/ETag and a 60 requests/minute/IP limit. It
+returns names and regional counts, **not per-repeater identities**. Keep Beacon's
+existing configured-source importer, conditional requests and manual fallback.
+A read-only `/scope-catalogues` endpoint exposes its immutable cached metadata;
+opening a graph never initiates upstream HTTP or packet-table scans. A missing,
+failed, disabled or stale catalogue must not create or remove neighbour evidence.
+Case-sensitive scope names and monitored zero-count entries remain intact.
+
+The [Zones API](https://wiki.meshmapper.net/zones-api/) lists published regional
+URLs by country and serves nullable GeoJSON boundaries, cached hourly with ETags.
+Use that discovery contract for a future configured-source expansion and map link;
+keep geometric boundary crossings separate from receiving-IATA changes.
+
+Shared advertised defaults are context, not proof of forwarding. An IATA group is
+based on the node's latest hearing region, not geographic coordinates. Packet
+colours follow high-confidence adjacent resolved hops; animation speed is illustrative.
+The existing Pi importer is configured for YOW. Other IATAs must say their catalogue
+is unavailable until a published source is deliberately configured; do not invent
+URLs or assign a group catalogue's counts to every member region.
+
 ## Delivery order
 
 | Phase | Deliverable | Completion evidence | Status |
 |---|---|---|---|
-| Next — upstream 2.0 baseline | Inspect synchronized versioning and the flattened migration contract when published | Validate an isolated fresh database, API/feature compatibility, available history and recoverable cutover; preserve the running Pi database | Awaiting upstream implementation |
+| Separate gate — upstream 2.0 baseline | Inspect synchronized versioning and the flattened migration contract when published | Validate an isolated fresh database, API/feature compatibility, available history and recoverable cutover; preserve the running Pi database | Landed during this phase; isolated integration and fresh-database checks pass, cutover/history decision pending |
 | 1 — correctness | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Route fix delivered to the experimental Pi preview; remaining controls/polish are separate; server PR #192 stays draft |
 | 2 — experimental Atlas | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Delivered in n30nex-test; stable-release inclusion remains undecided |
 | 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued after baseline validation |
 | 4 — find and compare | Bounded global entity search, saved views/filters, Atlas-node filters, channel activity and hearing context | Search/paging/share links agree; channel key/history availability is explicit; comparisons use aligned windows | Queued |
-| 5 — network structure | Observed route segments/alternatives, topology, distance, hash ambiguity and prefix/path inspection | Count evidence at the correct grain; separate observed ambiguity from static conflicts; use valid coordinates and show unresolved hops | Queued |
+| 5 — network structure | Observed route segments/alternatives, topology, distance, hash ambiguity and prefix/path inspection | Count evidence at the correct grain; separate observed ambiguity from static conflicts; use valid coordinates and show unresolved hops | 3D topology and scope context delivered; distance/hash inspection remains queued |
 | 6 — history and reach | Bounded retained map replay, observer reach and timing analysis, comparable fleet telemetry | Replay preserves ordering and retention limits; confirmed identities are separate from unresolved prefixes; timing/counter gaps are not labelled packet loss | Queued |
 | Beyond parity | Regional boundary/scope crossing investigation and links between observations, discovered scopes and route changes | Each relationship links to retained evidence; distinguish reported locations from inferred paths and scope names from geography | Queued after supporting phases |
 
