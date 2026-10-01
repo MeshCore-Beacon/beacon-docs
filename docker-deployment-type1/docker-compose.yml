@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/meshcore-beacon/beacon-server:latest
+    image: ${BEACON_SERVER_IMAGE:?Set BEACON_SERVER_IMAGE to the reviewed server tag or digest}
     env_file: .env
     ports:
       - "127.0.0.1:8080:8080"
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/meshcore-beacon/beacon-web:latest
+    image: ${BEACON_WEB_IMAGE:?Set BEACON_WEB_IMAGE to the reviewed web tag or digest}
     env_file: .env
     environment:
       - VITE_API_BASE=${VITE_API_BASE:?VITE_API_BASE environment variable is required}

@@ -6,6 +6,13 @@ This repo is the single place to:
 
 1. **Grab a deployment** — copy the Docker Compose folder for the topology you want, fill in your variables, and `docker compose up -d`.
 2. **Read the docs** — project-wide design and API documentation that describe how the whole system works.
+3. **Follow development** — the [parity and analytics roadmap](ROADMAP.md) and [executable contributor workflow](CONTRIBUTOR_WORKFLOW.md) track review dependencies, validation and the next phases.
+
+**Beacon 1.4.0:** [release and cutover plan](app_documentation/release-140-preparation.md).
+The intended production destination is `live.meshcore.ca`, replacing CoreScope after
+Alderson's approval. `dev.meshcore.ca` stays online for development testing only.
+The Canadaverse preview remains the separate review candidate. My Atlas is deferred
+until after 1.4.0. These roles do not imply that production has already switched.
 
 ---
 
@@ -58,6 +65,8 @@ Set every `CHANGE_*` value. The variables you must fill in:
 | Variable | Service | What to set |
 |---|---|---|
 | `POSTGRES_DSN` | `app` | Database connection string. Change the password (`CHANGE_DB_PASS`) to a strong one. |
+| `BEACON_SERVER_IMAGE` | `app` | Required reviewed server tag or digest, chosen independently of the web version. |
+| `BEACON_WEB_IMAGE` | `web` | Required reviewed web tag or digest; `1.4.0` becomes available after the stable tag is published. |
 | `REDIS_ADDR` | `app` | `redis:6379` — points the API at the compose Redis service. Leave it out and the server runs uncached, so every read hits Postgres. |
 | `MQTT_BROKER_1_*` / `MQTT_BROKER_2_*` | `app` | URL, username, and password for your live MeshCore MQTT packet sources. |
 | `DOMAIN` | `caddy` | Your public domain (e.g. `beacon.example.com`). Caddy auto-provisions a Let's Encrypt cert for it. |
