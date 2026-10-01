@@ -1,14 +1,22 @@
 # Beacon parity and analytics roadmap
 
-## Active post-1.4 phased work — 30 September
+## Active experimental work and proposed 2.0 baseline — 30 September
+
+The latest maintainer discussion ends at **2.0.0**, with synchronized server/web
+major/minor versions and independent patch levels. Flattened migrations and a clean
+start are proposed but have not landed in the checked upstream refs. The next step
+is to validate that published baseline on a separate database before extending the
+feature work. The discussion is not authorization to wipe the Pi or reuse an old
+migration journal with a new baseline. See the [version and migration direction](app_documentation/post-140-roadmap.md#maintainer-direction--30-september-2026).
 
 The contributor approved proceeding toward and beyond CoreScope feature parity.
-The sequence is **saved-route correctness (#183) → My Atlas (#97, experimental now; release after 1.4.0)
+The sequence is **validate the upcoming 2.0 baseline → preserve saved-route correctness (#183) and experimental My Atlas (#97)
 → node/trace dashboards and investigation → search/saved views/channel analytics
 → topology/distance/hash tools → bounded replay/reach/timing → regional crossing evidence**.
-Phases 1 and 2 are combined on the requested `n30nex-test` branches in server, web and docs. The Pi preview runs this experimental composition, with daily upstream dev/main compatibility checks and no review pings. The route fix and Atlas are validated; node/trace dashboards and deeper investigation are next. Each phase ends in focused reviewable PRs, exact Pi validation,
+Phases 1 and 2 are combined on the requested `n30nex-test` branches in server, web and docs. The Pi preview runs this experimental composition, with daily upstream dev/main compatibility checks and no review pings. The route fix and Atlas are validated; node/trace dashboards follow baseline validation. Each phase ends in focused reviewable PRs, exact Pi validation,
 updated source/changelog and retained rollback; release numbers remain a maintainer decision.
-The current 1.4.0 handoff remains recorded below, with Atlas excluded.
+The earlier 1.4.0 handoff remains recorded below as historical evidence. Atlas stays
+experimental; its inclusion in a stable 2.0 release is not yet decided.
 
 [Phases, contracts and acceptance](app_documentation/post-140-roadmap.md) · [Current experimental preview](app_documentation/n30nex-test-preview.md).
 

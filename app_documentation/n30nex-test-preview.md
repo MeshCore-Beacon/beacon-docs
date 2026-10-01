@@ -4,7 +4,10 @@ Verified 30 September 2026. The contributor requested separate `n30nex-test`
 branches, Atlas in the Pi preview, and daily checks against upstream dev/main.
 This work is experimental. Existing server #192 and docs #7 remain drafts; do not
 request reviews, mention reviewers or promote the work until asked. The web branch
-has no new pull request. The stable 1.4.0 release handoff remains separate.
+has no new pull request. The earlier 1.4.0 handoff remains a separate historical
+checkpoint. The maintainer's proposed 2.0 baseline and synchronized version policy
+are recorded in the [roadmap](post-140-roadmap.md); they have not changed this
+running build or authorized a database reset.
 
 [Open My Atlas](https://canadaverse.org/beacon-dev/?tab=MyAtlas) ·
 [Corresponding source and changelog](https://canadaverse.org/beacon-dev/source.html)
@@ -83,7 +86,7 @@ database over new traffic.
 Daily compatibility checks run at 09:00 America/Toronto. They inspect upstream
 changes and isolated trial merges, preserving active work and reporting meaningful
 changes only. They do not push, rebase, deploy or ping reviewers automatically.
-Use the [phased roadmap](post-140-roadmap.md) for subsequent work; node/trace
-dashboards and deeper investigation are next, alongside the separate retained-window
-decision. Atlas remains excluded from the stable 1.4.0 release even though it is
-enabled in this experiment.
+Use the [phased roadmap](post-140-roadmap.md) for subsequent work. Validate the
+proposed upstream 2.0 baseline separately when it lands, preserving this database
+and rollback; node/trace dashboards and deeper investigation follow. Atlas is
+enabled in this experiment, with stable-release inclusion still undecided.

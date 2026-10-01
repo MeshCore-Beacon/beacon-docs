@@ -1,16 +1,47 @@
-# Beacon after 1.4: parity and further development
+# Beacon experimental roadmap: 2.0 baseline and feature parity
+
+## Maintainer direction — 30 September 2026
+
+The contributor shared a maintainer discussion whose final proposed target is
+**2.0.0**, superseding the earlier 1.7.0 suggestion and 1.4.0 planning target.
+This is planning evidence, not a published release or permission to reset data.
+At this check, upstream server dev remains `da6de40b`, web dev `e2d272e0`, and
+docs main `e671ee45`; the announced migration reset has not landed in those refs.
+The existing 1.4 records below and elsewhere remain dated validation checkpoints.
+
+The proposed version policy is shared **major/minor** versions for server and web,
+with independent patch levels. Medium/large features advance the minor version,
+fixes advance the patch version, and major changes or a deliberate new baseline
+advance the major version. There is no automatic major bump after a fixed number
+of minor releases. Maintainers choose release versions and tags.
+
+The maintainer plans to flatten historical migrations and require a clean start.
+Once that work lands, inspect its actual startup/upgrade contract and validate the
+new baseline on a separate disposable database. Preserve the current Pi database,
+configuration, source and rollback. Do not apply a flattened migration history to
+the existing database or reset it automatically. A fresh preview/production switch
+needs a separate cutover decision after the candidate is concrete and tested.
+Any retained history/import requirements must be decided explicitly; a new empty
+database does not contain the old 30-day summaries.
+
+The next step is baseline compatibility and recovery validation, then the queued
+node/trace work. Atlas stays enabled in the experiment; its inclusion in the stable
+2.0 release has not been decided. The existing daily job checks and reports only;
+it does not automatically rebase, push, deploy or reset databases.
+
+## Experimental delivery scope
 
 Approved direction, 30 September 2026: deliver useful CoreScope feature parity in
 small validated phases, then extend Beacon's regional and evidence-based analysis.
-Post-1.4 work lives on the explicitly requested `n30nex-test` branches in server,
+Development work lives on the explicitly requested `n30nex-test` branches in server,
 web and docs, with focused pull requests and the Pi preview as validation.
 The branch is experimental: keep existing PRs in draft and do not request or ping
 for review until the contributor asks. Daily upstream dev/main compatibility checks
 are scheduled; inspect dirty work first, use isolated trial merges, and report only
 new changes, conflicts or required decisions. Routine checks do not push, deploy
-or merge changes automatically. Version assignments remain with maintainers. The 1.4.0 release handoff is separate
-from this development queue; My Atlas remains excluded from that release, but is explicitly included in the
-experimental branch and Pi preview at the contributor's request.
+or merge changes automatically. Version assignments remain with maintainers. The
+earlier 1.4.0 handoff is historical and separate from this development queue.
+My Atlas is explicitly included in the experimental branch and Pi preview.
 
 [Current experimental build, validation and recovery](n30nex-test-preview.md).
 
@@ -18,9 +49,10 @@ experimental branch and Pi preview at the contributor's request.
 
 | Phase | Deliverable | Completion evidence | Status |
 |---|---|---|---|
-| 1 — correctness suitable for 1.4.x | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Delivered to the experimental Pi preview; server PR #192 stays draft |
-| 2 — first feature after 1.4.0 | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Delivered in n30nex-test; all 1,066 native frontend tests and public checks pass |
-| 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued |
+| Next — upstream 2.0 baseline | Inspect synchronized versioning and the flattened migration contract when published | Validate an isolated fresh database, API/feature compatibility, available history and recoverable cutover; preserve the running Pi database | Awaiting upstream implementation |
+| 1 — correctness | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Route fix delivered to the experimental Pi preview; remaining controls/polish are separate; server PR #192 stays draft |
+| 2 — experimental Atlas | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Delivered in n30nex-test; stable-release inclusion remains undecided |
+| 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued after baseline validation |
 | 4 — find and compare | Bounded global entity search, saved views/filters, Atlas-node filters, channel activity and hearing context | Search/paging/share links agree; channel key/history availability is explicit; comparisons use aligned windows | Queued |
 | 5 — network structure | Observed route segments/alternatives, topology, distance, hash ambiguity and prefix/path inspection | Count evidence at the correct grain; separate observed ambiguity from static conflicts; use valid coordinates and show unresolved hops | Queued |
 | 6 — history and reach | Bounded retained map replay, observer reach and timing analysis, comparable fleet telemetry | Replay preserves ordering and retention limits; confirmed identities are separate from unresolved prefixes; timing/counter gaps are not labelled packet loss | Queued |
