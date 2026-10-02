@@ -1,5 +1,14 @@
 # Experimental n30nex-test preview
 
+## Prepared branch versus deployed preview — 2 October
+
+The prepared 2.0 branch heads are server `ae328cb6` and web `9d3f9585`, including
+upstream hourly rollups. They have not been deployed. The table below continues
+to identify the actual running binaries/assets and their matching source offer.
+[Post-2.0 feature packages and validation](post-20-integration.md) describes the
+clean merge sequence. Daily compatibility checks remain paused; no database reset
+or review request is authorized by this preparation.
+
 The Pi preview now includes **Topology**, a 3D topology with animated live packet
 paths, alongside My Atlas and pinned route evidence. Work remains on `n30nex-test`.
 Server #192 and docs #7 stay draft, with no new review requests. There is no new

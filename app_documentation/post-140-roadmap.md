@@ -1,31 +1,27 @@
 # Beacon experimental roadmap: 2.0 baseline and feature parity
 
-## Current checkpoint — 1 October 2026
+## Current checkpoint — 2 October 2026
 
-The deployed UI pass is web `462d49e`: My Atlas leads desktop and mobile navigation.
-Topology has one region selector and a compact toolbar, an inspector that opens on
-selection/search, a mobile details sheet and expandable Display/Live activity panels.
-The camera now starts above the mesh; Fit centres the projected bounds and drag
-defaults to pan, with Shift-drag rotating. All paths and live traffic remain available.
-Route-window loading keeps the existing graph visible while the new data arrives.
-There are no backend, database, configuration or retention changes.
+Prepare for stable 2.0 first; My Atlas and Topology are held for later acceptance.
+The new upstream hourly-rollup commits are incorporated into the experimental
+branches: server `ae328cb6` on `98006a9`, web `9d3f9585` on `39e921c`.
+Upstream Analytics, schema, generated SQL, rollup workers and dependencies remain
+unchanged by our feature patches. Atlas is one focused commit, Topology is the next;
+optional scope metadata and exact-route evidence are separate backend packages.
+[Merge sequence, exact sources and validation](post-20-integration.md).
 
-Mesh Pulse includes Atlas, route evidence and the connected-layout/camera patch
-`117ee99`. Regions and nodes are placed using actual connections; larger groups get
-more space. All loaded paths remain visible by default. Region focus, isolation,
-pan/orbit/zoom, top view and full screen work alongside live packet animation.
-The topology now includes resolved saved routes, with 15-minute (default), one-hour
-and 24-hour windows, plus 60-second live trails. Static drawing is cached separately.
+Native PostgreSQL/build/vet checks and 1,180 web tests pass. Desktop/French phone
+browser checks retain all paths, animated traffic, camera controls and isolation.
+My Atlas #97 is refreshed against current dev and held as draft after 2.0. No review
+requests or new Topology PR were made. Daily checks remain paused.
 
-The 2.0 baseline has landed upstream. The latest compatibility check found source
-conflicts with dev, including the separately prepared 2.0 integration; its earlier
-clean-merge receipt is no longer current. This focused frontend patch applies cleanly
-to that prepared checkout and still trial-merges cleanly with main. Refreshing the
-overall integration and choosing a fresh-database/history cutover remain separate.
-The live experiment keeps its legacy database and retained history.
-[Exact preview, validation and recovery](n30nex-test-preview.md).
+The Pi still runs `644960e4` / `462d49e8`. Its database, retention, source offer and
+rollback are unchanged. A stable tag and a separate database/history decision are
+still required before deploying the prepared pair. The current request authorizes
+preparation, not a clean-start reset. Subsequent parity features remain queued.
+[Exact preview and recovery](n30nex-test-preview.md).
 
-## Maintainer direction — 30 September 2026
+## Historical maintainer direction — 30 September 2026
 
 The contributor shared a maintainer discussion whose final proposed target is
 **2.0.0**, superseding the earlier 1.7.0 suggestion and 1.4.0 planning target.
