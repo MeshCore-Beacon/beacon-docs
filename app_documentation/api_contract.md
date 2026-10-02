@@ -55,6 +55,8 @@ All errors use one shape:
 
 `code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
 
+A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
+
 ## Pagination
 
 Most lists return a page:
@@ -75,7 +77,7 @@ Most list and stats endpoints take the same location filters:
 |---|---|
 | `iatas` | Comma-separated IATA codes, case-insensitive (`YOW,YYZ`) |
 | `iata` | Single IATA, used only when `iatas` is absent |
-| `region` / `regionId` | Region slug or ID; expands to its member IATAs and adds them to any `iatas`. An unknown region is a `400`. |
+| `region` / `regionId` | Region slug or ID; expands to its member IATAs and adds them to any `iatas`. An unknown region or malformed ID is a `400`; a failed lookup is a `500`. |
 | `scope` | Transport scope name, URL-encoded (`%23bc` for `#bc`) |
 
 ---
@@ -266,7 +268,14 @@ at most 30 days old) ends the window earlier.
 Buckets are aligned to the clock in UTC (a `15m` bucket always starts at :00, :15, :30 or :45) and the
 window start is rounded up to the next bucket boundary, so bucket starts are stable across requests.
 Only non-empty buckets are returned — gaps in `points` mean the observer heard nothing in that bucket,
-and the client is expected to render them as zero.
+and the client is expected to render them as zero, except for uncovered hours (below).
+
+Hourly intervals (`1h`, `6h`, `24h`) read the analytics rollups up to the newest complete rollup hour,
+and raw observations after it, at most 24 hours back. Those responses add `rolledUntil` (end of the
+newest complete rollup hour, epoch ms; omitted before the first rollup) and `rawFrom` (start of the raw
+tail, epoch ms). Rollup buckets cover times before `rolledUntil` and raw buckets from `rawFrom` on.
+When `rawFrom` is later than `rolledUntil` (or `rolledUntil` is missing), the rollup is more than 24
+hours behind and `[rolledUntil, rawFrom)` is unknown, not quiet; show it as a gap.
 
 `radio` echoes the observer's current radio parameters plus the preamble length the airtime maths
 assumes; it is `null` when those parameters are unknown, in which case `airtimeMs` is `null` on every
@@ -350,11 +359,11 @@ Channel keys come from the server config file and, optionally, MeshMapper.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /iatas` | All IATAs, including ones created from traffic. |
-| `GET /iatas/{iata}` | One IATA. |
-| `GET /iatas/{iata}/border` | GeoJSON Feature (Polygon or MultiPolygon, with `bbox`); `204` when the IATA has no border. |
-| `GET /regions` | Regions in display order. |
-| `GET /regions/{regionId}` | One region with its IATAs. |
+| `GET /iatas` | All IATAs, including ones created from traffic. `[]` when there are none. |
+| `GET /iatas/{iata}` | One IATA. `404` if unknown or not three letters. |
+| `GET /iatas/{iata}/border` | GeoJSON Feature (Polygon or MultiPolygon, with `bbox`); `204` when the IATA has no border, `404` if the IATA is unknown. |
+| `GET /regions` | Regions in display order. `[]` when none are configured. |
+| `GET /regions/{regionId}` | One region with its IATAs. `400` for a non-numeric ID, `404` if unknown. |
 | `GET /scopes` | Array of scope names. Location filters narrow it to manual scopes configured for a matching region and imported scopes whose MeshMapper catalogue includes a matching IATA. |
 | `GET /scopes/{name}` | Scope detail (`%23bc` for `#bc`). |
 | `GET /brokers` | `[{ "name", "connected" }]` per MQTT broker. |
@@ -367,10 +376,12 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /routes` | Params: `iata`, `hopCount`, `cursor` (epoch ms), `limit` (default 50). |
+| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50). |
 | `GET /routes/search?iata=&from=&to=` | Routes in one IATA between two node hash prefixes (hex). All required. |
 | `GET /routes/cross?fromIata=&fromHash=&toIata=&toHash=` | Routes that cross IATA boundaries. All required. |
 | `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. |
+
+To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
 ### Stats
 
