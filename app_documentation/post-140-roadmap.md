@@ -1,205 +1,151 @@
-# Beacon experimental roadmap: 2.0 baseline and feature parity
+# Beacon roadmap: 2.0 integration and CoreScope parity
 
-## Current checkpoint — 2 October 2026
+## Current status — checked 2 October 2026
 
-Prepare for stable 2.0 first; My Atlas and Topology are held for later acceptance.
-The new upstream hourly-rollup commits are incorporated into the experimental
-branches: server `ae328cb6` on `98006a9`, web `9d3f9585` on `39e921c`.
-Upstream Analytics, schema, generated SQL, rollup workers and dependencies remain
-unchanged by our feature patches. Atlas is one focused commit, Topology is the next;
-optional scope metadata and exact-route evidence are separate backend packages.
-[Merge sequence, exact sources and validation](post-20-integration.md).
+| Surface | Verified state |
+|---|---|
+| Upstream server | `dev` **98006a9** includes the 2.0 baseline and hourly rollups; `main` remains **201cd9e**. Latest published release is still **v1.6.0**. |
+| Upstream web | `dev` **39e921c** consumes hourly rollups and handles empty regions; `main` remains **5ac36ce**. Latest published release is still **v1.3.0**. |
+| Upstream docs | `main` **24d2e5f**; our experimental roadmap remains in draft PR #7. |
+| Prepared experiment | `n30nex-test`: server **ae328cb6**, web **9d3f9585**. Both incorporate the named upstream dev/main heads. Server #192 and My Atlas #97 are draft, mergeable and pass their published-head CI; web CodeQL is skipped. |
+| Pi preview | Still server **644960e4** / web **462d49e8**, confirmed by the public source offer. Its legacy database, 72h raw/30d summary retention and rollback are unchanged. |
+| Official sites | `live.meshcore.ca` serves Beacon and displays **2.0.0**. `dev.meshcore.ca` also displays **2.0.0**, with a development-only banner linking everyday users to live. Backend revisions and operator rollout acceptance were not verified by this read-only browser check. |
+| Release boundary | **No stable 2.0 GitHub release/tag yet.** A frontend version label is not a published release. My Atlas and Topology remain held for post-2.0 acceptance. |
 
-Native PostgreSQL/build/vet checks and 1,180 web tests pass. Desktop/French phone
-browser checks retain all paths, animated traffic, camera controls and isolation.
-My Atlas #97 is refreshed against current dev and held as draft after 2.0. No review
-requests or new Topology PR were made. Daily checks remain paused.
+The prepared code passed native server build/vet/PostgreSQL validation and web
+build/lint/**1,180 tests**. Two opt-in backup/export tests were skipped. Browser
+checks covered desktop, French phone layouts, region isolation, all loaded paths
+and 160 animated packet reports. This roadmap-only refresh did not rerun those
+unchanged-code checks or deploy anything. Daily compatibility automation remains
+**paused**, and no review request is authorized.
 
-The Pi still runs `644960e4` / `462d49e8`. Its database, retention, source offer and
-rollback are unchanged. A stable tag and a separate database/history decision are
-still required before deploying the prepared pair. The current request authorizes
-preparation, not a clean-start reset. Subsequent parity features remain queued.
-[Exact preview and recovery](n30nex-test-preview.md).
+[Exact post-2.0 packages and merge order](post-20-integration.md) ·
+[Actual preview and rollback](n30nex-test-preview.md) ·
+[Pi source offer](https://canadaverse.org/beacon-dev/source.html).
 
-## Historical maintainer direction — 30 September 2026
+## Comparison baseline and scope
 
-The contributor shared a maintainer discussion whose final proposed target is
-**2.0.0**, superseding the earlier 1.7.0 suggestion and 1.4.0 planning target.
-This is planning evidence, not a published release or permission to reset data.
-At this check, upstream server dev remains `da6de40b`, web dev `e2d272e0`, and
-docs main `e671ee45`; the announced migration reset has not landed in those refs.
-The existing 1.4 records below and elsewhere remain dated validation checkpoints.
+This inventory compares Beacon's published dev code plus the prepared experiment
+with [CoreScope master `093e320`](https://github.com/Kpa-clawbot/CoreScope/tree/093e320c2bda99d1fef317d7fc21fc1240a8cd12),
+checked on 2 October. CoreScope's latest release is
+[v3.12.0](https://github.com/Kpa-clawbot/CoreScope/releases/tag/v3.12.0);
+master contains later fixes, so this is a source-backed workflow comparison,
+not a claim that every reference feature is deployed on every CoreScope instance.
+The old `live.meshcore.ca` CoreScope screenshots are historical references now.
 
-The proposed version policy is shared **major/minor** versions for server and web,
-with independent patch levels. Medium/large features advance the minor version,
-fixes advance the patch version, and major changes or a deliberate new baseline
-advance the major version. There is no automatic major bump after a fixed number
-of minor releases. Maintainers choose release versions and tags.
+Parity means useful user workflows with honest counting and bounded cost. It does
+not require matching CoreScope's architecture, copying every tab, or reproducing
+its performance claims on different storage and workloads. The remaining feature
+list is separated from release acceptance and production-load qualification.
 
-The maintainer plans to flatten historical migrations and require a clean start.
-Once that work lands, inspect its actual startup/upgrade contract and validate the
-new baseline on a separate disposable database. Preserve the current Pi database,
-configuration, source and rollback. Do not apply a flattened migration history to
-the existing database or reset it automatically. A fresh preview/production switch
-needs a separate cutover decision after the candidate is concrete and tested.
-Any retained history/import requirements must be decided explicitly; a new empty
-database does not contain the old 30-day summaries.
+## What is already covered
 
-Baseline compatibility and recovery validation still gate database-dependent
-node/trace work. The contributor has since prioritized the frontend topology phase below. Atlas stays enabled in the experiment; its inclusion in the stable
-2.0 release has not been decided. The existing daily job checks and reports only;
-it does not automatically rebase, push, deploy or reset databases.
+| Capability | Beacon state | Remaining boundary |
+|---|---|---|
+| Live packet feed and decoding | Upstream: filters, byte/payload inspection, per-observer receptions, signal values, shared links and mapped packet paths | A graphical reception timeline can still improve investigation. |
+| Live map and neighbour graph | Upstream: live packet animation, node/role controls, map links, neighbour view and IATA borders | Live animation does not provide historical replay. |
+| Channels and scope context | Upstream: decrypted messages, Public/hashtag keys, regional channel/scope filters and MeshMapper catalogue discovery/import | Per-channel historical analytics are still missing; unknown names cannot be inferred from a short hash alone. |
+| Observer monitoring | Upstream: unified sidebar/dashboard, activity/type/signal charts, telemetry and comparison | Reach by confirmed node/hop, fleet comparisons and timing interpretation need deeper work. |
+| Network analytics | Upstream: traffic, signal, path/hop/hash-width distributions, scopes, talkers, clock drift and neighbour graph; hourly summaries survive raw expiry | These aggregate views do not replace node or channel dashboards. |
+| Navigation and localization | Upstream: entity inspection, shareable routes/packets/observers, mobile layouts and English/French | Global search, saved filter presets and cross-page Atlas filtering remain. |
+| My Atlas | Implemented in the Pi experiment and prepared as a focused post-2.0 feature; PR #97 is refreshed, draft and clean | Acceptance after 2.0 remains. Cards use up to 200 retained origin-key reports, not complete node totals. |
+| 3D Topology | Implemented in the Pi experiment; a focused prepared commit follows Atlas | Acceptance after 2.0 remains. All paths, live animation, camera controls, region focus/isolation and lazy scope context are implemented. Follow mode, saved display preferences and replay are later work. |
+| Exact route evidence | Upstream already fixes saved-prefix refresh. The experiment adds pinned bytes/width, cursors and shared windows in separate patches | Accept the paired server/web evidence patches separately; neither new page depends on them. |
 
-A follow-up maintainer discussion proposes **24-hour raw packets on dev** and
-**7-day raw packets in production**, to keep development data and migrations
-smaller. These are environment-specific proposals, not applied settings. They do
-not authorize shortening the Pi preview's existing 72-hour raw retention or
-purging its data. The previously agreed 30-day summary policy has not been changed
-by this discussion. Validate the eventual configuration per deployment; offer raw
-history windows that match that retention, with longer windows only where durable
-summaries support them. The old fixed 24h/3d decision must be reconciled with this
-proposed deployment split rather than applied globally.
+## Remaining CoreScope parity
 
-The maintainer also reports that dev now uses rotational storage. Treat that as
-reported environment context, not a measured cause of any latency change; compare
-performance with storage, data volume and workload identified. Keep the source/
-changelog as the release audit trail. When a new baseline is accepted, distinguish
-its included work from later experimental changes while retaining older history
-and matching source downloads.
+| Area | What is left | Reference and current Beacon limit |
+|---|---|---|
+| **Node and repeater dashboards** | Full-key activity history, packet-type mix, signal/hop distributions, hearing coverage, activity heatmaps, peer relationships and comparable repeater/fleet metrics | [Node analytics source](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/node-analytics.js), [fleet/relay analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Beacon has node details/recent reports and Atlas samples, but no equivalent complete dashboard. |
+| **Packet/trace chronology and observer reach** | A graphical reception timeline, observer-to-observer spread, confirmed reach by hop/node, and a consistent return path into packets, routes and map | [CoreScope tracing overview](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/README.md#and-more). Beacon already shows first/last times, per-observer signal and trace hop chains; the gap is richer analysis, not basic packet inspection. |
+| **Global search and saved mesh filters** | Ctrl+K-style search across nodes, observers, packets and channels; use Atlas selections across views; saved filter/layout presets | [Global search and favorites](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/app.js). Beacon searches individual lists and saves cards, but has no shared search or site-wide saved-node filter. |
+| **Channel analytics** | Messages over time, channel comparisons, per-channel senders and hearing context, with explicit key/history availability | [Analytics guide](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/analytics.md#channels). The decoded message viewer and general talker statistics already exist. |
+| **Hash and prefix tools** | Collision/usage matrix, role-aware prefix-width analysis and a prefix checker with explicit ambiguity | [Hash and prefix analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Beacon already displays width distributions and ambiguous candidates; it lacks the dedicated tools. |
+| **Distance and route patterns** | Valid-coordinate hop/path distances, signal-versus-distance views, common subpath rankings and evidence-linked route alternatives/inspection | [Distance and route-pattern analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Existing route search, detail and 3D layout do not supply geographic-distance analytics. |
+| **Historical replay** | Play/pause/seek, stepping and speed controls over retained observations; one time controller for map and Topology, with visible gaps | [Live/VCR guide](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/live.md#vcr-mode). Beacon's live pause and static route-history windows are not replay. Hourly rollups cannot recreate expired packet paths. |
+| **Geographic area filtering** | Filter nodes and their attributed traffic by advertised location/polygon across views, separately from receiving-IATA groups | [Area filter](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/area-filter.md). Beacon's IATA groups, boundary overlay and optional foreign-node classification do not provide this complete workflow. |
 
-## Experimental delivery scope
-
-Approved direction, 30 September 2026: deliver useful CoreScope feature parity in
-small validated phases, then extend Beacon's regional and evidence-based analysis.
-Development work lives on the explicitly requested `n30nex-test` branches in server,
-web and docs, with focused pull requests and the Pi preview as validation.
-The branch is experimental: keep existing PRs in draft and do not request or ping
-for review until the contributor asks. Daily upstream dev/main compatibility checks
-are scheduled; inspect dirty work first, use isolated trial merges, and report only
-new changes, conflicts or required decisions. Routine checks do not push, deploy
-or merge changes automatically. Version assignments remain with maintainers. The
-earlier 1.4.0 handoff is historical and separate from this development queue.
-My Atlas is explicitly included in the experimental branch and Pi preview.
-
-[Current experimental build, validation and recovery](n30nex-test-preview.md).
-
-## CartoLite-inspired preview phase — 1 October 2026
-
-The contributor moved a graphical, animated topology experiment ahead of the
-node/trace dashboards. Work stays on `n30nex-test`, including Atlas, without review
-pings. This phase reuses existing node, neighbour and live packet data; it does not
-need the proposed 2.0 database reset. Baseline compatibility remains a separate gate.
-
-Reference audit: [CartoLite](https://github.com/n30nex/CartoLite/tree/f2b4bdff314094c22749819ddc6817d545aa0fa0),
-particularly [Netgraph](https://github.com/n30nex/CartoLite/blob/f2b4bdff314094c22749819ddc6817d545aa0fa0/docs/netgraph.md),
-`netgraph/layout.ts`, `quality.ts`, `follow.ts`, `nodeInspector.ts` and `routeFocus.ts`.
-CartoLite currently uses layered 2D canvases. Beacon adds a real perspective camera
-and 3D node positions with native canvas drawing, without a new rendering dependency.
-The implementation is original; CartoLite is a design reference, not an embedded app.
-
-| Priority | Useful CartoLite idea | Beacon adaptation and evidence boundary | State |
-|---|---|---|---|
-| Now | Stable area packing and transient packet overlays | Mesh Pulse: deterministic IATA clusters, orbit/zoom, node shapes, packet-type colours; preserve unknown hops instead of drawing invented links | Delivered on the experimental Pi preview |
-| Now | Finder and neighbour spotlight | Search loaded full identities, highlight existing neighbour links, inspect nodes/packets/reporting observers through Beacon panels | Included in this phase |
-| Now | Compact controls and bounded drawing work | Lazy tab, 20,000 nodes, 60,000 recent routes, 100,000 links/live segments, 10,000 reports and 512 animations; static ink cache, 30 fps ceiling, reduced motion, pause/background cleanup, English/French | Included in connected-layout patch |
-| Now | Regional context | Differentiate cross-IATA links and matching advertised default scopes; show cached MeshMapper catalogue counts/freshness separately | Included in this phase |
-| Now | Connected layout and regional camera | Pull linked regions together, separate islands, spread connected nodes, preserve all paths, focus/isolate regions and fit/pan/orbit/zoom; full screen and shared focus URLs | Included in connected-layout patch |
-| Now | Simpler navigation and controls | My Atlas first, one region picker, compact summary, on-demand inspector/activity, accessible mobile sheet, above-mesh camera and centred Fit | Included in UI pass `462d49e` |
-| Now | Observed route coverage | Load adjacent resolved route segments for a selected window; keep missing-hop gaps, distinguish these from neighbour records and live reports | Included in connected-layout patch |
-| Next | Constrained live follow | Follow a selected node/observer/region without camera jumps; retain explicit exit and keyboard return | Planned |
-| Next | Display preferences | Save camera/detail preferences and add measured adaptive quality; static ink caching and label collision handling are implemented | Planned; measure before adding rendering complexity |
-| Later | Retained traffic replay | Bounded server cursor/window, visible gaps and retention, one time controller shared by map/topology | Requires retained-evidence API contract |
-| Later | Cross-view selection and discovery | Shared node/route focus between Atlas, topology, map and investigation; bounded global search | Align with phases 3–4 |
-| Optional | Sound and exhibition views | Opt-in sound only after accessibility/performance feedback; no automatic audio or copied decorative Labs assets | Deferred |
-
-[MeshMapper Scopes API](https://wiki.meshmapper.net/scopes-api/) was rechecked.
-It is public, uses a five-minute cache/ETag and a 60 requests/minute/IP limit. It
-returns names and regional counts, **not per-repeater identities**. Keep Beacon's
-existing configured-source importer, conditional requests and manual fallback.
-A read-only `/scope-catalogues` endpoint exposes its immutable cached metadata;
-opening a graph never initiates upstream HTTP or packet-table scans. A missing,
-failed, disabled or stale catalogue must not create or remove neighbour evidence.
-Case-sensitive scope names and monitored zero-count entries remain intact.
-
-The [Zones API](https://wiki.meshmapper.net/zones-api/) lists published regional
-URLs by country and serves nullable GeoJSON boundaries, cached hourly with ETags.
-Use that discovery contract for a future configured-source expansion and map link;
-keep geometric boundary crossings separate from receiving-IATA changes.
-
-Shared advertised defaults are context, not proof of forwarding. An IATA group is
-based on the node's latest hearing region, not geographic coordinates. Packet
-colours follow high-confidence adjacent resolved hops; animation speed is illustrative.
-The existing Pi importer is configured for YOW. Other IATAs must say their catalogue
-is unavailable until a published source is deliberately configured; do not invent
-URLs or assign a group catalogue's counts to every member region.
+Smaller parity items remain below those analysis workflows: node/channel QR sharing,
+more table/layout preferences, an in-browser theme editor with import/export, and
+operator-facing performance diagnostics. Existing theme selection and deployment
+configuration are not a theme editor. See
+[CoreScope customization](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/customization.md),
+[channel QR](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/channel-qr.js)
+and [performance UI](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/perf.js).
+Audio/Lab and decorative exhibition modes are optional, not blockers for the core
+analysis roadmap. Account synchronization/MeshMapper login is a separate ownership
+and authentication decision, not a prerequisite for browser-local Atlas.
 
 ## Delivery order
 
-| Phase | Deliverable | Completion evidence | Status |
-|---|---|---|---|
-| Separate gate — upstream 2.0 baseline | Inspect synchronized versioning and the flattened migration contract when published | Validate an isolated fresh database, API/feature compatibility, available history and recoverable cutover; preserve the running Pi database | Landed during this phase; isolated integration and fresh-database checks pass, cutover/history decision pending |
-| 1 — correctness | Saved-route hash-width consistency, then retention-aware time controls and remaining French/mobile/accessibility fixes | Route identity survives representation changes; evidence pagination and shared windows do not silently change path; raw and summary periods match available data | Route fix delivered to the experimental Pi preview; remaining controls/polish are separate; server PR #192 stays draft |
-| 2 — experimental Atlas | My Atlas saved-node monitoring | Carry the feature from web PR #97 into the experiment; saved identities/order survive; compact cards, expandable Heard by/statistics and existing entity links work in English/French on desktop/phone | Delivered in n30nex-test; stable-release inclusion remains undecided |
-| 3 — node and trace investigation | Node dashboard, activity/type/signal/hop analysis, trace reception timeline and complete return navigation | Separate attributed node traffic from possible prefix matches; packet → route → node/observer → map links preserve selection, filters and Back | Queued after baseline validation |
-| 4 — find and compare | Bounded global entity search, saved views/filters, Atlas-node filters, channel activity and hearing context | Search/paging/share links agree; channel key/history availability is explicit; comparisons use aligned windows | Queued |
-| 5 — network structure | Observed route segments/alternatives, topology, distance, hash ambiguity and prefix/path inspection | Count evidence at the correct grain; separate observed ambiguity from static conflicts; use valid coordinates and show unresolved hops | 3D topology and scope context delivered; distance/hash inspection remains queued |
-| 6 — history and reach | Bounded retained map replay, observer reach and timing analysis, comparable fleet telemetry | Replay preserves ordering and retention limits; confirmed identities are separate from unresolved prefixes; timing/counter gaps are not labelled packet loss | Queued |
-| Beyond parity | Regional boundary/scope crossing investigation and links between observations, discovered scopes and route changes | Each relationship links to retained evidence; distinguish reported locations from inferred paths and scope names from geography | Queued after supporting phases |
+| Phase | Next package | Completion gate |
+|---|---|---|
+| **0 — stable baseline** | Recheck the actual 2.0 release refs, then decide the Pi's fresh-database/history cutover | Keep existing data and recovery; publish a compatible server/web pair only after that decision. Official hosts remain owner-controlled. |
+| **1 — accept prepared work** | My Atlas, then Topology; optional scope context and exact-route evidence remain separate | Refresh only changed bases; keep the focused merge sequence, current-head checks, paired API compatibility and draft hold until review is requested. |
+| **2 — node and trace investigation** | Full-key node dashboard first, then packet/trace chronology and fleet comparisons | Define origin reports versus confirmed relay evidence; share counting/window rules across cards/charts. Reuse existing rollups where their dimensions fit; measure before adding a node aggregate. |
+| **3 — finding and channel analysis** | Global search, Atlas-node filters/saved views, channel activity and sender/hearing comparisons | Bounded queries, stable entity keys, aligned windows, keyboard access and share/Back behavior. |
+| **4 — network tools** | Hash/prefix ambiguity, distance, repeated subpaths and route alternatives | Keep unknown identities and invalid coordinates visible; every route claim links to recorded evidence. |
+| **5 — history and geography** | Retained packet replay, observer reach/timing and GPS-area filtering | Ordered bounded cursors, explicit retention/gaps, no invented paths or clock-based claims of RF propagation. |
+| **Beyond parity** | Evidence-linked MeshMapper scope/boundary crossings, region changes and guided live follow | Distinguish a receiving-IATA change, advertised location, scope label and a geometric crossing; never manufacture neighbour links from catalogue counts. |
 
-The initial Atlas cards show a bounded sample of the latest 200 retained
-origin-key reports per node. Complete node totals and longer history need an
-explicit aggregate contract in phase 3; do not relabel the sample as total traffic.
-Browser-local cards remain the first release. Account sync or MeshMapper login
-needs a separately agreed authentication and ownership contract.
+**Recommended next new implementation after 2.0:** the node dashboard/trace phase.
+It builds on the existing node inspector and Atlas instead of adding another
+independent page with different counts. Replay is the largest remaining live-view
+capability gap and needs its retained-evidence contract before UI implementation.
+This update schedules work; it does not start new feature implementation.
 
-## First implementation: saved-route evidence
+## CartoLite-derived follow-ups
 
-[Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) remains
-open, with the server correction in [PR #192](https://github.com/MeshCore-Beacon/beacon-server/pull/192). The same fully resolved node chain can arrive with different hash widths,
-while its saved prefix metadata currently stays at the first representation.
-That can omit newer exact-path observations from route evidence.
+[CartoLite `f2b4bdf`](https://github.com/n30nex/CartoLite/tree/f2b4bdff314094c22749819ddc6817d545aa0fa0)
+remains a design reference. Stable regional groups, actual-link placement, finder,
+neighbour emphasis, region isolation, compact controls, above-mesh camera and
+separate static/live rendering are already delivered experimentally. The current
+limits remain 20,000 nodes, 60,000 recent routes, 100,000 links/live segments,
+10,000 reports and 512 simultaneous animations, with background cleanup and
+reduced-motion support. These are ceilings, not claims of a complete network view.
 
-Keep the stable IATA/node-chain identity. Define how the latest representation is
-updated and how an already-open evidence page retains its selected representation.
-Cover successive 1/2/3-byte paths, unchanged repeats, malformed/missing metadata,
-ambiguous identities, cursor precision and shared-window behavior. Preserve exact
-bytes and the existing bounded observation index; do not replace the query with
-a broad short-prefix or raw-history scan. Avoid a schema change unless the agreed
-behavior requires one. This phase must include a real PostgreSQL regression and
-the exact combined Pi build before its preview is called verified.
+Next Topology-specific refinements are constrained live follow, saved camera/display
+preferences and measured adaptive quality. Cross-view selection belongs with phase
+3; replay belongs with phase 5. Scope metadata stays optional and lazy. Upstream
+now discovers regional scope/channel sources through MeshMapper zone lists; that
+is already implemented and must not remain listed as a future importer feature.
+The unchanged legacy Pi still has its recorded YOW importer configuration.
 
-## Parallel priorities, scheduled deliberately
+## Issue reconciliation and operational work
 
-- Operational work: remaining admin configuration scope, browser access and
-  import/restore, deployment-file coverage and remote/scheduled backup under
-  [server #60](https://github.com/MeshCore-Beacon/beacon-server/issues/60) and
-  [#72](https://github.com/MeshCore-Beacon/beacon-server/issues/72).
-- MQTT timeout attribution under
-  [#116](https://github.com/MeshCore-Beacon/beacon-server/issues/116): collect
-  evidence on recurrence or a meaningful workload change. A healthy short sample
-  does not identify the historical cause.
-- Complete translations under
-  [web #12](https://github.com/MeshCore-Beacon/beacon-web/issues/12), with touched
-  interface text translated in the same feature PR.
-- Reconcile older open tickets against accepted code. Several observer, packet
-  and route tickets were implemented through the consolidation batch; their open
-  state alone is not a new feature gap. Close only after their full scope is checked.
+- [Server #183](https://github.com/MeshCore-Beacon/beacon-server/issues/183) is
+  **closed**: upstream `6cd03e7` refreshes saved-route prefix metadata. The prepared
+  pinned-evidence changes are additional work, not a still-open prefix fix.
+- [Server #116](https://github.com/MeshCore-Beacon/beacon-server/issues/116) and
+  [web #12](https://github.com/MeshCore-Beacon/beacon-web/issues/12) are **closed**.
+  Reopen investigation only for new MQTT evidence or a specific localization defect;
+  continue translation/accessibility checks on every new UI change.
+- [Web #96](https://github.com/MeshCore-Beacon/beacon-web/issues/96) remains tied to
+  held My Atlas PR #97. Experimental delivery is not stable acceptance.
+- [Server #60](https://github.com/MeshCore-Beacon/beacon-server/issues/60) and
+  [#72](https://github.com/MeshCore-Beacon/beacon-server/issues/72) remain open for
+  admin and local/remote backup scope. Existing protected settings/accounts/exports
+  are partial delivery; public admin and backup access remain disabled on our Pi.
+- Sustained production-like ingest/query load, recovery/export qualification and
+  physical Safari checks remain operational acceptance work. Passing fixtures or
+  CoreScope's published benchmarks do not establish Beacon production capacity.
 
-## Shared acceptance criteria
+## Shared acceptance rules
 
-Every new view defines its counting unit, effective period, available history,
-sample size, missing data and ambiguity. Raw packets and observations cannot be
-reconstructed after expiry; longer-lived summaries must state what they preserve.
-Reuse the existing observer, packet, route, map and chart components. Load only the
-selected data, coalesce updates, bound requests and test query plans on
-representative data. New aggregation is justified by a measured query need.
+Every view states its counting unit, effective time window, sample cap, missing
+history and identity ambiguity. Receptions, unique packets, origins and relay
+candidates are different metrics. A missing record or unsynchronized clock does
+not establish packet loss or RF delay. Raw chart choices follow actual deployment
+retention; durable summaries only expose dimensions that were retained.
 
-Validate source and actual running artifacts, native PostgreSQL behavior, relevant
-ingestion/reconnect regressions, desktop/phone, English/French, keyboard and shared
-links. Publish matching source/changelog and preserve rollback without overwriting
-new traffic. Compare CPU/memory/storage and latency against the preceding build;
-a fixture or short Pi sample does not certify production capacity.
+Reuse Beacon's inspection panels, region model, query cache, chart components and
+new hourly-rollup contract. Keep bounded indexed queries, lazy loading and coalesced
+refreshes; do not fetch separately per chart or add a blanket materialized-view
+refresh job. Native database and relevant replay/browser checks precede deployment.
+No feature patch in this queue should alter the flattened baseline migration.
 
-Maintainers control merges, version numbers, stable artifacts and the production
-switch. `live.meshcore.ca` is the planned production destination; `dev.meshcore.ca`
-remains development-only. The Canadaverse Pi remains the contribution preview.
+Keep source offers and rollback tied to the actual running pair, preserve unrelated
+work, and retain the paused merge recovery. Prepared 2.0 branches must not be
+applied automatically to the Pi's 1.x ledger. Earlier 1.4/1.7 planning is historical;
+server/web major and minor versions track maintainer decisions, with independent
+patches. Merges, stable tags and official-host operations remain maintainer-controlled.
