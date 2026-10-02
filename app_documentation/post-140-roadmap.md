@@ -2,6 +2,14 @@
 
 ## Current checkpoint — 1 October 2026
 
+The deployed UI pass is web `462d49e`: My Atlas leads desktop and mobile navigation.
+Topology has one region selector and a compact toolbar, an inspector that opens on
+selection/search, a mobile details sheet and expandable Display/Live activity panels.
+The camera now starts above the mesh; Fit centres the projected bounds and drag
+defaults to pan, with Shift-drag rotating. All paths and live traffic remain available.
+Route-window loading keeps the existing graph visible while the new data arrives.
+There are no backend, database, configuration or retention changes.
+
 Mesh Pulse includes Atlas, route evidence and the connected-layout/camera patch
 `117ee99`. Regions and nodes are placed using actual connections; larger groups get
 more space. All loaded paths remain visible by default. Region focus, isolation,
@@ -100,6 +108,7 @@ The implementation is original; CartoLite is a design reference, not an embedded
 | Now | Compact controls and bounded drawing work | Lazy tab, 20,000 nodes, 60,000 recent routes, 100,000 links/live segments, 10,000 reports and 512 animations; static ink cache, 30 fps ceiling, reduced motion, pause/background cleanup, English/French | Included in connected-layout patch |
 | Now | Regional context | Differentiate cross-IATA links and matching advertised default scopes; show cached MeshMapper catalogue counts/freshness separately | Included in this phase |
 | Now | Connected layout and regional camera | Pull linked regions together, separate islands, spread connected nodes, preserve all paths, focus/isolate regions and fit/pan/orbit/zoom; full screen and shared focus URLs | Included in connected-layout patch |
+| Now | Simpler navigation and controls | My Atlas first, one region picker, compact summary, on-demand inspector/activity, accessible mobile sheet, above-mesh camera and centred Fit | Included in UI pass `462d49e` |
 | Now | Observed route coverage | Load adjacent resolved route segments for a selected window; keep missing-hop gaps, distinguish these from neighbour records and live reports | Included in connected-layout patch |
 | Next | Constrained live follow | Follow a selected node/observer/region without camera jumps; retain explicit exit and keyboard return | Planned |
 | Next | Display preferences | Save camera/detail preferences and add measured adaptive quality; static ink caching and label collision handling are implemented | Planned; measure before adding rendering complexity |

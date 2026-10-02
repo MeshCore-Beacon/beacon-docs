@@ -1,6 +1,6 @@
 # Experimental n30nex-test preview
 
-The Pi preview now includes **Mesh Pulse**, a 3D topology with animated live packet
+The Pi preview now includes **Topology**, a 3D topology with animated live packet
 paths, alongside My Atlas and pinned route evidence. Work remains on `n30nex-test`.
 Server #192 and docs #7 stay draft, with no new review requests. There is no new
 web PR, stable release or production-host change.
@@ -12,8 +12,30 @@ web PR, stable release or production-host change.
 | Repository | Preview source |
 |---|---|
 | Server | `644960e4a6d6a1c02e10ace182f6d335358d3f44` — cached catalogue API and the node-list default-scope mapping correction |
-| Web | `117ee99a60e6f7da352bb27a442eaae7f056706d` — connected layout, regional camera, saved routes and live trails; Atlas retained |
+| Web | `462d49e8afb2fabf54f20832318a0f7ae0a0d77d` — My Atlas first, simpler Topology controls and camera orientation correction |
 | Docs | `n30nex-test`, draft #7 — roadmap, contracts and this record |
+
+## Topology UI and navigation — 1 October
+
+My Atlas is the far-left desktop tab and the first mobile tab. Nodes remains in the
+mobile More menu. Topology uses a compact status/count header and one region selector.
+The main toolbar contains region, route window, pause and node search. Display holds
+path modes, camera presets, drag mode, animation, legend, sharing and refresh.
+
+The inspector opens when a node is selected or searched. Phones reuse the existing
+focus-trapped details sheet. Closing details returns to the graph; search from full
+screen first exits full screen so its input is visible and focused. Live activity,
+reporters and packet details are expandable and continue receiving data while closed.
+Scope metadata is fetched only when the inspector is open.
+
+The camera now looks down from above the mesh. Its projection previously placed the
+camera below the plane even for Top view. Raised points are now nearer the camera;
+pan follows the corrected axes, and Fit centres projected bounds before scaling.
+Pan is the default drag action, Shift-drag rotates, and Display offers Top/3D views.
+The graph stays visible while a new route window loads, with an updating indicator.
+
+All-path visibility, live packet animation, full screen, region focus/isolation and
+English/French controls remain. This is a frontend-only update on `n30nex-test`.
 
 ## Mesh Pulse
 
@@ -54,21 +76,20 @@ view, with windowed deduplication and explicit pauses/reconnect gaps.
 
 ## Validation
 
-The exact frontend passed native Pi build/lint and **1,078 tests in 122 files**.
-The final native assets passed desktop and French 390px browser checks: all-path
-visibility, 160 simultaneous report animations, no static redraws during a sampled
-second of animation, full screen, regional camera, pan/zoom/fit, isolation,
-Back/reload and reduced motion. The public site returned 1,991 nodes and 4,220
-connections in the default window, or 5,041 connections after the 24-hour query
-completed, with no cap warning. A fresh browser loaded the default view in 2.31s;
-loading the longer route history took about 11s. These are observations, not a
-load-capacity guarantee. The live check received 112 real reports, including 84
-with resolved paths, and no page errors.
+The exact frontend passed native Pi build/lint and **1,079 tests in 122 files**.
+Windows build, changed-file lint and all 30 focused navigation/topology tests passed.
+The above-mesh regression checks depth, apparent scale and screen position of raised
+nodes; framing and pan tests cover desktop and portrait dimensions.
 
-Windows builds and browser checks passed. One local Node 22 validation process
-exited with an access violation; the unfinished Windows full suite was stopped.
-The exact candidate's complete suite passed using Node 24.15.0 on the Pi.
-Physical iPhone/Safari and sustained production-load qualification are not claimed.
+The final native browser fixture verified Atlas first on desktop/mobile, one region
+control, inspector focus (including search from full screen), French phone menus,
+expanded activity, pause/resume, retained chart data during window loading, region
+focus/isolation, reduced motion and 160 simultaneous animations. Static ink did not
+repaint during the sampled second of packet animation. Public checks verified Atlas
+navigation, Back, default all-path visibility and mobile focus/menu bounds. The
+public browser loaded the view in 2.68s and received 138 real reports, 99 with
+resolved paths, with no page errors. These are bounded observations, not a sustained
+load-capacity guarantee. Physical iPhone/Safari qualification is not claimed.
 
 Native Go/PostgreSQL tests pass for the server, including scope cache freshness,
 concurrent snapshot readers, disabled/invalid sources and node-list scope projection.
@@ -89,12 +110,27 @@ before/after benchmark or a physical-phone performance certification.
 
 ## Current frontend recovery — 1 October
 
+The UI update changes static frontend files only. All 24 assets, both source archives
+and the source/changelog match. All 24 existing containers were unchanged. Server
+`644960e4`, schema 045, configuration and 72h raw/30d summary retention remain.
+
+Latest rollback is `evidence/topology-ux-20261001/deploy-beacon-web.py rollback
+--evidence-dir topology-ux-20261001`, checkpoint `web-20261002T000512Z`. It restores
+web `117ee99a` without changing the server or new traffic. Use it before the previous
+connected-layout and backend recovery recipes below. The checkpoint uses UTC.
+
+The combined camera/UI patch applies cleanly to the prepared 2.0 web checkout.
+The whole branch still has 14 dev conflicts at `f9ffb564`; main trial-merges cleanly.
+The experiment remains on `n30nex-test`, with draft reviews held and no new web PR.
+
+## Previous connected-layout recovery — 1 October
+
 The connected-layout update changes only static frontend files. All 24 published
 files and both corresponding-source archives match; the source/changelog is current.
 Every existing container identity and restart count was unchanged by deployment.
 Server `644960e4`, schema 045, configuration and the 72h raw/30d summary policy remain.
 
-Latest rollback is `evidence/topology-camera-20261001/deploy-beacon-web.py rollback
+That phase’s rollback is `evidence/topology-camera-20261001/deploy-beacon-web.py rollback
 --evidence-dir topology-camera-20261001`, checkpoint `web-20261001T231151Z`. It restores
 web `4b2497df` while keeping the server and new traffic. Use this frontend rollback
 before the older backend recovery recipes below.
