@@ -76,3 +76,11 @@ services:
       app:
         condition: service_started
     restart: unless-stopped
+
+# Fixed subnet so data/app/config.yaml can trust Caddy in server.trusted_proxies.
+# Pick another private /24 if this one is already in use on the host.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
