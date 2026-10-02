@@ -73,6 +73,11 @@ Set every `CHANGE_*` value. The variables you must fill in:
 | `VITE_API_BASE` | `web` | `https://<your-domain>/api/v1` — must be the **public** domain, never localhost. |
 | `VITE_WS_URL` | `web` | `wss://<your-domain>/ws` |
 | `VITE_MAP_CENTER` / `VITE_MAP_ZOOM` | `web` | *(Optional)* Fallback "All" map view. The app auto-fits the map to all IATA locations from `config.yaml`; these values are only used as a fallback when those IATAs have no location set. Omit for a world view. |
+| `VITE_DISABLED_TABS` | `web` | *(Optional)* Comma list of tabs to hide, e.g. `Map,Traces`. Options: `Packets,Channels,Map,Nodes,Observers,Routes,Traces,Analytics`. |
+| `VITE_ENABLED_THEMES` | `web` | *(Optional)* Comma list of theme ids. When set, only these themes are offered; listing `meshmapper_dark` / `meshmapper_light` is the only way to enable those. |
+| `VITE_APP_NAME` | `web` | *(Optional)* Top-left wordmark text. Default `BEACON`. |
+| `VITE_SKIP_SPLASH` | `web` | *(Optional)* `true` skips the once-per-session load splash. |
+| `VITE_BANNER` | `web` | *(Optional)* Notice above the header on every page, e.g. for a dev instance. `[label](url)` and bare URLs become links. |
 
 > ⚠️ **Password must match in two places.** The password inside `POSTGRES_DSN` (in `.env`) must equal `POSTGRES_PASSWORD` in `docker-compose.yml`. Update both before bringing the stack up.
 
@@ -113,11 +118,11 @@ docker compose logs -f
 
 Visit `https://<your-domain>` and you're off to the races. 🚀
 
-> After changing any `VITE_*` value later, recreate the web container so the new values get baked into the JS bundle:
+> After changing any `VITE_*` value later, apply it with:
 > ```bash
-> docker compose up -d --force-recreate web
+> docker compose up -d web
 > ```
-> (then hard-refresh / use incognito, since `/assets/*` is cached immutable.)
+> The web container writes these to `/config.js` on every start, so visitors get the new values on their next page load.
 
 ### Container images
 
@@ -127,8 +132,9 @@ is required**.
 
 Tags: `latest` follows stable releases on `main`, `dev` follows the development branch, and each
 release is also published as `X.Y.Z` and `X.Y`. The compose file uses `latest`; to control when
-upgrades happen, pin both images to a release line, e.g. `beacon-server:2.0` and `beacon-web:2.0`
-(server and web share major.minor versions).
+upgrades happen, pin both images to a release line (`beacon-server:2.0` and `beacon-web:2.0`) or an
+exact release (`:2.0.0`). Server and web share major.minor versions, so web `2.0.x` pairs with server
+`2.0.x`; patch numbers move independently.
 
 > **Troubleshooting — `403 Forbidden` on pull.** If `docker compose up` fails with a
 > `... manifests/<tag>: 403 Forbidden` error, the package has been set (or defaulted)
