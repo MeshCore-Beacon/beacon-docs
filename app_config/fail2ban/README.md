@@ -12,9 +12,12 @@ Two deployment shapes, two file sets:
 
 ## 1. Edge: log + client-IP hygiene + manual block list
 
-**Caddy.** `Caddyfile.proxy` now writes a JSON access log to `data/Caddy/logs/access.json`, strips
-`True-Client-IP` and overwrites `X-Real-IP` on the way to the app (beacon-server trusts those headers
-for the client IP), and 403s anything listed in `data/Caddy/conf.d/blocklist.caddy`. The compose
+**Caddy.** `Caddyfile.proxy` writes a JSON access log to `data/Caddy/logs/access.json`, overwrites
+`X-Real-IP` with the connecting address on the way to the app, and 403s anything listed in
+`data/Caddy/conf.d/blocklist.caddy`. beacon-server takes the client IP only from `X-Real-IP`, and only
+when the request comes from an address in `server.trusted_proxies` (the compose subnet,
+`172.30.0.0/24`); it drops `X-Forwarded-For` and `True-Client-IP` from every request. With
+`trusted_proxies` empty, every client is keyed by Caddy's address and shares one rate limit. The compose
 file mounts `conf.d` and `logs`; new mounts need one `docker compose up -d caddy`, after that:
 
 ```bash
@@ -25,12 +28,16 @@ docker compose exec caddy caddy reload   --config /etc/caddy/Caddyfile
 **Apache.** Apply the snippet to the `*:443` vhost and create `/etc/apache2/beacon-blocklist.conf`
 and `/etc/apache2/beacon-blocklist-ua.conf`, then `apachectl configtest && systemctl reload apache2`.
 
+**Behind a CDN** (e.g. Cloudflare) the edge sees the CDN's addresses: follow the note at the top of
+`Caddyfile.proxy` so the app and the block list see the real client. The firewall jails can't help
+there (every connection comes from the CDN, so a ban hits all users); block at the CDN instead.
+
 **Two ways to block.** By source IP (`remote_ip` / `Require not ip`) or by User-Agent signature
 (`@blocked_ua` / `SetEnvIfNoCase`). A scraper that identifies itself, like the
 `mesh.hansimgamr.net am-i-connected` client found on day 0, is better blocked by UA: it survives an
 IP change and leaves the operator's own browser alone. Both apply to `/api/*` and `/ws` only.
 
-Smoke test on either box (chi's log line must show the real client IP, not 1.2.3.4):
+Smoke test on either box (the app's request log line must show your real IP as `client_ip`, not 1.2.3.4):
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -H 'True-Client-IP: 1.2.3.4' -H 'X-Real-IP: 1.2.3.4' https://$DOMAIN/api/v1/scopes
@@ -47,7 +54,7 @@ Three jails per box, same thresholds:
 | `beacon-api-429` | `/api/` responses with status 429 | 300 in 10 min | only fires on clients that keep hammering through the server's throttle |
 | `beacon-api-sustained` | every `/api/` request | 1,000 in 1 h | a paced scraper (the day-0 Pi ran ~135/min for hours) never trips the flood rule; real sessions peak ~300/h |
 
-Both use `backend = polling` (the Debian default `systemd` cannot tail files) and a flat 10 min ban.
+All three use `backend = polling` (the Debian default `systemd` cannot tail files) and a flat 10 min ban.
 Install:
 
 ```bash
@@ -78,8 +85,9 @@ sudo fail2ban-client set beacon-api-flood banip <phone-on-cellular>   # site unr
 sudo fail2ban-client set beacon-api-flood unbanip <phone-on-cellular>
 ```
 
-Once beacon-server's per-IP limit is live, re-derive the flood `maxretry` as ~3× the per-minute
-allowance. Consider `bantime.increment` only after a clean week.
+beacon-server's own per-IP limit (`ratelimit.requests_per_minute`, 300 by default) answers first
+with 429s; the flood `maxretry` of 900 is 3× that allowance. Re-derive it if you change the server
+limit. Consider `bantime.increment` only after a clean week.
 
 ## 3. Finding scrapers by hand
 

@@ -1,11 +1,17 @@
 # Type 2 Server: API-only, redirect other traffic to web host
+# beacon-server needs this proxy's address in server.trusted_proxies, and the web host
+# (https://web.your.domain.com) in websocket.allowed_origins so browsers can open /ws.
 {$DOMAIN} {
     handle /api/* {
-        reverse_proxy tower-app:8080
+        reverse_proxy app:8080 {
+            header_up X-Real-IP {remote_host}
+        }
     }
 
     handle /ws {
-        reverse_proxy tower-app:8080
+        reverse_proxy app:8080 {
+            header_up X-Real-IP {remote_host}
+        }
     }
 
     handle {

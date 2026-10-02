@@ -1,4 +1,13 @@
 # Type 1 (All-in-One): API + Web on same server
+# Behind Cloudflare (or another CDN), {remote_host} is the CDN's address. Trust its ranges
+# in a global block, then use {client_ip} instead of {remote_host} below and client_ip
+# instead of remote_ip in conf.d/blocklist.caddy:
+#   {
+#   	servers {
+#   		trusted_proxies static <Cloudflare IPv4 and IPv6 ranges>
+#   		client_ip_headers CF-Connecting-IP
+#   	}
+#   }
 {$DOMAIN} {
 	# defines @blocked_ip and @blocked_ua; edit conf.d/blocklist.caddy then `caddy reload`
 	import conf.d/blocklist.caddy
@@ -30,8 +39,8 @@
 		}
 		# respond @foreign_referer "Forbidden" 403
 		reverse_proxy app:8080 {
-			# the app trusts these headers for the client IP, so only Caddy may set them
-			header_up -True-Client-IP
+			# beacon-server takes the client IP only from X-Real-IP, and only from peers in
+			# server.trusted_proxies; overwrite it so clients can't supply their own
 			header_up X-Real-IP {remote_host}
 		}
 	}
@@ -44,7 +53,6 @@
 			close
 		}
 		reverse_proxy app:8080 {
-			header_up -True-Client-IP
 			header_up X-Real-IP {remote_host}
 		}
 	}

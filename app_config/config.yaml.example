@@ -1,42 +1,118 @@
 # Beacon configuration file
 # Copy to config.yaml and adjust as needed.
+# Durations are Go strings (30s, 1h, 168h); negative values prevent startup
+# (observers.delete_after excepted, where nonpositive disables it).
+
+# Public reads stay available. No key means admin routes return 503.
+# Prefer BEACON_API_KEY in the service environment; never commit a real key.
+# At least 16 characters with no inner whitespace (surrounding whitespace is
+# trimmed); a shorter key prevents startup.
+auth:
+  api_key: ""
+
+log:
+  # Environment LOG_LEVEL / LOG_FORMAT override these values.
+  level: info  # debug, info, warn, error
+  format: text # text or json
+
+server:
+  # Only these direct proxy peers may set the client IP through X-Real-IP.
+  # The proxy must overwrite that header, not pass through client input.
+  # Leave empty for direct access (logs a startup warning). Invalid/empty CIDR
+  # entries prevent startup. A single host needs /32 for IPv4 or /128 for IPv6;
+  # bare IP addresses are not accepted.
+  # For Docker, list the actual proxy/compose network CIDR (e.g. 172.20.0.0/24).
+  # For a local host proxy, use ["127.0.0.1/32", "::1/128"].
+  # Direct-client proxy examples; X-Forwarded-For alone is not used:
+  # Apache 2.4.10+ (mod_headers, in the proxy virtual host):
+  #   RequestHeader set X-Real-IP "expr=%{REMOTE_ADDR}"
+  # nginx (in the proxy location):
+  #   proxy_set_header X-Real-IP $remote_addr;
+  # Caddy (inside the reverse_proxy block):
+  #   header_up X-Real-IP {http.request.remote.host}
+  # With additional proxy hops, first configure their trust at the edge proxy
+  # and pass its validated client address rather than a client-supplied header.
+  trusted_proxies: []
+
+# Applies to /api/v1/* only. Both counters are local to this Beacon instance.
+# Set trusted_proxies correctly before using a reverse proxy, or clients share
+# the proxy's budget. IPv6 clients share a /64 budget to prevent address rotation.
+ratelimit:
+  enabled: true
+  requests_per_minute: 300
+  # Maximum requests in a one-second sliding window, not token-bucket capacity.
+  # Omitted/zero defaults to requests_per_minute. Negative limits prevent startup.
+  # A 429 returns error.code=rate_limited and Retry-After (1 or 60 seconds).
+  burst: 300
 
 # MeshMapper integrations (optional, no API key). Import transport scopes and
 # IATA border outlines from MeshMapper instead of maintaining scopes: and
-# iatas.*.borderFile by hand. Both need the IATAs to be in a configured region below.
+# iatas.*.borderFile by hand.
 #
 # Scope-name discovery. Manual scopes remain authoritative.
-# Sources must belong to a configured region's IATAs.
-# Group endpoints are not supported: their names cannot be attributed to each IATA.
-# At most 16 sources, 64 names per source, 64 KiB per response; no page scraping.
+# Every known IATA, including ones auto-created from traffic, is looked up in its
+# country's zone list (shared with zones below) and its site's get_scopes.php
+# catalogue is imported; IATAs MeshMapper doesn't list are skipped. No sources
+# to configure; a legacy sources: list is ignored with a warning.
+# Catalogues covering more than one IATA are rejected.
+# 64 names per catalogue, 64 KiB per response; no page scraping.
 # Catalogues and ETags persist in PostgreSQL. Failed refreshes retain known names.
 # Refresh success/failure/freshness is logged under component=meshmapper.scopes.
-# Removing/turning off a source deactivates its imported matching keys on restart;
+# Turning scopes off deactivates imported matching keys on restart;
 # historical scope identities and recorded evidence are retained.
 # Region-filtered scope lists and scope stats show imported names only under the
-# IATAs whose catalogue lists them; regions without a source show manual scopes only.
+# IATAs whose catalogue lists them; IATAs without a catalogue show manual scopes only.
 #meshmapper:
 #  scopes:
 #    enabled: false
-#    refresh_interval: 1h  # 5m-24h; one source checked per 15s tick
-#    sources:
-#      YOW: https://yow.meshmapper.net/get_scopes.php
+#    refresh_interval: 1h  # 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
 #
-# Region boundaries (Zones API). Every IATA in a configured
-# region is looked up in its country's zone list, then its get_geojson.php outline
-# is imported. An imported boundary overrides that IATA's borderFile on the border
-# map and for nodes.mark_foreign. A missing or failed boundary keeps the last good
-# import, or the borderFile when there is none. Disabling, or removing an IATA from
-# every region, drops its import on restart. Logged under component=meshmapper.zones.
+# Region boundaries (Zones API). Every known IATA, including ones auto-created
+# from traffic, is looked up in its country's zone list, then its get_geojson.php
+# outline is imported; new IATAs are picked up while running. An imported boundary
+# overrides that IATA's borderFile on the border map and for nodes.mark_foreign.
+# A missing or failed boundary keeps the last good import, or the borderFile when
+# there is none. Disabling drops every import on restart. Logged under
+# component=meshmapper.zones.
+# Each country's zone list is fetched at most once a day (MeshMapper allows one
+# get_zones.php per country per 23.5h) and saved, so restarts don't refetch it.
+# Failed or rate-limited requests also wait out the limit, or Retry-After if longer.
+# Listed IATAs also take their display name and approximate location from the
+# zone list, unless iatas: below sets a name or lat/lng for them.
+# import_groups turns MeshMapper zone groups (e.g. ONQC: YOW, YQB, YUL) into
+# regions, from the zone lists already fetched. A group is imported when at least
+# one member is heard by an observer or configured here, with its full member list (members Beacon hasn't
+# heard yet are added as IATAs); slug = lowercased group code, centered on the
+# members' average location, listed after the regions below. A region below with
+# the same slug wins.
+# Imported regions are removed when the group disappears or stops qualifying,
+# and all of them when import_groups is turned off. Requires zones.enabled.
 #  zones:
 #    enabled: false
-#    refresh_interval: 24h # 1h-168h; one request per 15s tick, ETag-conditional
+#    import_groups: false
+#    refresh_interval: 24h # 24h-168h (one get_geojson.php per region per 23.5h); one request per 15s tick, ETag-conditional
+#
+# Public hashtag channels (get_channels.php). Every known IATA that MeshMapper
+# lists is looked up on its site, the same way as scopes. Each key and hash is
+# checked against the name before use; a list with any mismatch is rejected and
+# the last good one kept. Imported channels decrypt like configured ones (history
+# is backfilled when a key first appears) and are listed under that IATA when
+# /channels is filtered by region. Saved in PostgreSQL across restarts; failures
+# wait out the 23.5h limit. Turning it off removes the region listing on restart.
+# Logged under component=meshmapper.channels.
+#  channels:
+#    enabled: false
+#    refresh_interval: 24h # 24h-168h (one get_channels.php per region per 23.5h)
 
 iatas:
   YVR:
     name: Vancouver International
     lat: 49.1967
     lng: -123.1815
+    # borderFile: borders/yvr.geojson   # optional GeoJSON Feature (Polygon/MultiPolygon)
+    #                                    # (or use meshmapper.zones above)
+    #                                    # for the region border map; path is relative to
+    #                                    # this file's directory; validated at boot.
   YYJ:
     name: Victoria International
     lat: 48.6469
@@ -58,6 +134,8 @@ iatas:
     lat: 43.6777
     lng: -79.6248
 
+# Hand-written regions; optional with meshmapper.zones.import_groups. Seeding
+# sets each region's members to exactly this list.
 regions:
   - slug: western-canada
     name: Western Canada
@@ -80,8 +158,12 @@ channel_keys:
   # secret = SHA256("#tag")[:16], channel_hash = SHA256(secret)[0]
   # Hashtag names should be provided without the # prefix.
   # Beacon prepends # automatically before deriving the key.
+  # A plain name is listed under every region; add region: <slug> (a configured
+  # region) to list it only there when /channels is filtered by region.
   hashtags:
     - meshcore
+    # - name: ottawa-mesh
+    #   region: eastern-canada
 
   # Explicit keys: provide the channel hash (hex) and key (hex) directly.
   # An optional name can be set for display purposes.
@@ -89,6 +171,7 @@ channel_keys:
     "11":
       key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
       name: "Public"
+      # region: eastern-canada   # optional, as for hashtags
 
 # Regional transport scopes for matching TRANSPORT_FLOOD packets.
 # Plain names have # prepended automatically (e.g. "bc" → "#bc").
@@ -102,14 +185,93 @@ scopes:
     region: western-canada
 
 telemetry:
-  retention: 672h   # 4 weeks
+  retention: 744h   # 31 days
   resolution: 1h    # store one snapshot per observer per hour
 
+# Optional authenticated database/config downloads. Disabled unless explicitly enabled.
+# Requires auth.api_key, a supported PostgreSQL URL and a compatible pg_dump client.
+# A failed prerequisite leaves this feature unavailable; ingest and other APIs continue.
+#backup:
+#  enabled: false
+
+# Also covers observations and channel messages.
 packets:
-  retention: 720h   # 30 days
+  retention: 168h   # 7 days
+
+# Hourly analytics rollups (stats endpoints). Rollups outlive raw packets; this is also the
+# longest window /stats/series and the other historical stats endpoints accept.
+analytics:
+  rollup_retention: 2160h   # 90 days
+
+# Presence write coalescing: observer last_seen and packet last_heard_at bumps are
+# batched in memory and flushed on an interval. An unclean shutdown loses at most
+# one interval of presence freshness.
+#presence:
+#  flush_interval: 30s   # default: 30s
+#  packet_ttl: 30s       # how long a quiet packet stays coalesced (default: 30s)
+
+# Known-route retention. Routes are distilled packet history (the path a packet
+# took, hop by hop), so they may outlive packets.retention; there is no required
+# relationship between the two.
+routes:
+  # How long a route is kept after it was last observed. Every new observation
+  # of the same path resets this clock, so routes the mesh still uses never
+  # expire -- only paths nothing has traveled for this long age out.
+  retention: 336h   # 14 days
+  # Shorter window for rarely-seen routes: one observed fewer than
+  # min_observations times in total is dropped once it goes unobserved for
+  # this long. Must be shorter than retention, or it never applies.
+  grace: 168h       # 7 days
+  # Lifetime observation count a route must reach to earn the full retention
+  # window. Below it a route is treated as flood noise -- a path recorded once
+  # or twice and never confirmed -- and only kept for the grace window. The
+  # count never resets, so once a route crosses this bar it stays in the
+  # retention tier for good.
+  min_observations: 3
 
 websocket:
   max_connections_per_ip: 5 # default: 5
+  # Upgrade attempts, including failed handshakes; zero/omitted defaults to 10.
+  # IPv6 clients share a /64 attempt budget. Negative values prevent startup.
+  # Rate exhaustion rejects the handshake with 429 and Retry-After: 60.
+  # Within this rate budget, a full concurrent cap accepts then closes with 1013
+  # before hello, allowing browsers to back off without evicting existing clients.
+  max_connects_per_minute: 10
+  # Other sites allowed to open /ws. Exact scheme://host[:port], or
+  # scheme://*.domain[:port] for every subdomain of domain at any depth. The
+  # wildcard never matches the apex itself, and scheme and port stay exact.
+  #allowed_origins:
+  #  - https://example.com
+  #  - https://*.example.com
+
+# Node staleness, deletion, and clock-drift thresholds.
+#nodes:
+#  mark_foreign: false           # opt in to possiblyForeign on repeater nodes
+#                                # uses the union of configured iatas.*.borderFile polygons,
+#                                # with meshmapper.zones boundaries replacing them; requires
+#                                # a valid border file or meshmapper.zones; no packet filtering
+#  stale_threshold: 24h          # default: 24h
+#  delete_after: 720h            # default: 30 days
+#  clock_drift_threshold: 5m     # default: 5m
+
+# Optional observer age-out. Omitted or nonpositive leaves observers intact.
+# Enable only with one Beacon ingest process for this database.
+# At most 1000 old observers are deleted per background.cleanup interval;
+# retained observations, telemetry and ownership records prevent deletion.
+#observers:
+#  delete_after: 720h           # opt in to 30 days unseen
+
+# CORS configuration.
+# Controls which origins, methods and headers are allowed for cross-origin requests.
+# Defaults to allowing all origins with GET/HEAD/OPTIONS if omitted — appropriate
+# for a public read-only API. Restrict allowed_origins if you expose write endpoints.
+#cors:
+#  allowed_origins:
+#    - "https://app.example.com"
+#  allowed_methods: [GET, HEAD, OPTIONS, POST, PUT, DELETE] # admin UI writes
+#  allowed_headers: [Accept, Authorization, Content-Type]
+#  allow_credentials: false
+#  max_age: 300
 
 # Redis caching layer.
 # If REDIS_ADDR is not set, caching is disabled and all reads go directly to PostgreSQL.
@@ -120,7 +282,7 @@ cache:
   ttl: "1h"
   ttls:
     # Aggregated stats endpoints (overview, observations, breakdowns, top nodes/observers,
-    # radio presets, scope stats). Backed by materialized views refreshed hourly.
+    # radio presets, scope stats). Backed by hourly rollups; keys change when a new hour rolls.
     stats: "1h"
     # Mostly-static reference data (IATAs, regions, scopes).
     # Only changes when new observers arrive or config is reseeded.
@@ -141,3 +303,10 @@ cache:
 #  allow_countries: [CA, US]
 #  allow_continents: [NA]
 
+# Background task intervals.
+# Shorter intervals are useful during initial deployment to confirm data is
+# flowing. Back off to 1h or more once stable.
+#background:
+#  view_refresh: 1h   # rebuilds radio presets; default: 1h
+#  reconfirm: 1h      # default: 1h
+#  cleanup: 1h        # default: 1h

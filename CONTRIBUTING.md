@@ -113,7 +113,7 @@ Common scopes: `readme`, `deploy`, `config`, `caddy`, `docs`.
 ```
 docker-deployment-type1/   — single-server (all-in-one) Docker Compose deployment
 docker-deployment-type2/   — split server/web deployment (WIP)
-app_config/                — example .env, config.yaml, and Caddyfile templates
+app_config/                — example .env, config.yaml, proxy configs (Caddy, nginx, Apache), fail2ban
 app_documentation/         — project-wide design & API docs
 logos/                     — brand assets
 ```

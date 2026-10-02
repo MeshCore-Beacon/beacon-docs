@@ -26,8 +26,9 @@ repository.
 ## Deployment hardening
 
 The Docker deployments in this repo expose `db`, `redis`, and `app` only on
-`127.0.0.1`, with Caddy terminating TLS on ports 80/443. Beacon has no
-authentication layer and is intended to sit behind that reverse proxy on a
-trusted network. Keep this in mind when assessing the severity of any findings,
-and never expose the database, Redis, or the raw app port to the public
-internet.
+`127.0.0.1`, with Caddy terminating TLS on ports 80/443. Beacon's REST reads
+and WebSocket feed are public by design; only `/api/v1/admin/*` needs a bearer
+key (`BEACON_API_KEY`), and abuse is limited by per-IP rate limits. It is
+intended to sit behind that reverse proxy, listed in `server.trusted_proxies`.
+Keep this in mind when assessing the severity of any findings, and never expose
+the database, Redis, or the raw app port to the public internet.
