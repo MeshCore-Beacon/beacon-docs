@@ -222,7 +222,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes` | Page of node summaries. Cursor is `lastSeen` epoch ms. Default limit 50. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers. |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
-| `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours. |
+| `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
 
@@ -289,11 +289,9 @@ breakdown; none exist within the retention window in practice.
 backfills the trailing 7 days, so for the first 30 days after deploy buckets older than 7 days may be
 only partially costed, and observations recorded without radio parameters are never costed.
 
-Intervals of `1h` and up are read from the hourly analytics rollups. Each UTC hour is rolled about
-95 minutes after it closes, so the newest hour or two are not yet included at those intervals. Sub-hour
-intervals read live observation rows and are always current. The response also reports `windowStart`,
-`windowEnd`, `generatedAt`, `source` (`raw` or `hourly`) and a `summary` of recorded packets and the
-last complete hour.
+Sub-hour intervals read live observation rows and are always current. The response also reports
+`windowStart`, `windowEnd`, `generatedAt`, `source` (`raw` or `hourly`) and a `summary` of recorded
+packets and the last complete hour.
 
 ```json
 {
@@ -383,6 +381,25 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
+`/routes` and `/routes/search` return a plain array of routes:
+
+```json
+{
+  "id": 412,
+  "pathKey": "5d1c0e7a9b2f4c8d6e3a1b0f9c8d7e6a",
+  "iata": "YOW",
+  "hopCount": 3,
+  "hops": [ { "nodeId": "uuid", "hashBytes": "ae", "node": { "id": "uuid", "name": "YOW_Kanata", "...": "" } } ],
+  "firstSeen": 1747526400000,
+  "lastSeen": 1747665456000,
+  "observationCount": 57
+}
+```
+
+`/routes/cross` returns `[{ sourceSegment, crossHop, targetSegment, totalHops }]`, where the segments are hop arrays as above and `crossHop` is `{ fromNode, toNode, fromIata, toIata, lastSeen }`.
+
+The observations endpoint returns `{ items, hasMore, nextPageCursor, route, windowStart, windowEnd, generatedAt, matchType, matchAvailable, hashSize, pathBytes }`. Each item is `{ id, packetHash, observerId, observerName, heardAt, payloadType, payloadTypeName, rssi, snr }`.
+
 ### Stats
 
 ```
@@ -467,14 +484,21 @@ clamped to the oldest hour the rollups still hold. An empty region returns zeros
 - `top-nodes` ranks nodes by advert hearings. `TopNode` and `TopAdvertiser` carry `publicKey` (hex,
   always set) and a nullable `nodeId` (null once the node row has been deleted); key rows by `publicKey`.
 - `scopes` counts packets heard since `since`. Observer and node counts are current memberships:
-  observers filter by the IATA they last reported from. `hourly` splits the packet count by UTC hour.
-- `signal` gives SNR/RSSI distributions and hourly trends; `paths` gives path-entry and hash-width
-  distributions. Both require `since` and `until` (at most 30 days) and read hourly snapshots refreshed
-  every `background.view_refresh`, so the current hour is excluded.
+  observers filter by the IATA they last reported from. `hourly` is `[{ hour, packets, observers, nodes }]`,
+  oldest first with empty hours omitted: the scope's packets that hour, plus the distinct observers that
+  heard them and nodes whose adverts were heard in the scope.
+- `signal` gives SNR/RSSI histograms and averages; `paths` gives hash-width and path-length
+  distributions. Both have an `hourly` array, require `since` and `until` (at most 30 days) and read the
+  hourly rollups, so empty or not-yet-rolled hours are missing. Each `paths` hour carries `maxEntries`,
+  the longest path heard that hour (0 if only empty paths were heard).
 - `observer-comparison` counts distinct flood packets heard by A only, B only and both, over a required
-  `since`/`until`. The observers must be different; an unknown one is a `404`.
+  `since`/`until`. The observers must be different; an unknown one is a `404`. Response:
+  `{ observerA, observerB, since, until, totalPackets, onlyA, onlyB, both }`.
 - `clock-drift` lists repeaters and room servers whose last advert clock is off by more than
   `nodes.clock_drift_threshold`, worst first. It is current state, not windowed.
+- `radio-presets` is `[{ preset, iata, sourceType, count }]`, where `preset` is `freqMhz,bwKhz,sf` and
+  `sourceType` is `observer` or `node`; it is rebuilt every `background.view_refresh` (default `1h`).
+  `node-types` is `[{ nodeType, nodeTypeName, count }]` over all known nodes.
 
 ### Traces
 
@@ -491,6 +515,26 @@ Counts and times always describe the whole tag.
 It returns a plain array, most recently heard first, default limit 50. To page, pass the last item's
 `lastHeardAt` as `cursor` and its trace tag (hex) as `cursorTag`; the tag breaks ties between traces
 last heard in the same millisecond. `/traces/{tag}` is a `404` for an unknown tag.
+
+A list item:
+
+```json
+{
+  "traceTag": "a3f1b2c4",
+  "firstHeardAt": 1747665450000,
+  "lastHeardAt": 1747665462000,
+  "packetCount": 3,
+  "iataCount": 2,
+  "traceType": "TRACE",
+  "pathHashes": ["ae", "9b", "f3"],
+  "snrValues": [7.25, 4.5, -1.0]
+}
+```
+
+`pathHashes` and `snrValues` come from the most complete observation. The detail is
+`{ traceTag, packets }`, one entry per packet: `{ packetHash, routeType, routeTypeName, scope, firstHeardAt,
+lastHeardAt, rawPath, resolvedRoute }`. `rawPath` is `[{ hash, snr }]` as received; `resolvedRoute` uses the
+resolved hop shape from packet detail.
 
 ### Admin
 

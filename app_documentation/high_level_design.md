@@ -30,7 +30,7 @@ This is the single source of truth for the project; sub-documents (deployment, r
 - **Backend:** Single Go binary, pgx + pgxpool + sqlc for Postgres, `github.com/meshcore-go/meshcore-go` for packet decoding, internal Go channels for live WebSocket fanout
 - **Database:** Postgres with BRIN + composite indexes, hourly rollup tables for historical stats
 - **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus in-memory LRU in Go in front
-- **Web client:** React + Vite + TypeScript + Tailwind + TanStack Query/Virtual + shadcn/ui
+- **Web client:** React 19 + Vite + TypeScript + Tailwind 4 + TanStack Query/Virtual, MapLibre GL for the map, ECharts for analytics charts, i18next for translations
 - **Mobile client:** Flutter (native iOS + Android)
 - **Edge:** Caddy for TLS and reverse proxy
 - **Deployment:** Docker Compose with five services (app, db, redis, web, caddy)
@@ -930,10 +930,23 @@ Covers REST endpoints (`/api/v1/`), auth and rate limits, WebSocket protocol (`/
 - Per-observer page: payload type breakdown of their contributions, recent observations, battery and uptime curves from `status_metadata` history (if we capture deltas), software version
 - Filter pills: by observer type, by broker (mqtt1-only / mqtt2-only / both), by IATA or super-region
 
+### Routes
+- `known_routes`: fully resolved multi-hop paths per IATA, every hop high confidence. Listed by IATA and hop count, searchable between two node hashes, and across IATA boundaries.
+- Route detail pages the retained observations whose path matches the route exactly (`/routes/{iata}/{pathKey}/observations`).
+
+### Traces
+- One row per trace tag from the `trace_tags` summary kept at ingest: type (TRACE or PING), packet count, IATAs heard, first and last heard.
+- Detail shows each packet's raw hops with per-hop SNR and the resolved route.
+
+### Observer page
+- Observer summary, telemetry curves (battery, airtime, noise floor) from the telemetry history, and an activity chart of what it heard, read from raw observations for sub-hour buckets and the hourly rollups otherwise.
+- A page of the adverts the observer heard.
+
 ### Stats
 - Queries against the hourly rollup tables. Regions expand to their IATAs through `region_iatas`; distinct counts come from the IATA-set tables, so a packet heard in several IATAs counts once.
 - Top-line: total packets last 24h, total observations last 24h, active observers, active IATAs, unique nodes seen
 - Charts: observations over time by IATA (with optional super-region rollup), payload type breakdown, top contributing observers, top contributing nodes
+- The web Analytics tab adds signal and path-length distributions, per-scope activity, clock drift, radio presets, an observer comparison and the neighbour graph, with hourly sparklines from `/stats/series`
 
 ---
 
@@ -972,6 +985,8 @@ New observations of the same packet arrive via WebSocket and appear inline in th
 
 These are out of scope for v1 but worth keeping in mind so the schema and architecture don't paint us into a corner.
 
+Already shipped from this list: the trace explorer (Traces tab, with per-hop SNR), live packet flow on the map, and the neighbour graph (map overlay and Analytics).
+
 ### Web-based admin UI
 The admin API exists (see [Admin API and access control](#admin-api-and-access-control)), but there is
 no login or browser UI yet. A future version could add:
@@ -983,25 +998,8 @@ no login or browser UI yet. A future version could add:
 
 The config file should remain the primary source of truth; admin UI writes would update the file (or a parallel DB table that overlays it) so a snapshot of operational state is always version-controllable.
 
-### Trace packet visualization (payload type 0x09)
-Trace packets carry per-hop SNR values (`[snr_1][snr_2]...[snr_N]` where each is a signed byte representing SNR × 4). Once decoded, these unlock a dedicated per-hop signal quality view: for any traced path, render the actual SNR at each hop on the map, color-coded by signal strength. This is the only way to see real RF link quality between specific repeaters rather than just observer-reported reception. The schema already supports this since trace packets parse into `parsed_payload` like any other type. A future trace explorer view would query packets where `payload_type = 0x09` and pivot the per-hop SNR data into a visualization.
-
-### Live pew pew map
-A real-time animated map showing packets propagating across the mesh as they happen. Each new observation fires an animated arc or pulse from the resolved sending node (or first known hop) to the observing node's location, color-coded by payload type. Multiple observations of the same packet from different observers light up in sequence, visualizing flood propagation as it spreads. Filterable by region, payload type, and channel. The schema already supports this since every observation has timestamps, observer coordinates, and (when paths resolve) node coordinates. Mostly useful as an "is the mesh alive right now?" glance view and as eye candy for the project landing page.
-
-**Constraints for whoever builds this:**
-- Must handle high traffic without melting the browser (likely needs WebGL or canvas, not SVG)
-- Must degrade gracefully under load (throttle, drop frames, queue events)
-- Must NOT draw ambiguous paths (any hop without confidence "high" → don't animate that segment)
-- Must NOT zoom-jump the map as new observations come in
-- Must support payload-type filters so users can isolate (e.g.) only chat traffic
-- Must work from slim WebSocket events where possible to keep bandwidth low, fetch enrichment lazily
-
 ### Live neighbor activity graph
-Different from pew pew: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
-
-### Neighbor maps (static topology)
-Node response payloads can carry full neighbor tables with SNR values per neighbor. This is similar to traces but for adjacency rather than path. A future view could render a graph of node-to-node SNR relationships, giving a true picture of the mesh topology beyond just observer-reported sightings.
+Different from the live packet flow on the map: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
 
 ### Mobile push notifications
 The Flutter app could let users set up notifications for specific events: a keyword appearing in a specific channel, a specific node starting to talk, an observer going offline, a packet matching arbitrary filter criteria. The `channelMessage` and `packetObservation` WebSocket events already carry everything a push service would need. This is purely a feature of the mobile app plus a notification dispatch service (Firebase or APNs).
