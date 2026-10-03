@@ -126,7 +126,9 @@ admin-password aliases. Across bounded tests and normal operation, Hilltop,
 Weaver, Royal City, Starkey and Royal Relay have returned correlated readings.
 Reservoir has not returned a usable response. Hilltop supplied channel-2
 12.4 C, 64% humidity and 985 hPa, plus 3.99 V battery; later readings may differ.
-Royal City has multiple real samples, allowing a measured battery sparkline.
+Royal City has multiple real samples with a longer gap. Hilltop’s next normal
+hourly poll arrived through the public service, and all five telemetry sparklines
+were verified in the deployed Atlas card.
 
 Temporary test exceptions were confined to a private harness; the distributed
 collector retains normal cooldown and congestion rules. Its latest SDK handling

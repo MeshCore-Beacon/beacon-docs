@@ -2,6 +2,8 @@
 
 ## Current delivery — 3 October 2026 UTC
 
+The web branch subsequently advanced to **f7637aa** for a single trailing-blank-line cleanup. The actual deployed and full-suite-tested web source remains **4b189dff**, correctly identified by its public source archive; this formatting-only branch difference has not been relabelled as a new deployment.
+
 The [Pi preview](https://canadaverse.org/beacon-dev/) now runs experimental
 **2.1.0-n30nex.1**, server **fe4c4156** / web **4b189dff**, including the checked
 upstream **af20beb / 0924260**. The 2.0.1 patch milestone and 2.1.0 feature tags

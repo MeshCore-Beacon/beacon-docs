@@ -2,6 +2,8 @@
 
 ## Current: 2.1 experimental preview — 3 October 2026 UTC
 
+The web branch subsequently advanced to **f7637aa** for a single trailing-blank-line cleanup. The actual deployed and full-suite-tested web source remains **4b189dff**, correctly identified by its public source archive; this formatting-only branch difference has not been relabelled as a new deployment.
+
 The user approved **private collector repository + separate intake service**, fresh
 preview history with the old database intact, and continued exclusive collector use
 of the RemoteTerm radio. These direct decisions supersede older cutover/restore
