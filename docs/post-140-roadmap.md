@@ -1,44 +1,32 @@
 # Beacon roadmap: 2.0 integration and CoreScope parity
 
-## Current delivery — 3 October 2026 UTC
+## Current: released 2.0 base and verified preview — 3 October 2026
 
-The web branch subsequently advanced to **f7637aa** for a single trailing-blank-line cleanup. The actual deployed and full-suite-tested web source remains **4b189dff**, correctly identified by its public source archive; this formatting-only branch difference has not been relabelled as a new deployment.
+The [Pi preview](https://canadaverse.org/beacon-dev/) runs server **8c7fbb8** and
+web **7e139d5**, retaining My Atlas, Topology and node/route work on top of the
+published **2.0.0** release. Experimental tags are `v2.1.0-n30nex.2` (server) and
+`v2.1.1-n30nex.1` (web). Stable release and production ownership remain upstream.
 
-The [Pi preview](https://canadaverse.org/beacon-dev/) now runs experimental
-**2.1.0-n30nex.1**, server **fe4c4156** / web **4b189dff**, including the checked
-upstream **af20beb / 0924260**. The 2.0.1 patch milestone and 2.1.0 feature tags
-are published on contribution forks; they are not upstream stable releases.
+At the user's request, the preview matches released defaults: **7-day raw,
+90-day summaries, 31-day observer telemetry, 14-day routes**. The runtime values
+were verified. The previous 30-day-summary documentation was wrong; the previous
+runtime already used 90 days. Legacy history is still intact.
 
-Delivered in the preview:
+This patch fixes camera resets on refreshed Topology data/layout, retry/error
+feedback on node and telemetry pages, and optional telemetry collections. Private
+Collector alpha.4 rejects missing/null readings instead of inventing zero; its
+source and intake database remain separate from Beacon core. The current signed
+HTTPS path passed real companion checks with no extra RF polling or fake samples.
 
-- Topology left-pan/right-orbit/wheel zoom, scene-anchored labels, route-window
-  refresh, viewport-sized Live Activity, region isolation and fullscreen.
-- Full node pages with bounded report summaries, observer sparklines, visible live
-  map icons with reception glow, and compact Routes/Traces.
-- My Atlas battery and environmental telemetry via the **separate Beacon Collector
-  service/database**. The collector repository is private; its license is unchanged.
-  Automatic enrollment does not require operator approval.
-- Fresh 2.0 baseline history, preserving the old database intact and its verified
-  on/off-Pi recovery dump. 72-hour raw/30-day summary retention remains.
+Validation: **753 server tests, 1,259 web tests**, native PostgreSQL/build/vet/lint,
+**31 preview API checks**, exact public assets/source archives and sampled browser
+journeys. Two optional backup tests and physical Safari/BLE coverage are not claimed.
+All changes are preview/repository work; the earlier production inspection was
+read-only and stopped when the user redirected the scope.
 
-Verified: **753 server tests, 1,255 web tests**, native PostgreSQL/build/lint/vet,
-3,200 replay inputs with zero fixture drops, 30 public assets and both corresponding
-source archives, signed public HTTPS delivery, duplicate rejection and invalid
-signature rejection. Initial 20-second replay timing failed under concurrent load;
-the retained 60-second-budget run passed in 22.80 seconds. Two optional backup tests
-remain skipped. Browser checks cover live traffic, camera controls, route refresh,
-region isolation, fullscreen, full-node details and French phone containment.
-
-Five of the six selected solar repeaters have returned readings. Reservoir has not.
-Hilltop supplied channel-2 temperature, humidity and pressure plus battery. Graphs
-require later successful readings and retain gaps; no values are fabricated. The
-leased radio stays on the normal hourly collector schedule and RemoteTerm remains
-suspended at the user's request.
-
-Rollback is `evidence/post21-final-20261003/deploy-preview.py rollback`, checkpoint
-`post21-cutover-20261003T014506Z`. The core and telemetry databases remain separate.
-Review requests and the daily compatibility automation remain on hold. Official
-production deployment and stable version selection belong to the maintainers.
+[Audit findings and next gates](post-20-audit-20261003.md) ·
+[Merge sequence](post-20-integration.md) ·
+[Current preview source](https://canadaverse.org/beacon-dev/source.html).
 
 ## Remaining parity and next phases
 

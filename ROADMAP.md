@@ -1,29 +1,33 @@
 # Beacon parity and analytics roadmap
 
-## Active experimental work and proposed 2.0 baseline — 30 September
+## Current: released 2.0 baseline and experimental preview — 3 October
 
-The latest maintainer discussion ends at **2.0.0**, with synchronized server/web
-major/minor versions and independent patch levels. Flattened migrations and a clean
-start are proposed but have not landed in the checked upstream refs. The next step
-is to validate that published baseline on a separate database before extending the
-feature work. The discussion is not authorization to wipe the Pi or reuse an old
-migration journal with a new baseline. See the [version and migration direction](docs/post-140-roadmap.md#maintainer-direction--30-september-2026).
+The Pi preview includes released server `0015430` and web `7a9770e`, plus My Atlas,
+Topology, full node pages and exact route evidence. Its deployed revisions are
+server **8c7fbb8** (`2.1.0-n30nex.2`) and web **7e139d5** (`2.1.1-n30nex.1`).
+Both contain the checked upstream main/dev branches. The separate private Collector
+runs alpha.4; its implementation and prototype history are absent from public Beacon.
 
-A follow-up proposes 24-hour raw retention on dev and 7 days in production, and
-reports that dev has moved to rotational storage. No retention change is applied
-to the Pi by this discussion. Chart windows need to follow the effective retention
-of their deployment; summary-backed history remains distinct from raw records.
+The new 001 database baseline is active; the old database and verified recovery
+copies remain intact. At the user's request, preview retention matches the released
+defaults: **7 days raw, 90 days summaries, 31 days observer telemetry and 14 days
+routes**. This replaces older preview-policy notes below. No production service,
+configuration or database was changed.
 
-The contributor approved proceeding toward and beyond CoreScope feature parity.
-The sequence is **validate the upcoming 2.0 baseline → preserve saved-route correctness (#183) and experimental My Atlas (#97)
-→ node/trace dashboards and investigation → search/saved views/channel analytics
-→ topology/distance/hash tools → bounded replay/reach/timing → regional crossing evidence**.
-Phases 1 and 2 are combined on the requested `n30nex-test` branches in server, web and docs. The Pi preview runs this experimental composition, with daily upstream dev/main compatibility checks and no review pings. The route fix and Atlas are validated; node/trace dashboards follow baseline validation. Each phase ends in focused reviewable PRs, exact Pi validation,
-updated source/changelog and retained rollback; release numbers remain a maintainer decision.
-The earlier 1.4.0 handoff remains recorded below as historical evidence. Atlas stays
-experimental; its inclusion in a stable 2.0 release is not yet decided.
+753 server tests and 1,259 frontend tests passed, plus native PostgreSQL/build/lint,
+31 preview API checks and exact public assets/source checks. Topology camera
+continuity, node/telemetry error handling and missing-number validation are fixed.
+Deployment-log rotation is prepared in these templates under docs issue #13.
 
-[Phases, contracts and acceptance](docs/post-140-roadmap.md) · [Current experimental preview](docs/n30nex-test-preview.md).
+Next: complete node/fleet history and graphical trace analysis, then shared search,
+saved filters, channel analytics, prefix/distance tools, retained replay and area
+filtering. Collector wider-alpha gates remain separate. Experimental PRs stay
+draft with no review pings; daily automation remains paused. Older checkpoints below
+are historical, including their version, retention and recovery instructions.
+
+[Audit and remaining gates](docs/post-20-audit-20261003.md) ·
+[Parity roadmap](docs/post-140-roadmap.md) ·
+[Current experimental preview](docs/n30nex-test-preview.md).
 
 ## Recorded 1.4.0 checkpoint — superseded on the Pi by the experiment
 

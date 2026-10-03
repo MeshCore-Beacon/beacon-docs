@@ -1,6 +1,35 @@
 # My Atlas and Topology after Beacon 2.0
 
-## Current: 2.1 experimental preview — 3 October 2026 UTC
+## Current: released 2.0 base and verified preview — 3 October 2026
+
+The [Pi preview](https://canadaverse.org/beacon-dev/) runs server **8c7fbb8** and
+web **7e139d5**, retaining My Atlas, Topology and node/route work on top of the
+published **2.0.0** release. Experimental tags are `v2.1.0-n30nex.2` (server) and
+`v2.1.1-n30nex.1` (web). Stable release and production ownership remain upstream.
+
+At the user's request, the preview matches released defaults: **7-day raw,
+90-day summaries, 31-day observer telemetry, 14-day routes**. The runtime values
+were verified. The previous 30-day-summary documentation was wrong; the previous
+runtime already used 90 days. Legacy history is still intact.
+
+This patch fixes camera resets on refreshed Topology data/layout, retry/error
+feedback on node and telemetry pages, and optional telemetry collections. Private
+Collector alpha.4 rejects missing/null readings instead of inventing zero; its
+source and intake database remain separate from Beacon core. The current signed
+HTTPS path passed real companion checks with no extra RF polling or fake samples.
+
+Validation: **753 server tests, 1,259 web tests**, native PostgreSQL/build/vet/lint,
+**31 preview API checks**, exact public assets/source archives and sampled browser
+journeys. Two optional backup tests and physical Safari/BLE coverage are not claimed.
+All changes are preview/repository work; the earlier production inspection was
+read-only and stopped when the user redirected the scope.
+
+[Audit findings and next gates](post-20-audit-20261003.md) ·
+[Merge sequence](post-140-roadmap.md) ·
+[Current preview source](https://canadaverse.org/beacon-dev/source.html).
+
+
+## Historical: early 2.1 experimental preview — 3 October 2026 UTC
 
 The web branch subsequently advanced to **f7637aa** for a single trailing-blank-line cleanup. The actual deployed and full-suite-tested web source remains **4b189dff**, correctly identified by its public source archive; this formatting-only branch difference has not been relabelled as a new deployment.
 
