@@ -34,7 +34,7 @@ This is the single source of truth for the project; sub-documents (deployment, r
 - **Mobile client:** Flutter (native iOS + Android)
 - **Edge:** Caddy for TLS and reverse proxy
 - **Deployment:** Docker Compose with five services (app, db, redis, web, caddy)
-- **Observability:** structured `slog` logs (text or JSON); opt-in, time-boxed CPU profiles written to a private directory (beacon-server `PROFILING.md`). There is no HTTP profiling endpoint.
+- **Observability:** structured `slog` logs (text or JSON); opt-in, time-boxed CPU profiles written to a private directory ([CPU profiling](profiling.md)). There is no HTTP profiling endpoint.
 - **MQTT brokers:** mqtt1.meshcore.ca + mqtt2.meshcore.ca over WSS, Role 2 SUBSCRIBER account auth (see Broker authentication below)
 
 ### Flow
@@ -91,7 +91,7 @@ We need Role 2 because the analyzer relies on SNR and RSSI per observation. Coor
 
 ### Why this is fast
 
-One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap at billions of rows. Caddy speaks HTTP/3 and brotli. React + virtualized lists keep the UI snappy regardless of how many packets are on screen. Flutter on mobile is native-compiled and runs at 60fps by default.
+One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React with virtualized lists renders only the rows on screen. Flutter on mobile is native-compiled and runs at 60fps by default.
 
 ---
 
@@ -782,7 +782,7 @@ With `backup.enabled: true` and an admin key configured, `GET /api/v1/admin/back
 new as the Postgres server inside the app's runtime (the Docker image ships PostgreSQL 16's client);
 if that check fails at startup the endpoint stays unavailable and everything else runs normally. A
 standalone `beacon-backup` command can also export a bundle and verify one offline. Details:
-beacon-server `docs/backup-export.md`.
+[Backup and export](backup-export.md).
 
 ### IATA and super-region seeding
 
@@ -880,7 +880,7 @@ The implementation picks the correct prefix column based on `hashSize` (`prefix_
 
 ## API contract
 
-Moved to its own document: **[API Contract](api_contract.md)**
+Moved to its own document: **[API Contract](api-contract.md)**
 
 Covers REST endpoints (`/api/v1/`), auth and rate limits, WebSocket protocol (`/ws`), backpressure/reconnection, and mobile-specific concerns.
 
@@ -1027,7 +1027,7 @@ Responses to dev feedback on this design. Captures decisions and rationale for t
 
 ### Q: pprof endpoints, internal only with auth middleware, or exposed for perf stats?
 
-**A:** Neither, as it turned out. There is no pprof HTTP endpoint; CPU profiling is opt-in and time-boxed, and writes profile files to a private directory (beacon-server `PROFILING.md`).
+**A:** Neither, as it turned out. There is no pprof HTTP endpoint; CPU profiling is opt-in and time-boxed, and writes profile files to a private directory ([CPU profiling](profiling.md)).
 
 ### Q: MQTT brokers, internal WSS to our own broker for distribution? Should we include Mosquitto or EMQX as a deploy option for other communities?
 

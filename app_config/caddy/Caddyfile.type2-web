@@ -1,6 +1,4 @@
-# Type 2 Web: Frontend-only
+# Type 2, web host: frontend only. Copy of docker-deployment-type2/web/data/Caddy/CaddyFile/Caddyfile.proxy.
 {$DOMAIN} {
-    handle {
-        reverse_proxy web:80
-    }
+	reverse_proxy beacon-web:80
 }
