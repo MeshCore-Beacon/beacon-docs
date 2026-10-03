@@ -30,6 +30,15 @@ read-only and stopped when the user redirected the scope.
 
 ## Remaining parity and next phases
 
+The 3 October discussion proposes **2.1 focused on My Atlas and Collector**, with
+USB/TCP companion qualification first. See the [2.1 planning scratchpad and
+MeshCore HA comparison](beacon-21-collector-design.md) for existing safeguards,
+the proposed flood/direct budgets, shared repeater leases and MQTT acceptance
+requirements. MQTT control/console work is provisionally later (2.5); BLE/browser
+qualification and observer-firmware integration are later work. These are planning
+proposals, not changes to the running preview or permission to enable control.
+Topology stays available in the experiment; the broader parity backlog follows.
+
 | Area | Remaining work |
 |---|---|
 | Node/repeater analytics | Full history beyond the bounded 200-report sample; signal/hop distributions, heatmaps, hearing coverage and comparable fleet metrics. |
@@ -37,7 +46,7 @@ read-only and stopped when the user redirected the scope.
 | Finding and channel analysis | Global search, saved mesh/Atlas filters, channel activity and sender/hearing comparisons. |
 | Network tools | Prefix collisions/checker, geographic distance analysis, repeated subpaths and route alternatives. |
 | Replay and geography | Retained packet playback/seek/speed, reach/timing analysis and GPS-area filtering. |
-| Collector release readiness | Cross-client per-repeater leases, abuse/revocation controls, packaged USB/BLE onboarding, long-run reconnect/delivery tests and diagnosis of unresponsive targets. A possible Beacon 3.0 pairing remains planning. |
+| Collector release readiness | Proposed 2.1 Atlas/Collector focus: per-radio flood/direct budgets, cross-client repeater leases, USB/TCP qualification, automatic MQTT credentials and acceptance receipts, abuse/revocation controls and long-run reconnect tests. BLE/browser and remote control follow later. |
 | Smaller optional work | QR sharing, theme/layout import/export and operator diagnostics. |
 
 ## Comparison baseline and scope

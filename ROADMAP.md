@@ -19,9 +19,12 @@ configuration or database was changed.
 continuity, node/telemetry error handling and missing-number validation are fixed.
 Deployment-log rotation is prepared in these templates under docs issue #13.
 
-Next: complete node/fleet history and graphical trace analysis, then shared search,
-saved filters, channel analytics, prefix/distance tools, retained replay and area
-filtering. Collector wider-alpha gates remain separate. Experimental PRs stay
+The latest discussion proposes **Atlas and Collector as the 2.1 focus**. The
+[planning scratchpad](docs/beacon-21-collector-design.md) compares MeshCore HA's
+traffic controls and records USB/TCP, per-radio budgets, shared repeater leases
+and MQTT decisions. Topology remains in the preview; full node/fleet history,
+graphical trace analysis, shared search, channel analytics and replay remain on the
+broader parity roadmap. Collector wider-alpha gates remain explicit. Experimental PRs stay
 draft with no review pings; daily automation remains paused. Older checkpoints below
 are historical, including their version, retention and recovery instructions.
 

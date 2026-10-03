@@ -1,5 +1,12 @@
 # Post-2.0 UI and node telemetry batch
 
+**Current planning update, 3 October:** see [Beacon 2.1: Atlas and Collector](beacon-21-collector-design.md).
+The new discussion proposes a 2.1 focus, USB/TCP first and MQTT forwarding;
+the older possible 3.0 release pairing below is historical. The preview still uses
+the verified HTTPS path and its existing radio lease. No MQTT/control/firmware
+change is authorized merely by the discussion. The deployed app revisions are
+recorded in the [current audit](post-20-audit-20261003.md).
+
 Requested 2 October 2026. Work stays experimental on `n30nex-test`, based on
 upstream server `af20beb` / web `0924260` plus Atlas, Topology and exact-route
 evidence. Review requests and the daily automation remain on hold.
