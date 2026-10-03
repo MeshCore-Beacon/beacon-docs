@@ -12,7 +12,3 @@ docker-deployment-*/*/data/redis/
 docker-deployment-*/*/data/Caddy/data/
 docker-deployment-*/*/data/Caddy/config/
 docker-deployment-*/*/data/Caddy/logs/
-
-# Local planning scratch
-.superpowers/
-docs/superpowers/
