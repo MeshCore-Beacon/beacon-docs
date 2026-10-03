@@ -1,5 +1,57 @@
 # My Atlas and Topology after Beacon 2.0
 
+## Current: 2.1 experimental preview — 3 October 2026 UTC
+
+The user approved **private collector repository + separate intake service**, fresh
+preview history with the old database intact, and continued exclusive collector use
+of the RemoteTerm radio. These direct decisions supersede older cutover/restore
+holds below. RemoteTerm stays **stopped and disabled** until the user asks for it back.
+
+`n30nex-test` is now server **fe4c4156** / web **4b189dff**, incorporating upstream
+server dev **af20beb** / web dev **0924260** and main. Both application branches and
+experimental tags are published to the contribution forks. My Atlas and Topology
+remain experimental; server #192 and Atlas #97 remain draft. No review ping or
+upstream stable release was made; daily automation remains **PAUSED**.
+
+The Pi publicly runs those exact server/web revisions. Core uses the new
+`beacon_post21_preview_20261002` database (001 baseline); the old **beacon_dev**
+with its 045 ledger is intact. The old dump was restore-tested and its SHA-256
+verified on/off Pi. Raw/summary retention stays 72 hours/30 days.
+
+Beacon Collector intake **84b0d22** runs in its own container and dedicated
+`beacon_collector_preview` database/role. Its repository is **private**, with the
+existing license unchanged. Public telemetry routes go to this service; Beacon
+core has no collector table, migration or package dependency. Never push the local
+embedded prototype history (`1b10530` through `633a380`) into public Beacon refs.
+The public server was composed from its clean parent instead.
+
+753 native server checks and 1,255 frontend tests passed, plus build/lint/vet,
+real PostgreSQL checks, the 3,200-input replay (zero fixture drops), exact public
+assets/source hashes and automatic signed HTTPS enrollment/delivery. Two opt-in
+backup/export tests were skipped. The replay exceeded its original 20-second
+shared-host budget and passed at 22.80 seconds with a 60-second allowance; this
+is not a production throughput guarantee.
+
+Five configured repeaters have returned telemetry: Hilltop, Weaver, Royal City,
+Starkey and Royal Relay. Reservoir still times out. Hilltop supplied real channel-2
+temperature/humidity/pressure as well as battery. Missing data and timing gaps stay
+visible. Normal polling keeps 1–72-hour intervals and congestion checks; no test
+bypass is shipped. Hardware attestation and cross-client polling leases are not
+implemented. The collector defaults to Canadaverse until a later Beacon release.
+
+Current paired rollback: `evidence/post21-final-20261003/deploy-preview.py rollback`
+on Pi; checkpoint **post21-cutover-20261003T014506Z**. It restores the retained
+legacy container/config/frontend while preserving the new core and telemetry DBs.
+The private DB dump is **post21-fresh-20261003T002912Z**. Old rollback commands are
+historical and must not be applied directly against this pair.
+
+Canonical state: `planning/experimental-n30nex-test.json`; public source offer:
+https://canadaverse.org/beacon-dev/source.html. Final evidence is under
+`evidence/post21-final-20261003`. Keep the old dirty `topology-web-2-integration`
+checkout untouched. Docs changes were preserved in `docs-n30nex-test` and prepared
+in `docs-telemetry-20261003` for integration.
+
+
 Prepared on 2 October 2026 against server `98006a93645c9f8b09d2ea441a5776eecb9add02`
 and web `39e921c277a8a1c8ba79db04131a6cc8fa27649d`. These are the published dev
 commits introducing hourly rollups and empty-region handling. A stable 2.0 tag is

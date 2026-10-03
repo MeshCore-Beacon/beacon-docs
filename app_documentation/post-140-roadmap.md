@@ -1,27 +1,54 @@
 # Beacon roadmap: 2.0 integration and CoreScope parity
 
-## Current status — checked 2 October 2026
+## Current delivery — 3 October 2026 UTC
 
-| Surface | Verified state |
+The [Pi preview](https://canadaverse.org/beacon-dev/) now runs experimental
+**2.1.0-n30nex.1**, server **fe4c4156** / web **4b189dff**, including the checked
+upstream **af20beb / 0924260**. The 2.0.1 patch milestone and 2.1.0 feature tags
+are published on contribution forks; they are not upstream stable releases.
+
+Delivered in the preview:
+
+- Topology left-pan/right-orbit/wheel zoom, scene-anchored labels, route-window
+  refresh, viewport-sized Live Activity, region isolation and fullscreen.
+- Full node pages with bounded report summaries, observer sparklines, visible live
+  map icons with reception glow, and compact Routes/Traces.
+- My Atlas battery and environmental telemetry via the **separate Beacon Collector
+  service/database**. The collector repository is private; its license is unchanged.
+  Automatic enrollment does not require operator approval.
+- Fresh 2.0 baseline history, preserving the old database intact and its verified
+  on/off-Pi recovery dump. 72-hour raw/30-day summary retention remains.
+
+Verified: **753 server tests, 1,255 web tests**, native PostgreSQL/build/lint/vet,
+3,200 replay inputs with zero fixture drops, 30 public assets and both corresponding
+source archives, signed public HTTPS delivery, duplicate rejection and invalid
+signature rejection. Initial 20-second replay timing failed under concurrent load;
+the retained 60-second-budget run passed in 22.80 seconds. Two optional backup tests
+remain skipped. Browser checks cover live traffic, camera controls, route refresh,
+region isolation, fullscreen, full-node details and French phone containment.
+
+Five of the six selected solar repeaters have returned readings. Reservoir has not.
+Hilltop supplied channel-2 temperature, humidity and pressure plus battery. Graphs
+require later successful readings and retain gaps; no values are fabricated. The
+leased radio stays on the normal hourly collector schedule and RemoteTerm remains
+suspended at the user's request.
+
+Rollback is `evidence/post21-final-20261003/deploy-preview.py rollback`, checkpoint
+`post21-cutover-20261003T014506Z`. The core and telemetry databases remain separate.
+Review requests and the daily compatibility automation remain on hold. Official
+production deployment and stable version selection belong to the maintainers.
+
+## Remaining parity and next phases
+
+| Area | Remaining work |
 |---|---|
-| Upstream server | `dev` **98006a9** includes the 2.0 baseline and hourly rollups; `main` remains **201cd9e**. Latest published release is still **v1.6.0**. |
-| Upstream web | `dev` **39e921c** consumes hourly rollups and handles empty regions; `main` remains **5ac36ce**. Latest published release is still **v1.3.0**. |
-| Upstream docs | `main` **24d2e5f**; our experimental roadmap remains in draft PR #7. |
-| Prepared experiment | `n30nex-test`: server **ae328cb6**, web **9d3f9585**. Both incorporate the named upstream dev/main heads. Server #192 and My Atlas #97 are draft, mergeable and pass their published-head CI; web CodeQL is skipped. |
-| Pi preview | Still server **644960e4** / web **462d49e8**, confirmed by the public source offer. Its legacy database, 72h raw/30d summary retention and rollback are unchanged. |
-| Official sites | `live.meshcore.ca` serves Beacon and displays **2.0.0**. `dev.meshcore.ca` also displays **2.0.0**, with a development-only banner linking everyday users to live. Backend revisions and operator rollout acceptance were not verified by this read-only browser check. |
-| Release boundary | **No stable 2.0 GitHub release/tag yet.** A frontend version label is not a published release. My Atlas and Topology remain held for post-2.0 acceptance. |
-
-The prepared code passed native server build/vet/PostgreSQL validation and web
-build/lint/**1,180 tests**. Two opt-in backup/export tests were skipped. Browser
-checks covered desktop, French phone layouts, region isolation, all loaded paths
-and 160 animated packet reports. This roadmap-only refresh did not rerun those
-unchanged-code checks or deploy anything. Daily compatibility automation remains
-**paused**, and no review request is authorized.
-
-[Exact post-2.0 packages and merge order](post-20-integration.md) ·
-[Actual preview and rollback](n30nex-test-preview.md) ·
-[Pi source offer](https://canadaverse.org/beacon-dev/source.html).
+| Node/repeater analytics | Full history beyond the bounded 200-report sample; signal/hop distributions, heatmaps, hearing coverage and comparable fleet metrics. |
+| Trace investigation | Graphical reception chronology and evidence-linked observer reach; compact rows are now delivered. |
+| Finding and channel analysis | Global search, saved mesh/Atlas filters, channel activity and sender/hearing comparisons. |
+| Network tools | Prefix collisions/checker, geographic distance analysis, repeated subpaths and route alternatives. |
+| Replay and geography | Retained packet playback/seek/speed, reach/timing analysis and GPS-area filtering. |
+| Collector release readiness | Cross-client per-repeater leases, abuse/revocation controls, packaged USB/BLE onboarding, long-run reconnect/delivery tests and diagnosis of unresponsive targets. A possible Beacon 3.0 pairing remains planning. |
+| Smaller optional work | QR sharing, theme/layout import/export and operator diagnostics. |
 
 ## Comparison baseline and scope
 
@@ -56,7 +83,7 @@ list is separated from release acceptance and production-load qualification.
 
 | Area | What is left | Reference and current Beacon limit |
 |---|---|---|
-| **Node and repeater dashboards** | Full-key activity history, packet-type mix, signal/hop distributions, hearing coverage, activity heatmaps, peer relationships and comparable repeater/fleet metrics | [Node analytics source](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/node-analytics.js), [fleet/relay analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Beacon has node details/recent reports and Atlas samples, but no equivalent complete dashboard. |
+| **Node and repeater dashboards** | Full history beyond the delivered 200-report node page, signal/hop distributions, hearing coverage, activity heatmaps, peer relationships and comparable repeater/fleet metrics | [Node analytics source](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/node-analytics.js), [fleet/relay analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Beacon now has full node pages, report/type samples, telemetry cards and Atlas; complete node/fleet summaries remain. |
 | **Packet/trace chronology and observer reach** | A graphical reception timeline, observer-to-observer spread, confirmed reach by hop/node, and a consistent return path into packets, routes and map | [CoreScope tracing overview](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/README.md#and-more). Beacon already shows first/last times, per-observer signal and trace hop chains; the gap is richer analysis, not basic packet inspection. |
 | **Global search and saved mesh filters** | Ctrl+K-style search across nodes, observers, packets and channels; use Atlas selections across views; saved filter/layout presets | [Global search and favorites](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/app.js). Beacon searches individual lists and saves cards, but has no shared search or site-wide saved-node filter. |
 | **Channel analytics** | Messages over time, channel comparisons, per-channel senders and hearing context, with explicit key/history availability | [Analytics guide](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/analytics.md#channels). The decoded message viewer and general talker statistics already exist. |
