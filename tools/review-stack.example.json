@@ -1,0 +1,7 @@
+{
+  "repo": "beacon-server",
+  "upstream": "MeshCore-Beacon/beacon-server",
+  "fork": "YOUR_ACCOUNT/beacon-server-contributions",
+  "remote": "contribution",
+  "entries": []
+}
