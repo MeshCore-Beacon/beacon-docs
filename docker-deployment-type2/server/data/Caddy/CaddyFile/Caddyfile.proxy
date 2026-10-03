@@ -1,5 +1,3 @@
-# Type 2, server host: API and WebSocket only; everything else is redirected to the web host.
-# Copy of docker-deployment-type2/server/data/Caddy/CaddyFile/Caddyfile.proxy.
 # Behind Cloudflare (or another CDN), {remote_host} is the CDN's address. Trust its ranges
 # in a global block, then use {client_ip} instead of {remote_host} below and client_ip
 # instead of remote_ip in conf.d/blocklist.caddy:
