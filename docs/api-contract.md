@@ -122,6 +122,29 @@ A packet summary:
 
 `summary` is the advert name, `ACK <checksum>`, `TRACE <tag>` or `PING <tag>`, and is omitted for other types. `scope` is the matched transport scope, omitted when none. `latestObserver` can also carry `resolvedSource` / `resolvedDestination` (see below).
 
+#### Packet summaries
+
+Packet lists, regional lists, reconnect backfill and live `packetObservation` events carry the
+optional `summary` string. It comes from the packet's own stored metadata, never from a node's
+current name or a fresh decode.
+
+| Payload | Summary | Source |
+|---|---|---|
+| ADVERT | Advertised name | Saved `appData.name` / verified decoded advert |
+| ACK | `ACK 01020304` | Four-byte acknowledgement checksum |
+| TRACE | `TRACE efbeadde` | Trace tag |
+| TRACE classified as PING | `PING efbeadde` | Trace tag |
+
+- References are eight lowercase hex characters in the same byte order as packet detail's
+  `checksum` / `traceTag`. Zero is valid. Extended ACK retry bytes do not change the checksum.
+- They are short references, not unique packet IDs or proof of delivery. No message body, trace
+  auth code or inferred sender or recipient is included.
+- The text is projected from saved JSON in the existing list queries: no extra column, backfill
+  or per-packet lookup. A stored value of the wrong type or not exactly eight hex characters
+  omits the field.
+- Other payload types have no summary yet. A missing summary does not mean the packet is
+  invalid.
+
 ### Packet detail
 
 ```
@@ -226,6 +249,29 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
 
+#### Foreign repeater indication
+
+With `nodes.mark_foreign: true`, repeater nodes carry `possiblyForeign`. It is `true` when the
+repeater's reported position is outside the union of all configured `iatas.<code>.borderFile`
+polygons, with `meshmapper.zones` borders replacing them where MeshMapper has one. IATAs without
+a border add no area, and airport coordinates are not used. Enabling it with no border source, a
+missing file or invalid geometry stops startup. Border changes need a restart.
+
+- Points on an edge (including hole edges) are inside; hole interiors are outside.
+- Other roles and missing or invalid positions get no value. A 0/0 advert clears the stored
+  position.
+- It is a hint from the reported position, not proof of origin. Ingest, heard-in IATAs and route
+  matching are unaffected.
+- Computed at read time, so existing nodes need no backfill. The field is omitted when the
+  feature is off (the default).
+- In `nodeUpdate`, it is a boolean when the advert carries a position, `null` when the position
+  is 0/0 or invalid or the node stops being a repeater, and omitted to keep the previous value.
+  `lat`/`lng` follow the same rule.
+
+GeoJSON uses longitude, latitude order. Split borders that cross the antimeridian into
+MultiPolygons per [RFC 7946 section 3.1.9](https://www.rfc-editor.org/rfc/rfc7946#section-3.1.9);
+edges spanning more than 180 degrees are rejected.
+
 ### Observers
 
 | Endpoint | Notes |
@@ -291,7 +337,15 @@ only partially costed, and observations recorded without radio parameters are ne
 
 Sub-hour intervals read live observation rows and are always current. The response also reports
 `windowStart`, `windowEnd`, `generatedAt`, `source` (`raw` or `hourly`) and a `summary` of recorded
-packets and the last complete hour.
+packets and the last complete hour:
+
+- `summary.recordedPackets` counts stored observations in the window; repeated broker deliveries of
+  the same packet count once. Unknown payload types show as `-1`.
+- Freshness fields (`lastCompleteHour` with its start and end, `latestRecordedAt`) are measured at
+  `generatedAt`, even for historical `until` requests.
+- `until` lines up two observers' charts.
+- Missing records do not prove downtime. The observer's `observationCount` is a legacy cumulative
+  presence counter (including status and neighbour events), not a packet total.
 
 ```json
 {
@@ -398,7 +452,7 @@ To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `
 
 `/routes/cross` returns `[{ sourceSegment, crossHop, targetSegment, totalHops }]`, where the segments are hop arrays as above and `crossHop` is `{ fromNode, toNode, fromIata, toIata, lastSeen }`.
 
-The observations endpoint returns `{ items, hasMore, nextPageCursor, route, windowStart, windowEnd, generatedAt, matchType, matchAvailable, hashSize, pathBytes }`. Each item is `{ id, packetHash, observerId, observerName, heardAt, payloadType, payloadTypeName, rssi, snr }`.
+The observations endpoint returns `{ items, hasMore, nextPageCursor, route, windowStart, windowEnd, generatedAt, matchType, matchAvailable, hashSize, pathBytes }`. Each item is `{ id, packetHash, observerId, observerName, heardAt, payloadType, payloadTypeName, rssi, snr }`. It matches on the route's full path bytes, hash size and hop count within its IATA; `limit` is capped at 200. Evidence expires with raw packets, so a route can outlive every observation that produced it.
 
 ### Stats
 
@@ -542,14 +596,32 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings, whether auth is configured, and the broker count. No secrets. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status). No credentials, broker addresses, channel material or database settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins` until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
 
-Backup details are in beacon-server's
-[`docs/backup-export.md`](https://github.com/MeshCore-Beacon/beacon-server/blob/main/docs/backup-export.md).
+`PUT /admin/config` accepts only `{"cors":{"allowed_origins":[...]}}` and applies the new list
+immediately. It is runtime-only: nothing is written to disk, and a restart reloads the file. The
+response carries `config`, `persisted: false` and `requires_restart: false`. Send 1 to 32 ASCII
+http(s) origins of at most 512 bytes each, with an optional single hostname wildcard; a lone `*`
+allows all. Empty or null lists, paths, queries, credentials, control characters and unknown
+fields are rejected. Concurrent updates apply one at a time; requests already in flight may see
+the old list.
+
+`POST /admin/accounts` takes `{"name": "..."}` in a body of at most 4 KiB. The name is trimmed,
+case-sensitive, 1 to 128 characters with no control characters, and unique among active
+accounts. `DELETE` deactivates: `204`, or `404` if missing, `409` if already inactive. The name
+can then be reused. The list returns active and inactive accounts, newest first, unpaginated.
+
+Browser admin clients need the matching methods in `cors.allowed_methods`. The default
+`GET, HEAD, OPTIONS` is read-only. For an admin UI, use
+`[GET, HEAD, OPTIONS, POST, PUT, DELETE]`, restrict `cors.allowed_origins` to that UI and allow
+the `Authorization` and `Content-Type` headers, or preflight blocks requests that work from
+curl. CORS controls browser access, not authentication.
+
+Backup details are in [Backup and export](backup-export.md).
 
 ---
 
