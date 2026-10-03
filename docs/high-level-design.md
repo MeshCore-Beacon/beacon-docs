@@ -880,7 +880,7 @@ The implementation picks the correct prefix column based on `hashSize` (`prefix_
 
 ## API contract
 
-Moved to its own document: **[API Contract](api_contract.md)**
+Moved to its own document: **[API Contract](api-contract.md)**
 
 Covers REST endpoints (`/api/v1/`), auth and rate limits, WebSocket protocol (`/ws`), backpressure/reconnection, and mobile-specific concerns.
 

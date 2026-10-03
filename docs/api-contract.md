@@ -267,7 +267,7 @@ additionally cap `range` at `48h`, and an unknown observer is a `404`. An option
 at most 30 days old) ends the window earlier.
 Buckets are aligned to the clock in UTC (a `15m` bucket always starts at :00, :15, :30 or :45) and the
 window start is rounded up to the next bucket boundary, so bucket starts are stable across requests.
-Only non-empty buckets are returned — gaps in `points` mean the observer heard nothing in that bucket,
+Only non-empty buckets are returned. Gaps in `points` mean the observer heard nothing in that bucket,
 and the client is expected to render them as zero, except for uncovered hours (below).
 
 Hourly intervals (`1h`, `6h`, `24h`) read the analytics rollups up to the newest complete rollup hour,
@@ -789,4 +789,4 @@ The protocol doesn't need to know about backgrounding; the client just treats re
 
 - **packetObservation payload size.** With `resolvePath` on, events carry the full resolved path with node coordinates, which can be 1-2 KB each in heavy traffic. Clients that only need counts should leave it off and fetch detail over REST.
 
-(See [Questions and Answers](high_level_design.md#questions-and-answers) in the high level design for resolved items.)
+(See [Questions and Answers](high-level-design.md#questions-and-answers) in the high level design for resolved items.)
