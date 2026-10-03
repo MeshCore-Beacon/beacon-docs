@@ -31,7 +31,7 @@ to open).
 ## Web environment variables
 
 The web container reads these every time it starts and writes them to `/config.js`, which the
-browser loads fresh on each visit. To change one, edit `.env` and run `docker compose up -d web`.
+browser loads fresh on each visit. To change one, edit `.env` and run `docker compose up -d web` (`beacon-web` in the split deployment).
 Visitors get the new values on their next page load. Any characters are fine in values.
 
 | Variable | Required | What it does |
@@ -69,7 +69,7 @@ which ones to read.
 | `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 300 requests a minute. | You get 429s you did not expect. |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand. | You are in a region MeshMapper covers. |
-| `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. | You want names on the map or a border drawn. |
+| `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
 | `regions` | Groups of IATAs with a name, map centre and zoom. | Always, unless MeshMapper imports them. |
 | `channel_keys` | Hashtag channels and explicit keys for decrypting group messages. | Always. Without keys, channel messages are stored as hashes only. |
 | `scopes` | Transport scope names for matching `TRANSPORT_FLOOD` packets. Each needs a `region`. | Your mesh uses transport scopes. |
@@ -94,14 +94,17 @@ cannot honour. These are the ones people hit:
 
 - A manual `scopes:` entry without `region:`, or with a slug that is not under `regions:`.
 - `server.trusted_proxies` entries that are not CIDRs. One host is `10.0.0.5/32`, not `10.0.0.5`.
-- `packets.retention` or `analytics.rollup_retention` under `24h`, or any negative duration.
+- `packets.retention` or `analytics.rollup_retention` under `24h`, or any negative duration
+  (`observers.delete_after` is the exception: zero or negative turns it off).
 - MeshMapper refresh intervals outside their range: `scopes.refresh_interval` 1h to 24h,
   `zones.refresh_interval` and `channels.refresh_interval` 24h to 168h.
 - A `borderFile` that is missing or not a valid GeoJSON Polygon or MultiPolygon Feature, or
   `nodes.mark_foreign: true` with no border source at all.
 - `log.level` or `log.format` set to anything other than the listed values.
 - An admin key under 16 characters or containing whitespace.
-- A negative `ratelimit` or `websocket` limit.
+- A negative `ratelimit.requests_per_minute`, `ratelimit.burst` or `websocket.max_connects_per_minute`.
+  A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
+  connection instead, so leave it at a positive number.
 
 ## Admin API key
 

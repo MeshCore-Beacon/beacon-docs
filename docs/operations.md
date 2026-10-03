@@ -19,7 +19,17 @@ Beacon has no health endpoint yet. Use these instead:
 
 ## Logs
 
-Logs go to stderr, so Docker collects and rotates them. Set `log.level` (`debug`, `info`,
+Logs go to stderr and Docker collects them. Docker's default `json-file` driver does not
+rotate, so on a long-running host set a cap, either in `/etc/docker/daemon.json` for every
+container or per service in `docker-compose.yml`:
+
+```yaml
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+```
+
+Set `log.level` (`debug`, `info`,
 `warn`, `error`; default `info`) and `log.format` (`text` or `json`) in `config.yaml`, or
 override them with `LOG_LEVEL` and `LOG_FORMAT`. Invalid values stop startup.
 
@@ -85,13 +95,17 @@ off by default and needs the admin key. See [Backup and export](backup-export.md
 
 ## Restoring
 
-Restore into an empty database, never over live data:
+Restore into an empty database, never over live data. With the stack running and the app
+stopped, drop and recreate the database, load the dump, and only then start the app:
 
 ```bash
 docker compose stop app
-docker compose exec -T db pg_restore -U beacon -d beacon --clean --if-exists < beacon-YYYY-MM-DD.dump
-docker compose start app
+docker compose exec -T db psql -U beacon -d postgres -c 'DROP DATABASE beacon;' -c 'CREATE DATABASE beacon;' \
+  && docker compose exec -T db pg_restore -U beacon -d beacon < beacon-YYYY-MM-DD.dump \
+  && docker compose start app
 ```
+
+If `pg_restore` reports errors the app is not started; read them before trying again.
 
 A 1.x dump cannot be restored into 2.0.0; the server refuses the old schema. See
 [Upgrading](upgrading.md#upgrading-to-200-from-1x).

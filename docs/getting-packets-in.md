@@ -45,7 +45,8 @@ Observers publish under `meshcore/{IATA}/{observer public key}/`:
 |---|---|---|
 | `packets` | Raw LoRa packets with SNR and RSSI | Decode, dedupe, store, stream |
 | `status` | Observer health, position and firmware | Update the observer record |
-| `internal` | Owner details from the broker login | Nothing. Beacon never subscribes to it. |
+| `neighbors` | The observer's neighbour list | Update neighbour links |
+| `internal` | Owner details from the broker login | Ignored. A Role 2 account is not sent it anyway. |
 
 Beacon subscribes to `meshcore/#` and routes by subtopic. The IATA in the topic is where the
 observer says it is. Beacon creates an IATA the first time it sees one; `iatas:` in

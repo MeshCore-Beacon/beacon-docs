@@ -62,7 +62,7 @@ Set every `CHANGE_*` value. The ones you cannot skip:
 | Variable | What to set |
 |---|---|
 | `POSTGRES_DSN` | The database connection string. Change `CHANGE_DB_PASS` to a strong password. **The same password must go in `POSTGRES_PASSWORD` in `docker-compose.yml`.** |
-| `MQTT_BROKER_1_URL`, `_USERNAME`, `_PASSWORD` | Your MeshCore MQTT broker and the subscriber account on it. A second broker is optional. |
+| `MQTT_BROKER_1_URL`, `_USERNAME`, `_PASSWORD` | Your MeshCore MQTT broker and the subscriber account on it. The template also lists a second broker; if you have only one, clear `MQTT_BROKER_2_URL` (an empty URL disables that worker). |
 | `DOMAIN` | Your public hostname, for example `beacon.example.com`. Caddy requests a Let's Encrypt certificate for it. |
 | `VITE_API_BASE` | `https://<your-domain>/api/v1`. The browser calls this, so it must be the public domain, never `localhost`. |
 | `VITE_WS_URL` | `wss://<your-domain>/ws` |

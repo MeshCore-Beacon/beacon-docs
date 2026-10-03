@@ -19,10 +19,16 @@ docker-deployment-type2/
 
 ## Server host
 
-1. Copy `server/` to the host.
-2. Create `.env` from [`app_config/.env.example`](../app_config/.env.example) and fill in every
-   `CHANGE_*` value. Only the `app` and `caddy` lines matter here; the `VITE_*` lines can be
-   deleted. From inside `server/` in a clone of this repo:
+1. Clone this repo on the host and go to the server folder:
+
+   ```bash
+   git clone https://github.com/MeshCore-Beacon/beacon-docs.git
+   cd beacon-docs/docker-deployment-type2/server
+   ```
+
+2. Create `.env` from the shared template and fill in every `CHANGE_*` value. Only the `app`
+   and `caddy` lines matter here; the `VITE_*` lines can be deleted. If you have one broker,
+   clear `MQTT_BROKER_2_URL`.
 
    ```bash
    cp ../../app_config/.env.example .env
@@ -49,7 +55,8 @@ docker-deployment-type2/
    ```
 
    `server.trusted_proxies` is already set to the compose subnet so Beacon sees real client
-   addresses through Caddy.
+   addresses through Caddy. `ingest.allow_countries` is set to `[CA]`; change it to your
+   country or delete the `ingest` block, or nothing outside Canada is stored.
 
 4. Point DNS for `DOMAIN` at this host and bring it up:
 
@@ -61,13 +68,19 @@ docker-deployment-type2/
 
 ## Web host
 
-1. Copy `web/` to the host.
-2. Create `.env` from `web/.env.example` and set:
+1. Clone this repo on the host and go to the web folder:
+
+   ```bash
+   git clone https://github.com/MeshCore-Beacon/beacon-docs.git
+   cd beacon-docs/docker-deployment-type2/web
+   ```
+
+2. Create `.env` from the template in that folder (`cp .env.example .env`) and set:
 
    | Variable | Value |
    |---|---|
    | `DOMAIN` | the web hostname, `beacon.example.com` |
-   | `BEACON_WEB_IMAGE` | `ghcr.io/meshcore-beacon/beacon-web:2.0` or an exact release; keep its `X.Y` equal to the server's |
+   | `BEACON_WEB_IMAGE` | `ghcr.io/meshcore-beacon/beacon-web:latest` to follow releases like the server half does. To pin instead, pin both halves to the same release line, for example `:2.0` here and `beacon-server:2.0` in `server/docker-compose.yml`. |
    | `VITE_API_BASE` | `https://api.example.com/api/v1` |
    | `VITE_WS_URL` | `wss://api.example.com/ws` |
 

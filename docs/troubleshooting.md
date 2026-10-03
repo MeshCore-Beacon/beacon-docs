@@ -95,6 +95,6 @@ the stored messages for the new key and logs
 
 ## I changed a `VITE_*` value and nothing changed
 
-Run `docker compose up -d web`. The web container writes the values to `/config.js` when it
+Run `docker compose up -d web` (`docker compose up -d beacon-web` in the split deployment). The web container writes the values to `/config.js` when it
 starts, so an edited `.env` does nothing until the container is recreated. Then hard-refresh
 the page.

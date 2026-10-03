@@ -820,13 +820,13 @@ Connections with `includeRepeats` also get repeats, which have `packet.isRepeat:
 
 ### Backpressure and reconnection
 
-Each connection has a 256-event send buffer. When it is full, the server drops the oldest queued event, discards the new one, and queues a `lagged` notice:
+Each connection has a 256-event send buffer. When it is full, the server evicts the oldest queued event to make room and then queues the new one; if that still fails, the new event is dropped too. A `lagged` notice follows with the count:
 
 ```json
 { "v": 1, "type": "lagged", "droppedCount": 1, "since": 1747665440000 }
 ```
 
-Each notice reports one drop; `since` is when the notice was sent. Several can arrive in a burst. Clients should treat a `lagged` notice as a gap and refresh the affected view over REST.
+`droppedCount` is 1 or 2 per notice; `since` is when the notice was sent. Several can arrive in a burst. Clients should treat a `lagged` notice as a gap and refresh the affected view over REST.
 
 Reconnection is the client's responsibility. On any disconnect, the client should:
 1. Reconnect with backoff (1s, 2s, 5s, 10s, 30s cap)

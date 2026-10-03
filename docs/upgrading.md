@@ -9,28 +9,40 @@ database it refuses to start with:
 database schema predates Beacon 2.0.0; 2.0.0 needs a fresh database
 ```
 
-1.x history does not carry over. For the all-in-one stack:
+1.x history does not carry over. For the all-in-one stack, in this order:
+
+**1. Stop the stack and keep a copy of everything you edited.**
 
 ```bash
 docker compose down
+cp -r ../docker-deployment-type1 ../docker-deployment-type1.bak   # .env, config.yaml, Caddy files, blocklist
+```
+
+**2. Update the deployment files.** If the folder is a git clone, `git pull` will refuse
+because the 1.x layout tracked `.env` and you edited `docker-compose.yml`:
+
+```bash
+git checkout -- . && git pull
+```
+
+Then put your own files back from the copy: `.env`, `data/app/config.yaml`, and anything you
+changed under `data/Caddy/`. Do not copy `docker-compose.yml` back; re-apply your
+`POSTGRES_PASSWORD` to the new one instead.
+
+**3. Fix the database names.** The user and database are called `beacon` now, not `tower`.
+In `.env`, change both in `POSTGRES_DSN` (`postgres://beacon:...@db:5432/beacon`). The new
+`docker-compose.yml` already uses `beacon`. The names only have to agree with each other, so
+if you have already initialised a 2.0.0 database under `tower`, either keep `tower` in both
+places or move that data directory away as well.
+
+**4. Move the 1.x database away and start.** Postgres only creates the user and database on
+an empty data directory, so do this after step 3, not before:
+
+```bash
 mv data/postgres data/postgres-1.x   # or rm -rf data/postgres once you no longer need it
 docker compose pull
 docker compose up -d
 ```
-
-If your `docker-deployment-type1/` is a git clone, `git pull` will refuse because the 1.x
-layout tracked `.env` and you edited `docker-compose.yml`. Before pulling:
-
-```bash
-cp .env ../my-beacon.env && cp docker-compose.yml ../my-compose.yml   # keep your values
-git checkout -- . && git pull
-cp ../my-beacon.env .env
-```
-
-Then, in `.env`, change `tower` to `beacon` in both places in `POSTGRES_DSN`
-(`postgres://beacon:...@db:5432/beacon`), and put your password back into
-`POSTGRES_PASSWORD` in `docker-compose.yml`. The database user and name are `beacon` now, and
-the fresh database is created with them.
 
 `docker compose down` also lets the network come back with the new fixed subnet. If
 `172.30.0.0/24` is already used on your host, pick another in `docker-compose.yml` and change

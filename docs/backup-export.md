@@ -23,7 +23,7 @@ changes, PostgreSQL roles and cluster settings, Redis and deployment files are n
 ## Requirements and limits
 
 - `pg_dump` must be in the **same runtime** as the exporter (the CLI's environment, or the
-  server's PATH for the download), with a major version matching the database. A client on
+  server's PATH for the download), with a major version at least as new as the database's. A client on
   the Docker host or in another container doesn't count.
 - The Docker image ships the PostgreSQL 16 client. Its Alpine 3.19 base has no 17/18
   packages, so a newer database needs a different runtime, not just `POSTGRES_CLIENT_MAJOR`.
@@ -50,7 +50,7 @@ In a beacon-server clone:
 
 ```sh
 go build ./cmd/beacon-backup
-beacon-backup -config /private/config.yaml -output /private/beacon-20260913.tar.gz
+./beacon-backup -config /private/config.yaml -output /private/beacon-20260913.tar.gz
 ```
 
 Connection comes only from the standard libpq environment (`PGHOST`, `PGPORT`,
@@ -95,7 +95,7 @@ and logs a sanitized reason.
 ## Verify
 
 ```sh
-beacon-backup -verify /private/beacon-20260913.tar.gz
+./beacon-backup -verify /private/beacon-20260913.tar.gz
 ```
 
 Reads the file without extracting, running SQL or connecting to anything, so it needs no
