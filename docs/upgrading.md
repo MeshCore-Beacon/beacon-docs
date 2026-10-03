@@ -1,0 +1,81 @@
+# Upgrading
+
+## Upgrading to 2.0.0 from 1.x
+
+**2.0.0 needs a fresh database.** It starts from a new schema baseline. Pointed at a 1.x
+database it refuses to start with:
+
+```
+database schema predates Beacon 2.0.0; 2.0.0 needs a fresh database
+```
+
+1.x history does not carry over. For the all-in-one stack:
+
+```bash
+docker compose down
+mv data/postgres data/postgres-1.x   # or rm -rf data/postgres once you no longer need it
+docker compose pull
+docker compose up -d
+```
+
+`docker compose down` also lets the network come back with the new fixed subnet. If
+`172.30.0.0/24` is already used on your host, pick another in `docker-compose.yml` and change
+`server.trusted_proxies` in `data/app/config.yaml` to match.
+
+Config that **stops startup** if left as it was:
+
+- Every manual `scopes:` entry needs `region:` set to one of your `regions:` slugs.
+- MeshMapper refresh intervals must be within bounds: `meshmapper.scopes.refresh_interval` 1h
+  to 24h, `meshmapper.zones.refresh_interval` and `meshmapper.channels.refresh_interval` 24h to
+  168h.
+- `packets.retention` and `analytics.rollup_retention` must be at least `24h`.
+- `server.trusted_proxies` entries must be CIDRs (`10.0.0.5/32`, not `10.0.0.5`).
+
+Other changes to review:
+
+- `meshmapper.scopes.sources` is ignored, with a warning. Scope catalogues are now found
+  through MeshMapper's zone list for every known IATA.
+- **REST rate limiting is on by default:** 300 requests per minute per client IP on
+  `/api/v1/*` (IPv6 clients share a /64), answered with `429` and `Retry-After`. Behind a
+  proxy, set `server.trusted_proxies` and have the proxy send `X-Real-IP` (see
+  [Reverse proxy](reverse-proxy.md)); `X-Forwarded-For` and `True-Client-IP` are not trusted.
+  Tune or turn it off under `ratelimit:`.
+- **WebSocket upgrades are rate limited** to `websocket.max_connects_per_minute` (default 10)
+  per client IP, on top of `max_connections_per_ip` (default 5). Only the page's own host may
+  open `/ws` unless you list other origins in `websocket.allowed_origins`, for example when the
+  web app is served from a different host than the API.
+- `packets.retention` now defaults to **7 days** and also covers observations and channel
+  messages. Historical stats come from hourly rollups kept for `analytics.rollup_retention`
+  (90 days).
+- Admin endpoints under `/api/v1/admin/` need `BEACON_API_KEY` (or `auth.api_key`).
+- Image tags: `latest` is the newest stable release from `main`. Pin `:2.0` on both images if
+  you want to choose when to move to the next minor release.
+
+[`app_config/config.yaml.example`](../app_config/config.yaml.example) is the full 2.0.0
+reference.
+
+## Routine upgrades
+
+Pin both images to the same release line in `docker-compose.yml` (see
+[Image tags](releases.md#image-tags)), then:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Database migrations run when the server starts. Read the release notes first; a release that
+needs a config change says so there. Keep server and web on the same `X.Y`.
+
+## Changes that need a restart
+
+Beacon reads `config.yaml` once at startup. After editing it, run
+`docker compose restart app`. On the next start:
+
+- A newly added channel key decrypts the matching stored messages. Look for
+  `config: backfilled N previously-undecrypted channel message(s)` in the log.
+- Border file and MeshMapper import changes take effect.
+- A changed admin key is picked up.
+
+The one runtime-only setting is CORS origins: `PUT /api/v1/admin/config` changes them without a
+restart, and nothing is written to the file, so a restart reloads whatever the file says.
