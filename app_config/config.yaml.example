@@ -263,7 +263,7 @@ websocket:
 
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.
-# Defaults to allowing all origins with GET/HEAD/OPTIONS if omitted — appropriate
+# Defaults to allowing all origins with GET/HEAD/OPTIONS if omitted, appropriate
 # for a public read-only API. Restrict allowed_origins if you expose write endpoints.
 #cors:
 #  allowed_origins:
