@@ -1,6 +1,6 @@
 services:
   app:
-    image: ${BEACON_SERVER_IMAGE:?Set BEACON_SERVER_IMAGE to the reviewed server tag or digest}
+    image: ghcr.io/meshcore-beacon/beacon-server:latest
     env_file: .env
     ports:
       - "127.0.0.1:8080:8080"
@@ -50,6 +50,7 @@ services:
       - "443:443"
     environment:
       - DOMAIN=${DOMAIN:?DOMAIN environment variable is required}
+      - WEB_DOMAIN=${WEB_DOMAIN:?WEB_DOMAIN environment variable is required}
     env_file: .env
     volumes:
       - ./data/Caddy/CaddyFile/Caddyfile.proxy:/etc/caddy/Caddyfile
@@ -58,21 +59,6 @@ services:
       - ./data/Caddy/data:/data/caddy/
       - ./data/Caddy/config:/config/caddy/
     depends_on:
-      web:
-        condition: service_started
-    restart: unless-stopped
-
-  web:
-    image: ${BEACON_WEB_IMAGE:?Set BEACON_WEB_IMAGE to the reviewed web tag or digest}
-    env_file: .env
-    environment:
-      - VITE_API_BASE=${VITE_API_BASE:?VITE_API_BASE environment variable is required}
-      - VITE_WS_URL=${VITE_WS_URL:?VITE_WS_URL environment variable is required}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       app:
         condition: service_started
     restart: unless-stopped

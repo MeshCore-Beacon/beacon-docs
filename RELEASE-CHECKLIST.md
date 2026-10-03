@@ -2,7 +2,7 @@
 
 1.4.0 replaces the planned 1.3.2 release. Alderson controls acceptance, stable tags
 and the production switch. Earlier receipts remain in the [historical preparation
-record](app_documentation/release-132-preparation.md) and dated evidence documents.
+record](docs/release-132-preparation.md) and dated evidence documents.
 
 ## Destinations and scope
 
@@ -28,7 +28,7 @@ record](app_documentation/release-132-preparation.md) and dated evidence documen
   backed up. These checks do not establish production capacity.
 - [x] Source/assets, public reads, fresh packets and 26 boundaries are verified on
   the review preview. Active revisions and the frontend receipt are in the
-  [candidate manifest](app_documentation/release-140-heads.json).
+  [candidate manifest](docs/release-140-heads.json).
 - [x] A restored/checksummed private dump and prior application/configuration/assets
   are retained. Unrelated Pi services are preserved.
 
@@ -56,5 +56,5 @@ record](app_documentation/release-132-preparation.md) and dated evidence documen
   destinations and boundaries. Independently verify `dev.meshcore.ca` remains
   online and uses only its development backend/data.
 
-[Detailed cutover and rollback](app_documentation/release-140-preparation.md) ·
+[Detailed cutover and rollback](docs/release-140-preparation.md) ·
 [Review source/changelog](https://canadaverse.org/beacon-dev/source.html).

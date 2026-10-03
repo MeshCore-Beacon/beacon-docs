@@ -7,7 +7,7 @@ major/minor versions and independent patch levels. Flattened migrations and a cl
 start are proposed but have not landed in the checked upstream refs. The next step
 is to validate that published baseline on a separate database before extending the
 feature work. The discussion is not authorization to wipe the Pi or reuse an old
-migration journal with a new baseline. See the [version and migration direction](app_documentation/post-140-roadmap.md#maintainer-direction--30-september-2026).
+migration journal with a new baseline. See the [version and migration direction](docs/post-140-roadmap.md#maintainer-direction--30-september-2026).
 
 A follow-up proposes 24-hour raw retention on dev and 7 days in production, and
 reports that dev has moved to rotational storage. No retention change is applied
@@ -23,7 +23,7 @@ updated source/changelog and retained rollback; release numbers remain a maintai
 The earlier 1.4.0 handoff remains recorded below as historical evidence. Atlas stays
 experimental; its inclusion in a stable 2.0 release is not yet decided.
 
-[Phases, contracts and acceptance](app_documentation/post-140-roadmap.md) · [Current experimental preview](app_documentation/n30nex-test-preview.md).
+[Phases, contracts and acceptance](docs/post-140-roadmap.md) · [Current experimental preview](docs/n30nex-test-preview.md).
 
 ## Recorded 1.4.0 checkpoint — superseded on the Pi by the experiment
 
@@ -39,7 +39,7 @@ Backend recovery is `evidence/sync-140-20260930/deploy-server.py rollback`, chec
 
 **Remaining owner gates:** review/acceptance, the requested 24h/3d raw-history controls versus upstream 7d/30d controls, physical Safari, production-host capacity/data verification, approved Actions images/tags and the CoreScope switch. The bounded replay and 40-second live sample do not establish production capacity.
 
-[Current release/cutover plan](app_documentation/release-140-preparation.md) · [Exact candidate record](app_documentation/release-140-heads.json).
+[Current release/cutover plan](docs/release-140-preparation.md) · [Exact candidate record](docs/release-140-heads.json).
 
 ## Historical 1.3.2 preparation
 
@@ -49,7 +49,7 @@ The Pi now serves exact merged dev server `689bc232` / web `00d859d9`, with Atla
 
 My Atlas #97 remains held at `66ae0cc2` for after 1.3.2 and needs conflict resolution against the new dev branch. Web #93 is closed without merge. Upstream #101 restored 7d/30d controls and maps old 3d observer links to 7d; this conflicts with the requested 24h/3d raw-history controls and remains a release follow-up. Migration 043 was restore-tested: 273 stale location records cleared, raw counts and other located nodes preserved. The prior server/frontend and a verified on/off-Pi dump remain recoverable.
 
-[Current audit, exact heads, validation and recovery](app_documentation/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
+[Current audit, exact heads, validation and recovery](docs/release-132-preparation.md). [Live candidate and source](https://canadaverse.org/beacon-dev/source.html). Maintainers retain web acceptance, tags, version decisions and production rollout. Earlier dated records below are historical.
 
 Updated 29 September 2026 (Toronto). This is the working roadmap for n30nex's ongoing contributions toward CoreScope feature parity. Maintainers decide acceptance and merge order; deployment owners handle the production switch.
 
@@ -61,7 +61,7 @@ The following sections preserve dated historical checkpoints. Use the 30 Septemb
 
 ## Historical Atlas preview — 29 September
 
-[Exact feature, validation and recovery](app_documentation/my-atlas-20260929.md).
+[Exact feature, validation and recovery](docs/my-atlas-20260929.md).
 
 [Web #97](https://github.com/MeshCore-Beacon/beacon-web/pull/97), `4fd4b0de`, is the single My Atlas feature PR requested by the contributor. It follows #95 at `e1133ab5` and closes [web #96](https://github.com/MeshCore-Beacon/beacon-web/issues/96) on acceptance. Earlier application PRs remain included; no parent was rebased for this feature.
 
@@ -85,7 +85,7 @@ Visible periods are **24h / 3d** for observer monitoring and route evidence, and
 
 Current acceptance still requires maintainer re-review, especially #167/#169/#174. No upstream merge, stable release or production cutover was performed. The next focused issue is server #183 (saved-route prefix-width changes); broad partial issues remain open. External server #182 and web #93 are unmerged and not in this tested composition. Owners decide the release breakpoint and production switch.
 
-[Exact current heads, validation and recovery](app_documentation/review-release-20260929.md).
+[Exact current heads, validation and recovery](docs/review-release-20260929.md).
 
 ## Ingest integration delivered — 28 September
 
@@ -99,7 +99,7 @@ September 28 checkpoint: server `2ed2e03117f6c88795d446456e6d74c20c485d28` / web
 
 The shared UTF-8 corrections and merge guidance remain in place. Both application repos still disable merge commits; the contributor has READ access, so a maintainer must enable that setting. The helper remains optional for maintainers and unrelated to ingestion. Owners retain upstream merges and production release.
 
-[Current PR heads, validation and recovery](app_documentation/ingest-integration-20260928.md).
+[Current PR heads, validation and recovery](docs/ingest-integration-20260928.md).
 
 ## Earlier Canada/US scope and packet-layout checkpoint — 28 September
 
@@ -107,7 +107,7 @@ The preview now has **504 exact-case scope candidates**: 261 distinct names from
 
 The reported “Test 4” packet uniquely matches `#ykf`; its original unresolved label remains unchanged. Fresh “Ykf test” and “This is scoped to ykf only” messages now resolve as `#ykf`. A read-only audit of 932 retained transport packets found 670 unique candidate matches, 255 without a known match and seven short-code collisions. Unknown custom names cannot be recovered from these codes alone. Observer/neighbor reports currently contained only the wildcard `*`, so they supplied no additional names. No historical labels were rewritten. The native Pi matcher passes the captured-packet regression and measured a median 0.55ms for a full 504-name scan; this is not a production-capacity claim.
 
-See the [candidate snapshot and provenance](app_documentation/north-american-scope-candidates.json). This is a recorded catalogue snapshot, with the existing automatic YOW importer still active. For subsequent scope work, refresh Canadian/US published catalogues and observed IATA/report names within API cache/rate limits, retain manual fallbacks and surface unresolved/ambiguous codes. Do not claim an undisclosed recurring all-region discovery service. Arbitrary private names still require a published catalogue or an explicit supplied/reported name.
+See the [candidate snapshot and provenance](docs/north-american-scope-candidates.json). This is a recorded catalogue snapshot, with the existing automatic YOW importer still active. For subsequent scope work, refresh Canadian/US published catalogues and observed IATA/report names within API cache/rate limits, retain manual fallbacks and surface unresolved/ambiguous codes. Do not claim an undisclosed recurring all-region discovery service. Arbitrary private names still require a published catalogue or an explicit supplied/reported name.
 
 [Web #92](https://github.com/MeshCore-Beacon/beacon-web/pull/92), `dfeb2777`, follows #89 and closes #90. It gives the route label and scope separate lines within a 128px track, preserving 37px rows and exact scope case. Long tags remain inside phone cards. A real browser geometry check reproduced the spill before the fix and passed afterward, including the user's `BB2F2752` row. Desktop, 768px table, 390px phone, keyboard and English/French public checks pass. All 935 tests pass on Windows and the Pi, as does exact-head CI; existing warnings remain and web CodeQL is skipped.
 
@@ -121,7 +121,7 @@ At the channel-scope checkpoint, the Pi preview was composed server `7c9599b167b
 
 The standard MeshCore Public channel key is enabled at the user's request, matching the known non-hashtag hash-11 channel on dev.meshcore.ca. A restored-copy trial recovered 2,735 retained messages in 16.127 seconds; public decoded history and a new incoming message were verified. Expired packets remain unavailable. Schema042 is unchanged. Rollback retains server `eb99f752`, web `98f820d2`, configuration and source without discarding new database rows; the older schema041 recovery remains separately available. Packets stay 72h, summaries 30d and telemetry 720h. Public admin, backups and foreign detection remain disabled.
 
-See the [boundary integration plan](app_documentation/meshmapper-boundaries-plan.md).
+See the [boundary integration plan](docs/meshmapper-boundaries-plan.md).
 
 **Next:** refresh review feedback and listed issues first, then optional MeshMapper boundary synchronization using the published Zones API and existing map layer. Preserve manual boundaries and cached geometry; keep cross-boundary packet/route investigation in a later focused contribution. Group scope catalogues, regional evidence, existing translations and broader parity work remain open. Maintainers control acceptance, merge order and production release.
 
@@ -147,7 +147,7 @@ At the observer-navigation checkpoint, the Pi served web `98f820d2b2af5a69faf3f9
 
 ## MeshMapper scopes contract — 27 September
 
-The [public API](https://wiki.meshmapper.net/scopes-api/) is available. The documented YOW endpoint returned HTTP 200 and a successful conditional HTTP 304; it requires no API key. The [scope integration plan](app_documentation/mesh-scopes-plan.md) now specifies explicit per-IATA sources, cached refresh, durable last-known-good data, manual-name preservation and separate imported/observed evidence. Group results cannot be attributed to individual member IATAs. The former unpublished-endpoint blocker is removed; importer #174 and channel tags #176/#89 are now deployed for review. Review feedback and listed issues retain priority. That contract-only update preceded the tested importer deployment recorded above.
+The [public API](https://wiki.meshmapper.net/scopes-api/) is available. The documented YOW endpoint returned HTTP 200 and a successful conditional HTTP 304; it requires no API key. The [scope integration plan](docs/mesh-scopes-plan.md) now specifies explicit per-IATA sources, cached refresh, durable last-known-good data, manual-name preservation and separate imported/observed evidence. Group results cannot be attributed to individual member IATAs. The former unpublished-endpoint blocker is removed; importer #174 and channel tags #176/#89 are now deployed for review. Review feedback and listed issues retain priority. That contract-only update preceded the tested importer deployment recorded above.
 
 ## Saved-route evidence — 27 September
 
@@ -198,7 +198,7 @@ At the observer-release checkpoint the Pi ran composed server `88c2c10c830034cee
 
 Migration 040 preserves original rows and repairs available archived unknown-payload counts without inventing signal samples. A restored clone passed the migration probe. A fresh private dump was copied off the Pi and its checksum verified; the original schema039 database and matching binary/config/source are retained for DB-aware rollback. Only the Beacon app restarted for the server change; 22 other containers were unchanged. Frontend publication restarted no services. Both MQTT feeds reconnected. Public admin, backup and foreign detection remain disabled.
 
-See the [observer implementation and subsequent UX releases](app_documentation/observer-monitoring-plan.md) and the separate [Mesh Scopes interoperability plan](app_documentation/mesh-scopes-plan.md).
+See the [observer implementation and subsequent UX releases](docs/observer-monitoring-plan.md) and the separate [Mesh Scopes interoperability plan](docs/mesh-scopes-plan.md).
 
 ## Accepted consolidation batch
 
@@ -267,7 +267,7 @@ The September 24 consolidation check built accepted server `c02317a4` and retain
 
 ## Next phases
 
-Use the [active post-1.4 sequence](app_documentation/post-140-roadmap.md). The
+Use the [active post-1.4 sequence](docs/post-140-roadmap.md). The
 older dependency queue and optional-boundary implementation are delivered in the
 current candidate and must not be scheduled again. The next focused implementation
 is server #183; Atlas follows separately after 1.4.0. Scope/route crossing analysis,

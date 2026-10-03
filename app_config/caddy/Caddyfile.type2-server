@@ -1,14 +1,65 @@
-# Type 2 Server: API-only, redirect other traffic to web host
+# Type 2, server host: API and WebSocket only; everything else is redirected to the web host.
+# Copy of docker-deployment-type2/server/data/Caddy/CaddyFile/Caddyfile.proxy.
+# Behind Cloudflare (or another CDN), {remote_host} is the CDN's address. Trust its ranges
+# in a global block, then use {client_ip} instead of {remote_host} below and client_ip
+# instead of remote_ip in conf.d/blocklist.caddy:
+#   {
+#   	servers {
+#   		trusted_proxies static <Cloudflare IPv4 and IPv6 ranges>
+#   		client_ip_headers CF-Connecting-IP
+#   	}
+#   }
 {$DOMAIN} {
-    handle /api/* {
-        reverse_proxy tower-app:8080
-    }
+	# defines @blocked_ip and @blocked_ua; edit conf.d/blocklist.caddy then `caddy reload`
+	import conf.d/blocklist.caddy
 
-    handle /ws {
-        reverse_proxy tower-app:8080
-    }
+	# JSON access log for the whole site (API, SPA and assets together, so per-IP joins are one file)
+	log {
+		output file /var/log/caddy/access.json {
+			mode 0644
+			roll_size 100MiB
+			roll_keep 20
+			roll_keep_for 720h
+		}
+		format json
+	}
 
-    handle {
-        redir https://web.your.domain.com{uri} permanent
-    }
+	# opt-in: 403 API calls whose Referer names another site. Spoofable; enable only if the
+	# logs show a specific foreign host with sustained volume.
+	# @foreign_referer {
+	#     header Referer *
+	#     not header Referer https://{$DOMAIN}/*
+	# }
+
+	handle /api/* {
+		respond @blocked_ip "Forbidden" 403 {
+			close
+		}
+		respond @blocked_ua "Forbidden" 403 {
+			close
+		}
+		# respond @foreign_referer "Forbidden" 403
+		reverse_proxy app:8080 {
+			# beacon-server takes the client IP only from X-Real-IP, and only from peers in
+			# server.trusted_proxies; overwrite it so clients can't supply their own
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle /ws {
+		respond @blocked_ip "Forbidden" 403 {
+			close
+		}
+		respond @blocked_ua "Forbidden" 403 {
+			close
+		}
+		reverse_proxy app:8080 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Everything that is not the API lives on the web host.
+	handle {
+		redir https://{$WEB_DOMAIN}{uri} permanent
+	}
 }

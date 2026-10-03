@@ -1,8 +1,6 @@
-# MeshCore Tower: High Level Design
+# Beacon: High Level Design
 
-**Codename:** Tower
-
-A real-time packet analyzer and observer-of-observers for the MeshCore network. Tower watches the mesh from above. It passively listens to MQTT brokers, decoding LoRa packets, mapping observer health and node firmware capabilities, and surfacing the network's pulse to web and mobile clients.
+A real-time packet analyzer and observer-of-observers for the MeshCore network. Beacon watches the mesh from above. It passively listens to MQTT brokers, decoding LoRa packets, mapping observer health and node firmware capabilities, and surfacing the network's pulse to web and mobile clients.
 
 This is the single source of truth for the project; sub-documents (deployment, repo layout, frontend specs) reference back to this.
 
@@ -30,13 +28,13 @@ This is the single source of truth for the project; sub-documents (deployment, r
 ### Stack
 
 - **Backend:** Single Go binary, pgx + pgxpool + sqlc for Postgres, `github.com/meshcore-go/meshcore-go` for packet decoding, internal Go channels for live WebSocket fanout
-- **Database:** Postgres with BRIN + composite indexes, materialized views for aggregations
+- **Database:** Postgres with BRIN + composite indexes, hourly rollup tables for historical stats
 - **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus in-memory LRU in Go in front
-- **Web client:** React + Vite + TypeScript + Tailwind + TanStack Query/Virtual + shadcn/ui
+- **Web client:** React 19 + Vite + TypeScript + Tailwind 4 + TanStack Query/Virtual, MapLibre GL for the map, ECharts for analytics charts, i18next for translations
 - **Mobile client:** Flutter (native iOS + Android)
 - **Edge:** Caddy for TLS and reverse proxy
-- **Deployment:** Docker Compose with four services (app, postgres, redis, caddy)
-- **Observability:** pprof endpoint on the Go binary
+- **Deployment:** Docker Compose with five services (app, db, redis, web, caddy)
+- **Observability:** structured `slog` logs (text or JSON); opt-in, time-boxed CPU profiles written to a private directory ([CPU profiling](profiling.md)). There is no HTTP profiling endpoint.
 - **MQTT brokers:** mqtt1.meshcore.ca + mqtt2.meshcore.ca over WSS, Role 2 SUBSCRIBER account auth (see Broker authentication below)
 
 ### Flow
@@ -93,7 +91,7 @@ We need Role 2 because the analyzer relies on SNR and RSSI per observation. Coor
 
 ### Why this is fast
 
-One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap at billions of rows. Caddy speaks HTTP/3 and brotli. React + virtualized lists keep the UI snappy regardless of how many packets are on screen. Flutter on mobile is native-compiled and runs at 60fps by default.
+One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React with virtualized lists renders only the rows on screen. Flutter on mobile is native-compiled and runs at 60fps by default.
 
 ---
 
@@ -638,40 +636,16 @@ CREATE INDEX idx_channel_messages_channel ON channel_messages(channel_id, sent_a
 CREATE INDEX idx_channel_messages_sent_brin ON channel_messages USING BRIN (sent_at);
 
 -- ============================================================
--- MATERIALIZED VIEWS
+-- HOURLY ROLLUPS
 -- ============================================================
-
-CREATE MATERIALIZED VIEW mv_hourly_iata_stats AS
-SELECT
-  iata,
-  date_trunc('hour', heard_at) AS hour,
-  COUNT(*) AS observation_count,
-  COUNT(DISTINCT packet_hash) AS unique_packets,
-  COUNT(DISTINCT observer_id) AS active_observers
-FROM packet_observations
-WHERE heard_at > NOW() - INTERVAL '7 days'
-GROUP BY iata, date_trunc('hour', heard_at);
-
-CREATE UNIQUE INDEX idx_mv_hourly_iata
-  ON mv_hourly_iata_stats(iata, hour);
-
--- Super-region stats are derived on demand by joining mv_hourly_iata_stats
--- through region_iatas. Cheap because the IATA-level rollups are pre-computed.
-
-CREATE MATERIALIZED VIEW mv_top_nodes_by_iata AS
-SELECT
-  ni.iata,
-  ni.node_id,
-  n.name,
-  n.node_type,
-  ni.observation_count,
-  ni.last_heard
-FROM node_iatas ni
-JOIN nodes n ON n.id = ni.node_id
-WHERE ni.last_heard > NOW() - INTERVAL '7 days';
-
-CREATE UNIQUE INDEX idx_mv_top_nodes
-  ON mv_top_nodes_by_iata(iata, node_id);
+-- Historical stats read hourly rollup tables, never packet_observations.
+-- Each family table leads its primary key with `hour` (UTC) and has no
+-- foreign keys, so history outlives deleted observers, nodes and IATAs.
+-- `*_sets` tables group each distinct packet, advert or message under the
+-- exact sorted set of IATAs that heard it that hour (`iatas char(3)[]`), so
+-- distinct counts are exact for one IATA, a region or all IATAs.
+-- `analytics_rollup_hours` tracks each hour as missing, complete or partial.
+-- Full contract: beacon-server docs/historical-stats.md.
 ```
 
 ---
@@ -680,62 +654,135 @@ CREATE UNIQUE INDEX idx_mv_top_nodes
 
 ### Retention
 
-Packets and their observations are retained for **30 days by default**, configurable via the `PACKET_RETENTION_DAYS` environment variable. Change the value and restart the service to apply.
+All retention runs in the server's cleanup task, every `background.cleanup` (default `1h`), in
+bounded batches:
 
-A daily cleanup job runs at a configurable hour (default 3am local) and:
-1. Deletes `packet_observations` rows older than the retention window
-2. Deletes `packets` rows that have no remaining observations (cascades cleanly via FK)
+| Data | Setting | Default |
+|---|---|---|
+| Packets, observations, channel messages | `packets.retention` (minimum `24h`) | `168h` (7 days) |
+| Hourly analytics rollups | `analytics.rollup_retention` (minimum `24h`) | `2160h` (90 days) |
+| Observer telemetry | `telemetry.retention` | `744h` (31 days) |
+| Nodes not heard from | `nodes.delete_after` | `720h` (30 days) |
+| Observers not heard from | `observers.delete_after` | off (opt in; only with one ingest process per database) |
+| Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the `background.reconfirm` task |
 
-Materialized view aggregates (`mv_hourly_iata_stats`, `mv_top_nodes_by_iata`) persist beyond the retention window so historical stats survive raw data pruning. Refresh them on a 1-minute schedule via `pg_cron` or a Go goroutine.
+Changing a value needs a restart.
+
+### Hourly analytics rollups
+
+Historical stats never scan raw observations per request. One advisory-locked background task rolls
+each closed UTC hour into rollup tables about 95 minutes after it ends (ingest clamps `heard_at` to
+±30 minutes of server time, so nothing late can land in it). Rollups have no foreign keys, so they
+outlive deleted packets, nodes and observers, and are kept for `analytics.rollup_retention`.
+
+Cleanup holds raw rows back for hours not rolled yet, for at most 24 hours. An hour whose raw rows
+went first is marked `partial` and reported without values. Cache keys for rollup-backed endpoints
+carry a revision counter, so a newly rolled hour invalidates them. Full contract: beacon-server
+`docs/historical-stats.md`.
+
+### Presence coalescing
+
+Observer `last_seen`, observer-broker rows and packet `last_heard_at` bumps are batched in memory
+and flushed every `presence.flush_interval` (default `30s`) instead of one write per observation. A
+packet with no re-hearings writes through again after `presence.packet_ttl` (default `30s`). An
+unclean shutdown loses at most one interval of freshness, never packets or observations.
+
+### MeshMapper integration
+
+Optional, no API key, all under `meshmapper:` and off by default:
+
+- `scopes` imports each known IATA's transport scope names from its MeshMapper site
+  (`get_scopes.php`). Manual `scopes:` stay authoritative. Refresh `1h`–`24h`.
+- `zones` imports each IATA's boundary (`get_geojson.php`), overriding `iatas.*.borderFile` on the
+  border map and for `nodes.mark_foreign`. `import_groups` turns MeshMapper zone groups into
+  regions. Refresh `24h`–`168h`.
+- `channels` imports each IATA's public hashtag channels (`get_channels.php`); each key is checked
+  against its name before use and history is backfilled when a key first appears. Refresh `24h`–`168h`.
+
+Sources are discovered per known IATA from MeshMapper's per-country zone list; there is nothing to
+list by hand. Imports and ETags persist in Postgres, and a failed refresh keeps the last good data.
+Out-of-range intervals fail startup.
 
 ### Configuration
 
-v1 has no authentication or web-based admin UI. All operational state that isn't derived from MQTT traffic is managed via files on the server. The server reads them on startup; for v1, changes require a restart (or `SIGHUP` to trigger a reload, TBD).
+Operational state that isn't derived from MQTT traffic comes from two places, read at startup;
+changes need a restart.
 
-**Environment variables** for runtime tuning:
+**Environment variables** (`.env`) carry connection details and secrets:
 
 ```
-PACKET_RETENTION_DAYS=30
+LISTEN_ADDR=:8080
 POSTGRES_DSN=postgres://...
-REDIS_ADDR=...
-MQTT_BROKER_1_URL=wss://mqtt1.meshcore.ca
+REDIS_ADDR=...                # optional; unset = no cache
+MQTT_BROKER_1_URL=wss://mqtt1.meshcore.ca:443
 MQTT_BROKER_1_USERNAME=...
 MQTT_BROKER_1_PASSWORD=...
-MQTT_BROKER_2_URL=wss://mqtt2.meshcore.ca
+MQTT_BROKER_2_URL=wss://mqtt2.meshcore.ca:443
 MQTT_BROKER_2_USERNAME=...
 MQTT_BROKER_2_PASSWORD=...
-LISTEN_ADDR=:8080
+BEACON_API_KEY=...            # optional admin bearer key
+LOG_LEVEL=info                # optional, overrides log.level
+LOG_FORMAT=text               # optional, overrides log.format
 ```
 
-**YAML config file** (`config.yaml`) for content the API exposes (super-regions, channel keys):
+**YAML config** (`config.yaml`, snake_case keys) for everything else: IATA overrides, regions,
+channel keys, transport scopes, retention, rate limits, WebSocket limits, trusted proxies, CORS,
+cache TTLs, MeshMapper imports, and the ingest geo filter. A short sample:
 
 ```yaml
 regions:
   - slug: ottawa
     name: Ottawa Mesh
     description: National Capital Region
-    centerLat: 45.42
-    centerLng: -75.69
-    zoomLevel: 9
+    center_lat: 45.42
+    center_lng: -75.69
+    zoom_level: 9
     iatas: [YOW]
-  - slug: bc-coast
-    name: BC Coast
-    iatas: [YVR, YYJ, YCD, YQQ]
 
-channelKeys:
-  - channelHash: "f3"
-    name: "#ottawa"
-    keyHex: "0123456789abcdef0123456789abcdef"
-  - channelHash: "a1"
-    name: "#public"
-    keyHex: "fedcba9876543210fedcba9876543210"
+channel_keys:
+  hashtags:
+    - ottawa              # key derived from "#ottawa"
+  keys:
+    "11":
+      key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
+      name: "Public"
+
+scopes:
+  - name: ottawa
+    region: ottawa        # required, a slug from regions
+
+server:
+  trusted_proxies: [172.30.0.0/24]   # proxies allowed to set X-Real-IP
 ```
+
+The full reference with every key and default is [`app_config/config.yaml.example`](../app_config/config.yaml.example).
+Invalid values (bad CIDRs, out-of-range MeshMapper intervals, scopes without a configured region,
+retention under 24h) fail startup rather than being ignored.
 
 IATAs are still auto-created when packets arrive from unrecognized codes. The config file is only needed to override the default display name/coordinates, or to assign an IATA to a super-region.
 
-Channel hashes also auto-populate as messages arrive; adding a key in the config retroactively decrypts existing rows on next startup (or on `SIGHUP`).
+Channel hashes also auto-populate as messages arrive; adding a key in the config decrypts the stored hash-only rows for that channel on the next startup.
 
-Admin login, web-based config UI, and per-user accounts are tracked in Future Features.
+### Admin API and access control
+
+Public reads and the WebSocket need no credentials. The `/api/v1/admin/*` subtree requires
+`Authorization: Bearer <key>` with the key from `BEACON_API_KEY` or `auth.api_key`; with no key set it
+returns 503. It currently covers inspecting the running config and replacing CORS origins at runtime,
+operator account records (no login or sessions yet), and the backup download below.
+
+`/api/v1/*` is rate limited per client IP (`ratelimit:`, 300/min by default, IPv6 grouped by /64).
+WebSocket upgrades have their own per-IP rate and concurrency limits and a same-origin check
+(`websocket:`). The client IP is the TCP peer, or `X-Real-IP` when the peer is listed in
+`server.trusted_proxies`; `X-Forwarded-For` and `True-Client-IP` are never trusted.
+
+### Backup export
+
+With `backup.enabled: true` and an admin key configured, `GET /api/v1/admin/backup` streams a private
+`.tar.gz` holding a `pg_dump` of the database and the saved config. It needs a `pg_dump` at least as
+new as the Postgres server inside the app's runtime (the Docker image ships PostgreSQL 16's client);
+if that check fails at startup the endpoint stays unavailable and everything else runs normally. A
+standalone `beacon-backup` command can also export a bundle and verify one offline. Details:
+[Backup and export](backup-export.md).
 
 ### IATA and super-region seeding
 
@@ -833,9 +880,9 @@ The implementation picks the correct prefix column based on `hashSize` (`prefix_
 
 ## API contract
 
-Moved to its own document: **[API Contract](api_contract.md)**
+Moved to its own document: **[API Contract](api-contract.md)**
 
-Covers REST endpoints (`/api/v1/`), WebSocket protocol (`/ws`), search, backpressure/reconnection, and mobile-specific concerns.
+Covers REST endpoints (`/api/v1/`), auth and rate limits, WebSocket protocol (`/ws`), backpressure/reconnection, and mobile-specific concerns.
 
 ---
 
@@ -883,10 +930,23 @@ Covers REST endpoints (`/api/v1/`), WebSocket protocol (`/ws`), search, backpres
 - Per-observer page: payload type breakdown of their contributions, recent observations, battery and uptime curves from `status_metadata` history (if we capture deltas), software version
 - Filter pills: by observer type, by broker (mqtt1-only / mqtt2-only / both), by IATA or super-region
 
+### Routes
+- `known_routes`: fully resolved multi-hop paths per IATA, every hop high confidence. Listed by IATA and hop count, searchable between two node hashes, and across IATA boundaries.
+- Route detail pages the retained observations whose path matches the route exactly (`/routes/{iata}/{pathKey}/observations`).
+
+### Traces
+- One row per trace tag from the `trace_tags` summary kept at ingest: type (TRACE or PING), packet count, IATAs heard, first and last heard.
+- Detail shows each packet's raw hops with per-hop SNR and the resolved route.
+
+### Observer page
+- Observer summary, telemetry curves (battery, airtime, noise floor) from the telemetry history, and an activity chart of what it heard, read from raw observations for sub-hour buckets and the hourly rollups otherwise.
+- A page of the adverts the observer heard.
+
 ### Stats
-- Queries against `mv_hourly_iata_stats` and `mv_top_nodes_by_iata`. Super-region rollups are computed on demand by joining through `region_iatas` and summing.
+- Queries against the hourly rollup tables. Regions expand to their IATAs through `region_iatas`; distinct counts come from the IATA-set tables, so a packet heard in several IATAs counts once.
 - Top-line: total packets last 24h, total observations last 24h, active observers, active IATAs, unique nodes seen
 - Charts: observations over time by IATA (with optional super-region rollup), payload type breakdown, top contributing observers, top contributing nodes
+- The web Analytics tab adds signal and path-length distributions, per-scope activity, clock drift, radio presets, an observer comparison and the neighbour graph, with hourly sparklines from `/stats/series`
 
 ---
 
@@ -925,38 +985,21 @@ New observations of the same packet arrive via WebSocket and appear inline in th
 
 These are out of scope for v1 but worth keeping in mind so the schema and architecture don't paint us into a corner.
 
-### Admin authentication and web-based config UI
-v1 manages all configuration via files on the server. A future version would add:
+Already shipped from this list: the trace explorer (Traces tab, with per-hop SNR), live packet flow on the map, and the neighbour graph (map overlay and Analytics).
 
-- `admin_users` table with password hashing
-- `POST /api/v1/auth/login` / `logout` / `me` endpoints
-- Bearer-token auth on a `/api/v1/admin/*` namespace
+### Web-based admin UI
+The admin API exists (see [Admin API and access control](#admin-api-and-access-control)), but there is
+no login or browser UI yet. A future version could add:
+
+- Operator login and sessions built on the existing account records
 - Write endpoints for regions, channel keys, and retention overrides
 - A web UI for these operations so the operator doesn't need shell access
-- Optional `?token=` query param on the WebSocket for receiving admin-only event types (config change notifications, etc.)
 - Audit log of who changed what, when
 
-The config-file approach should remain the primary source of truth; admin UI writes would update the file (or a parallel DB table that overlays it) so a snapshot of operational state is always version-controllable.
-
-### Trace packet visualization (payload type 0x09)
-Trace packets carry per-hop SNR values (`[snr_1][snr_2]...[snr_N]` where each is a signed byte representing SNR × 4). Once decoded, these unlock a dedicated per-hop signal quality view: for any traced path, render the actual SNR at each hop on the map, color-coded by signal strength. This is the only way to see real RF link quality between specific repeaters rather than just observer-reported reception. The schema already supports this since trace packets parse into `parsed_payload` like any other type. A future trace explorer view would query packets where `payload_type = 0x09` and pivot the per-hop SNR data into a visualization.
-
-### Live pew pew map
-A real-time animated map showing packets propagating across the mesh as they happen. Each new observation fires an animated arc or pulse from the resolved sending node (or first known hop) to the observing node's location, color-coded by payload type. Multiple observations of the same packet from different observers light up in sequence, visualizing flood propagation as it spreads. Filterable by region, payload type, and channel. The schema already supports this since every observation has timestamps, observer coordinates, and (when paths resolve) node coordinates. Mostly useful as an "is the mesh alive right now?" glance view and as eye candy for the project landing page.
-
-**Constraints for whoever builds this:**
-- Must handle high traffic without melting the browser (likely needs WebGL or canvas, not SVG)
-- Must degrade gracefully under load (throttle, drop frames, queue events)
-- Must NOT draw ambiguous paths (any hop without confidence "high" → don't animate that segment)
-- Must NOT zoom-jump the map as new observations come in
-- Must support payload-type filters so users can isolate (e.g.) only chat traffic
-- Must work from slim WebSocket events where possible to keep bandwidth low, fetch enrichment lazily
+The config file should remain the primary source of truth; admin UI writes would update the file (or a parallel DB table that overlays it) so a snapshot of operational state is always version-controllable.
 
 ### Live neighbor activity graph
-Different from pew pew: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
-
-### Neighbor maps (static topology)
-Node response payloads can carry full neighbor tables with SNR values per neighbor. This is similar to traces but for adjacency rather than path. A future view could render a graph of node-to-node SNR relationships, giving a true picture of the mesh topology beyond just observer-reported sightings.
+Different from the live packet flow on the map: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
 
 ### Mobile push notifications
 The Flutter app could let users set up notifications for specific events: a keyword appearing in a specific channel, a specific node starting to talk, an observer going offline, a packet matching arbitrary filter criteria. The `channelMessage` and `packetObservation` WebSocket events already carry everything a push service would need. This is purely a feature of the mobile app plus a notification dispatch service (Firebase or APNs).
@@ -964,7 +1007,7 @@ The Flutter app could let users set up notifications for specific events: a keyw
 ### Remote observer console
 Letsmesh has a feature where users can remote console into their own observer and run commands via MQTT, useful for diagnosing a misbehaving repeater or just managing it without going onsite. The auth flow uses the public key set as the owner on the observer: users authenticate to the web UI by signing a challenge with their companion device (USB-to-web), proving they own the pubkey, and the server then proxies a console session to the observer over MQTT.
 
-For Tower, this requires a few things we don't have in v1:
+For Beacon, this requires a few things we don't have yet:
 - A privileged ingest path that subscribes to the broker's `/internal` subtopic to populate the private `observer_owners` table with the canonical owner pubkey for each observer. This requires a Role 1 SUBSCRIBER account.
 - A companion-device WebAuthn-style flow on the web frontend for signing the owner challenge.
 - An MQTT command path back to the observer (so we'd be publishing as well as subscribing, a change from our current Role 2 read-only stance).
@@ -984,7 +1027,7 @@ Responses to dev feedback on this design. Captures decisions and rationale for t
 
 ### Q: pprof endpoints, internal only with auth middleware, or exposed for perf stats?
 
-**A:** Undecided for now. If anyone on the team needs access, all the servers already have a Tailscale connection, I can share that with you so you can reach pprof over the tailnet. That probably covers it without us having to build out auth middleware for v1.
+**A:** Neither, as it turned out. There is no pprof HTTP endpoint; CPU profiling is opt-in and time-boxed, and writes profile files to a private directory ([CPU profiling](profiling.md)).
 
 ### Q: MQTT brokers, internal WSS to our own broker for distribution? Should we include Mosquitto or EMQX as a deploy option for other communities?
 
@@ -992,7 +1035,7 @@ Responses to dev feedback on this design. Captures decisions and rationale for t
 
 ### Q: How should we create Role 2 accounts for the broker? Manually in .env? Onboarding form for trust?
 
-**A:** Manually for now. I think it's out of scope of Project Tower, it's a side thing we should support but it's broker config, not Tower config. Don't want to mix concerns.
+**A:** Manually for now. I think it's out of scope of Beacon, it's a side thing we should support but it's broker config, not Beacon config. Don't want to mix concerns.
 
 ### Q: Path resolution scoped to IATA is great. Should we lean heavily on observers to provide confidence? Ambiguous prefix is the CoreScope killer that we need to solve.
 
@@ -1032,11 +1075,11 @@ Responses to dev feedback on this design. Captures decisions and rationale for t
 
 ### Q: Compose default vs with-broker variants?
 
-**A:** I think MQTT is separate and shouldn't be included in Tower. One default compose, Tower-only services (app + postgres + redis + caddy). Bring your own broker.
+**A:** I think MQTT is separate and shouldn't be included in Beacon. One default compose, Beacon-only services (app + db + redis + web + caddy). Bring your own broker.
 
 ### Q: pprof protection, auth middleware, IP allowlist, separate port, or behind admin auth?
 
-**A:** Tailscale handles this for us. All the servers already have a tailnet connection, I can share that with the team for access. No need to build auth in front of pprof for v1.
+**A:** Not needed: there is no pprof endpoint to protect. See the previous answer.
 
 ### Q: Add scoped auth earlier than planned?
 

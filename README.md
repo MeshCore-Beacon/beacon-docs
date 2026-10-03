@@ -1,35 +1,31 @@
-# beacon-docs
+# MeshCore Beacon
 
-Documentation, architecture, and **ready-to-run Docker deployments** for MeshCore Beacon.
+Beacon watches a MeshCore mesh from above. It listens to the MQTT brokers that observers publish
+into, decodes every LoRa packet it hears, stores it, and shows the network live: packets,
+channels, nodes, observers, routes, traces and stats, on a map and in lists.
 
-This repo is the single place to:
+This repo is where you deploy and operate it. The code lives in
+[beacon-server](https://github.com/MeshCore-Beacon/beacon-server) (the API and ingest) and
+[beacon-web](https://github.com/MeshCore-Beacon/beacon-web) (the frontend).
 
-1. **Grab a deployment** — copy the Docker Compose folder for the topology you want, fill in your variables, and `docker compose up -d`.
-2. **Read the docs** — project-wide design and API documentation that describe how the whole system works.
-3. **Follow development** — the [parity and analytics roadmap](ROADMAP.md) and [executable contributor workflow](CONTRIBUTOR_WORKFLOW.md) track review dependencies, validation and the next phases.
+> **Coming from 1.x?** 2.0.0 needs a fresh database and a few config changes. Read
+> [Upgrading](docs/upgrading.md) before you pull new images.
 
-**Beacon 1.4.0:** [release and cutover plan](app_documentation/release-140-preparation.md).
-The intended production destination is `live.meshcore.ca`, replacing CoreScope after
-Alderson's approval. `dev.meshcore.ca` stays online for development testing only.
-The Canadaverse preview remains the separate review candidate. My Atlas is deferred
-until after 1.4.0. These roles do not imply that production has already switched.
+The [experimental roadmap](docs/post-140-roadmap.md) and [integration guide](docs/post-20-integration.md) track My Atlas, Topology and the separate Collector service. These changes remain on `n30nex-test`; production acceptance and stable releases remain separate.
 
----
+## Deploy the all-in-one stack
 
-## Deploy Beacon
+One server runs everything: the API, Postgres, Redis, the web frontend and Caddy with automatic
+HTTPS. You need a domain pointed at the server, ports 80 and 443 open, Docker with the compose
+plugin, and a subscriber account on a MeshCore MQTT broker
+([where packets come from](docs/getting-packets-in.md)).
 
-Two deployment topologies are provided. Pick one, copy its folder to your server, set your variables, and bring it up.
+If you would rather run the API and the web frontend on different hosts, see
+[Split deployment](#split-deployment).
 
-| Type | Folder | What it is | Status |
-|---|---|---|---|
-| **Type 1 — All-in-One** | [`docker-deployment-type1/`](docker-deployment-type1/) | Full stack on a single server: API (`app`), Postgres (`db`), Redis (`redis`), web frontend (`web`), and Caddy reverse proxy with automatic TLS. | ✅ Ready |
-| **Type 2 — Split Server + Web** | [`docker-deployment-type2/`](docker-deployment-type2/) | API backend on one server, web frontend on a dedicated server. | 🚧 Not done yet (WIP) |
+### 1. Get the files onto your server
 
-### Step-by-step (Type 1)
-
-**1. Get the files onto your server**
-
-Clone the repo (you only need the deployment folder, but cloning is the simplest way to grab it):
+Clone the repo; you only need the deployment folder, but cloning is the simplest way to get it.
 
 ```bash
 git clone https://github.com/MeshCore-Beacon/beacon-docs.git
@@ -40,140 +36,165 @@ The folder is self-contained:
 
 ```text
 docker-deployment-type1/
-├── docker-compose.yml          # the stack
-├── .env                        # your secrets (you create this — see step 2)
+├── docker-compose.yml          # the stack (pins the network to 172.30.0.0/24)
+├── .env                        # your secrets (you create this in step 2)
 └── data/                       # persistent state, bind-mounted into the containers
-    ├── app/config.yaml         # Beacon app config (regions, channels, retention)
+    ├── app/config.yaml         # Beacon config: regions, channels, retention, proxy trust
     ├── Caddy/CaddyFile/Caddyfile.proxy
-    ├── postgres/               # ← Postgres database files live here (created on first run)
-    └── redis/                  # ← Redis data lives here (created on first run)
+    ├── Caddy/conf.d/blocklist.caddy   # manual IP and User-Agent block list
+    ├── Caddy/logs/             # JSON access log (read by fail2ban, created on first run)
+    ├── postgres/               # Postgres database files (created on first run)
+    └── redis/                  # Redis data (created on first run)
 ```
 
-> **`data/postgres/` and `data/redis/` are empty in git on purpose.** They're bind-mount targets: the `db` and `redis` containers write their data into them, so your database and cache **survive `docker compose down` and restarts**. Don't delete them unless you intend to wipe all data — `rm -rf data/postgres` resets the database. They populate automatically the first time you run `docker compose up -d`.
+`data/postgres/` and `data/redis/` are bind mounts, so your database and cache survive
+`docker compose down` and restarts. Do not delete `data/postgres/` unless you mean to wipe all
+data. A `data/postgres/` left over from Beacon 1.x must be moved away first; 2.0.0 will not
+start on a 1.x database (see [Upgrading](docs/upgrading.md)).
 
-**2. Create and fill in your `.env`**
-
-Copy the template from [`app_config/.env.example`](app_config/.env.example) and edit it:
+### 2. Create and fill in your `.env`
 
 ```bash
 cp ../app_config/.env.example .env
 nano .env
 ```
 
-Set every `CHANGE_*` value. The variables you must fill in:
+Set every `CHANGE_*` value. The ones you cannot skip:
 
-| Variable | Service | What to set |
-|---|---|---|
-| `POSTGRES_DSN` | `app` | Database connection string. Change the password (`CHANGE_DB_PASS`) to a strong one. |
-| `BEACON_SERVER_IMAGE` | `app` | Required reviewed server tag or digest, chosen independently of the web version. |
-| `BEACON_WEB_IMAGE` | `web` | Required reviewed web tag or digest; `1.4.0` becomes available after the stable tag is published. |
-| `REDIS_ADDR` | `app` | `redis:6379` — points the API at the compose Redis service. Leave it out and the server runs uncached, so every read hits Postgres. |
-| `MQTT_BROKER_1_*` / `MQTT_BROKER_2_*` | `app` | URL, username, and password for your live MeshCore MQTT packet sources. |
-| `DOMAIN` | `caddy` | Your public domain (e.g. `beacon.example.com`). Caddy auto-provisions a Let's Encrypt cert for it. |
-| `VITE_API_BASE` | `web` | `https://<your-domain>/api/v1` — must be the **public** domain, never localhost. |
-| `VITE_WS_URL` | `web` | `wss://<your-domain>/ws` |
-| `VITE_MAP_CENTER` / `VITE_MAP_ZOOM` | `web` | *(Optional)* Fallback "All" map view. The app auto-fits the map to all IATA locations from `config.yaml`; these values are only used as a fallback when those IATAs have no location set. Omit for a world view. |
+| Variable | What to set |
+|---|---|
+| `BEACON_SERVER_IMAGE` / `BEACON_WEB_IMAGE` | Reviewed tags or immutable digests. Keep server/web major and minor versions aligned; patches may differ. |
+| `POSTGRES_DSN` | The database connection string. Change `CHANGE_DB_PASS` to a strong password. **The same password must go in `POSTGRES_PASSWORD` in `docker-compose.yml`.** |
+| `MQTT_BROKER_1_URL`, `_USERNAME`, `_PASSWORD` | Your MeshCore MQTT broker and the subscriber account on it. The template also lists a second broker; if you have only one, clear `MQTT_BROKER_2_URL` (an empty URL disables that worker). |
+| `DOMAIN` | Your public hostname, for example `beacon.example.com`. Caddy requests a Let's Encrypt certificate for it. |
+| `VITE_API_BASE` | `https://<your-domain>/api/v1`. The browser calls this, so it must be the public domain, never `localhost`. |
+| `VITE_WS_URL` | `wss://<your-domain>/ws` |
 
-> ⚠️ **Password must match in two places.** The password inside `POSTGRES_DSN` (in `.env`) must equal `POSTGRES_PASSWORD` in `docker-compose.yml`. Update both before bringing the stack up.
+Everything else in the file is optional and explained in
+[Configuration](docs/configuration.md): the admin API key, log settings, Redis, and the
+web app's map view, tabs, themes, name and banner.
 
-**3. Fill in the app config**
-
-Edit [`data/app/config.yaml`](docker-deployment-type1/data/app/config.yaml) to define your network:
+### 3. Describe your network in `config.yaml`
 
 ```bash
 nano data/app/config.yaml
 ```
 
-- **`iatas`** — the airport-code anchor points for your coverage area (name + lat/lng).
-- **`regions`** — map regions that group IATAs together.
-- **`channel_keys`** — hashtag channels and/or explicit channel keys to decrypt.
-- **`scopes`**, **`telemetry`**, **`packets`**, **`ingest`** — transport scopes, retention windows, and an optional geographic ingest filter.
+- `iatas`: the airport codes your observers report under, with a name and coordinates.
+- `regions`: groups of IATAs that become the region picker in the web app.
+- `channel_keys`: hashtag channels and explicit keys to decrypt. Without them, channel messages
+  are stored as hashes only.
+- `scopes`: transport scopes, if your mesh uses them. Each one needs a `region`.
+- `packets`, `telemetry`, `analytics`, `routes`: how long things are kept. Packets default to
+  7 days.
+- `ingest.allow_countries` is set to `[CA]`, so packets from observers outside Canada are
+  dropped. Change it to your country, or delete the `ingest` block to accept everything.
+- `server.trusted_proxies` is already set to the compose subnet so Beacon sees real visitor
+  addresses through Caddy. Change it only if you change the subnet in `docker-compose.yml`.
 
-**4. Point DNS at the server**
+Every other key, with its default, is documented in
+[`app_config/config.yaml.example`](app_config/config.yaml.example); the
+[Configuration](docs/configuration.md#configyaml) page is the map of what each block does.
 
-Create an `A`/`AAAA` record for your `DOMAIN` pointing at the server's public IP. Caddy needs ports **80** and **443** reachable to issue the TLS certificate.
+### 4. Point DNS at the server
 
-**5. Bring it up**
+Create an `A` or `AAAA` record for `DOMAIN` pointing at the server's public IP. Caddy needs
+ports 80 and 443 reachable from the internet to get its certificate.
+
+### 5. Bring it up
 
 ```bash
 docker compose up -d
-```
-
-Check it's healthy:
-
-```bash
 docker compose ps
-docker compose logs -f
+docker compose logs -f app
 ```
 
-Visit `https://<your-domain>` and you're off to the races. 🚀
+Within a minute `app` should log a `connected` line for each broker. Packets themselves are
+not logged at the default level; open `https://<your-domain>` and watch the Packets tab, or
+check `https://<your-domain>/api/v1/observers` fills in. If something is off, [Troubleshooting](docs/troubleshooting.md)
+lists the usual suspects.
 
-> After changing any `VITE_*` value later, recreate the web container so the new values get baked into the JS bundle:
-> ```bash
-> docker compose up -d --force-recreate web
-> ```
-> (then hard-refresh / use incognito, since `/assets/*` is cached immutable.)
+To change a `VITE_*` value later, edit `.env` and run `docker compose up -d web`. The web
+container writes those values to `/config.js` on every start, so visitors get them on their
+next page load.
 
-### Container images
+## Split deployment
+
+API, database and ingest on one host, the web frontend on another:
+[docker-deployment-type2](docker-deployment-type2/README.md).
+
+## Container images
 
 The `app` and `web` services pull public images from GitHub Container Registry
-(`ghcr.io/meshcore-beacon/beacon-server` and `…/beacon-web`) — **no `docker login`
-is required**.
+(`ghcr.io/meshcore-beacon/beacon-server` and `ghcr.io/meshcore-beacon/beacon-web`). No
+`docker login` is needed.
 
-> **Troubleshooting — `403 Forbidden` on pull.** If `docker compose up` fails with a
-> `... manifests/<tag>: 403 Forbidden` error, the package has been set (or defaulted)
-> to **Private** on GHCR. A maintainer must set it back to Public — see
-> [Maintainers: publishing images](#maintainers-publishing-images).
+The compose files use `latest`, which follows stable releases. To decide for yourself when to
+upgrade, pin both images to the same release line (`:2.0`) or an exact release (`:2.0.0`); server
+and web share `major.minor`. Tags, versioning and the release process are in
+[Releases and versioning](docs/releases.md). A `403 Forbidden` on pull means the package has
+gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fails-with-403-forbidden-pulling-an-image).
 
-### Type 2 — Split Server + Web
+## Documentation
 
-🚧 **Not done yet.** [`docker-deployment-type2/`](docker-deployment-type2/) is a placeholder; instructions and compose files will land here.
+**Run it**
 
----
+- [Getting packets in](docs/getting-packets-in.md): brokers, the account Beacon needs, topics.
+- [Configuration](docs/configuration.md): every environment variable and a map of `config.yaml`.
+- [Reverse proxy](docs/reverse-proxy.md): Caddy, nginx, Apache, rate limits, split origins.
+- [Securing a deployment](docs/security.md): the admin key, the listener, origins, bans.
+- [Day-to-day operations](docs/operations.md): health, logs, retention, backup and restore.
+- [Upgrading](docs/upgrading.md): 2.0.0 from 1.x, and routine upgrades.
+- [Troubleshooting](docs/troubleshooting.md): symptom, cause, fix.
+- [Releases and versioning](docs/releases.md): image tags and how releases are cut.
 
-## Project documentation
+**Understand it**
 
-Project-wide docs that describe the entire system live in [`app_documentation/`](app_documentation/):
+- [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
+- [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
+- [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
-- [**High Level Design**](app_documentation/high_level_design.md) — single source of truth. System overview, database schema, ingestion pipeline, and future features.
-- [**API Contract**](app_documentation/api_contract.md) — REST endpoints, WebSocket protocol, search, backpressure/reconnection, and mobile-specific concerns.
+**Change it**
+
+- [Contributing](CONTRIBUTING.md): the workflow for all three repos and running the full stack
+  locally.
+- beacon-server: [historical stats](https://github.com/MeshCore-Beacon/beacon-server/blob/main/docs/historical-stats.md),
+  how the hourly rollups work.
+- beacon-web: [translations](https://github.com/MeshCore-Beacon/beacon-web/blob/main/docs/translations.md),
+  adding a language.
+
+Deployment folders are `docker-deployment-type1/` and `docker-deployment-type2/`; templates
+and proxy configs (`.env`, `config.yaml`, Caddy, nginx, Apache, fail2ban) are in `app_config/`;
+brand assets are in `logos/`.
 
 ## Source repositories
 
-- **Beacon Server (API):** [github.com/MeshCore-Beacon/beacon-server](https://github.com/MeshCore-Beacon/beacon-server) — image `ghcr.io/meshcore-beacon/beacon-server`
-- **Beacon Web (Frontend):** [github.com/MeshCore-Beacon/beacon-web](https://github.com/MeshCore-Beacon/beacon-web) — image `ghcr.io/meshcore-beacon/beacon-web`
+- **beacon-server** (API and ingest): [github.com/MeshCore-Beacon/beacon-server](https://github.com/MeshCore-Beacon/beacon-server), image `ghcr.io/meshcore-beacon/beacon-server`
+- **beacon-web** (frontend): [github.com/MeshCore-Beacon/beacon-web](https://github.com/MeshCore-Beacon/beacon-web), image `ghcr.io/meshcore-beacon/beacon-web`
 
 ## Maintainers: publishing images
 
-Container images are published automatically by each repo's `docker-publish.yml`
-workflow on pushes to `main`/`dev` and on `v*` tags. **GHCR packages are Private by
-default**, which makes anonymous `docker pull` fail with `403 Forbidden`. To make a
-package publicly pullable (one-time, per package):
+Container images are published automatically by each repo's `docker-publish.yml` workflow on
+pushes to `main` and `dev` and on `v*` tags. GHCR packages are private by default, which makes
+anonymous `docker pull` fail with `403 Forbidden`. To make a package publicly pullable, once per
+package:
 
-1. GitHub → the **MeshCore-Beacon** org → **Packages** → select `beacon-server`.
-2. **Package settings** → **Danger Zone** → **Change visibility** → **Public**.
+1. GitHub, the **MeshCore-Beacon** org, **Packages**, select `beacon-server`.
+2. **Package settings**, **Danger Zone**, **Change visibility**, **Public**.
 3. Repeat for `beacon-web`.
 
-Once a package is Public, every future CI push to it stays Public. `GITHUB_TOKEN`
-cannot change package visibility, so this step can't be automated in the workflow.
-
-## Repo structure
-
-- `/docker-deployment-type1` — Single-server (all-in-one) Docker Compose deployment ✅
-- `/docker-deployment-type2` — Split server/web Docker Compose deployment 🚧 WIP
-- `/app_config` — Example `.env`, `config.yaml`, and Caddyfile templates
-- `/app_documentation` — Project-wide design & API docs
-- `/logos` — Brand assets
+Once a package is public, every future push keeps it public. `GITHUB_TOKEN` cannot change
+package visibility, so this step cannot be automated in the workflow.
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
-workflow and the [Code of Conduct](CODE_OF_CONDUCT.md). Issues are disabled on
-this repo; to discuss a change first, reach out on the
-[MeshCore Canada Discord](https://discord.gg/Gz3KvJx2hf). Security reports go
-through [SECURITY.md](SECURITY.md), not public channels.
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the workflow and the
+[Code of Conduct](CODE_OF_CONDUCT.md) applies. Issues are disabled on this repo; to discuss a
+change first, reach out on the [MeshCore Canada Discord](https://discord.gg/Gz3KvJx2hf).
+Security reports go through [SECURITY.md](SECURITY.md), not public channels.
 
 ## License
 
-Beacon is licensed under the [GNU Affero General Public License v3.0](LICENSE)
-(AGPL-3.0), the same license as [beacon-server](https://github.com/MeshCore-Beacon/beacon-server).
+Beacon is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0), the
+same license as [beacon-server](https://github.com/MeshCore-Beacon/beacon-server) and
+[beacon-web](https://github.com/MeshCore-Beacon/beacon-web).

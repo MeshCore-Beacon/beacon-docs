@@ -16,7 +16,7 @@ The helper remains useful for the existing queue's integration with new `dev` ch
 
 The normal long-term path is a short queue: finish the current review sequence, then start each independent change from fresh `dev`. Keep only real dependencies stacked. Retain the exact built source and existing rollback; a documentation or history-only change with the same source tree needs no application rebuild.
 
-The My Atlas phase is one feature PR, web #97 after #95. It reused the published tip without rebasing earlier parents; source, checks and recovery are recorded in [the My Atlas handoff](app_documentation/my-atlas-20260929.md).
+The My Atlas phase is one feature PR, web #97 after #95. It reused the published tip without rebasing earlier parents; source, checks and recovery are recorded in [the My Atlas handoff](docs/my-atlas-20260929.md).
 
 ## Working loop
 
@@ -34,7 +34,7 @@ A source conflict still needs review. The helper automates routine history movem
 
 The September 29 review pass preserves the accepted dev bases and updates each affected server PR through the existing helper. Two authored merges kept both the new observer documentation and route section, and both query groups in queries.sql. SQLc/Swagger outputs were regenerated. Server #166/#184 remain independent; the ordered chain is #167 -> #169 -> #172 -> #174 -> #176. Web #95 is a new child of #92; none of the nine existing web parents needed rebasing.
 
-Both full-stack Check commands pass for all seventeen actual application heads. The Pi runs server a35cba1d / web e1133ab5 with validated database repair/rollback and 940 web tests. See [current heads and evidence](app_documentation/review-release-20260929.md). All candidates are out of draft; requested-change reviews still need maintainer re-review.
+Both full-stack Check commands pass for all seventeen actual application heads. The Pi runs server a35cba1d / web e1133ab5 with validated database repair/rollback and 940 web tests. See [current heads and evidence](docs/review-release-20260929.md). All candidates are out of draft; requested-change reviews still need maintainer re-review.
 
 Merge commits remain disabled and contributor permission remains READ. A maintainer must enable that repository option. No helper algorithm or repository policy changed in this phase. Continue from fresh dev after acceptance and stack only real dependencies.
 
@@ -134,7 +134,7 @@ Keep Atlas #97 outside the release and in the separate post-1.4.0 manifest. It
 needs conflict resolution and fresh validation after the release head is accepted.
 Refresh/publish/check the declared active queues when their bases or heads change.
 Keep production at live.meshcore.ca pinned to approved releases and dev.meshcore.ca
-online for development only. See the [owner cutover plan](app_documentation/release-140-preparation.md).
+online for development only. See the [owner cutover plan](docs/release-140-preparation.md).
 
 The bounded border snapshot tool is independent of the stack helper and never deploys or changes configuration. The contributor CI runs all `test_*.py` files, including the stack safety checks and exact-member/null/invalid-polygon coverage (26 tests at this checkpoint).
 

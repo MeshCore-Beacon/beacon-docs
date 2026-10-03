@@ -1,4 +1,3 @@
-# Type 1 (All-in-One): API + Web on same server
 # Behind Cloudflare (or another CDN), {remote_host} is the CDN's address. Trust its ranges
 # in a global block, then use {client_ip} instead of {remote_host} below and client_ip
 # instead of remote_ip in conf.d/blocklist.caddy:
@@ -57,7 +56,8 @@
 		}
 	}
 
+	# Everything that is not the API lives on the web host.
 	handle {
-		reverse_proxy web:80
+		redir https://{$WEB_DOMAIN}{uri} permanent
 	}
 }

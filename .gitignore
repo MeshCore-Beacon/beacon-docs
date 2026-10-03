@@ -1,2 +1,17 @@
 __pycache__/
 *.pyc
+
+# Deployment secrets and runtime state. Each deployment folder's .env is created from
+# app_config/.env.example; the data/ subfolders below are bind mounts the containers write to.
+docker-deployment-*/.env
+docker-deployment-*/*/.env
+docker-deployment-*/data/postgres/
+docker-deployment-*/data/redis/
+docker-deployment-*/data/Caddy/data/
+docker-deployment-*/data/Caddy/config/
+docker-deployment-*/data/Caddy/logs/
+docker-deployment-*/*/data/postgres/
+docker-deployment-*/*/data/redis/
+docker-deployment-*/*/data/Caddy/data/
+docker-deployment-*/*/data/Caddy/config/
+docker-deployment-*/*/data/Caddy/logs/
