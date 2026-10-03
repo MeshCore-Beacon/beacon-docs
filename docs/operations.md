@@ -13,8 +13,9 @@ Beacon has no health endpoint yet. Use these instead:
   status. A broker that never connects is a URL or credentials problem; see
   [Getting packets in](getting-packets-in.md).
 - Open `wss://<your-domain>/ws` in a WebSocket client. The first frame is `hello`.
-- `docker compose logs -f app` shows ingest connecting to each broker and then observations
-  arriving.
+- `docker compose logs -f app` shows a `connected` line per broker. Individual packets are
+  not logged at the default `info` level, so a quiet log after that is normal; use the
+  observers endpoint or the web app to see traffic.
 
 ## Logs
 

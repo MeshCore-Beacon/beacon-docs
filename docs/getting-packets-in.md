@@ -54,7 +54,8 @@ observer says it is. Beacon creates an IATA the first time it sees one; `iatas:`
 ## Checking it works
 
 - `GET /api/v1/brokers` shows each broker and whether it is connected.
-- `docker compose logs -f app` shows a connect line per broker and then observations arriving.
+- `docker compose logs -f app` shows a `connected` line per broker. Packets are not logged at
+  the default level, so do not wait for them there.
 - `GET /api/v1/observers` fills in as observers publish.
 - Within a few minutes the web app's Packets tab should be moving. If it is not, see
   [Troubleshooting](troubleshooting.md#no-packets-are-arriving).

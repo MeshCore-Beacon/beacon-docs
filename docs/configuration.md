@@ -45,6 +45,17 @@ Visitors get the new values on their next page load. Any characters are fine in 
 | `VITE_SKIP_SPLASH` | no | `true` skips the once-per-session loading splash. |
 | `VITE_BANNER` | no | Notice shown above the header on every page, for example on a test instance. `[label](url)` and bare URLs become links. |
 
+## Deployment variables
+
+These are read by `docker-compose.yml` and Caddy, not by Beacon itself.
+
+| Variable | Used by | What it does |
+|---|---|---|
+| `DOMAIN` | Caddy, both deployments | The public hostname Caddy serves and requests a certificate for. |
+| `WEB_DOMAIN` | Caddy, type 2 server host only | The web frontend's hostname. Anything that is not `/api/*` or `/ws` is redirected there. |
+| `BEACON_WEB_IMAGE` | type 2 web host | The image to run, for example `ghcr.io/meshcore-beacon/beacon-web:2.0`. Keep its `X.Y` equal to the server's. |
+| `POSTGRES_PASSWORD` | the `db` service | Set in `docker-compose.yml`, not `.env`. It must match the password inside `POSTGRES_DSN`. |
+
 ## config.yaml
 
 [`app_config/config.yaml.example`](../app_config/config.yaml.example) documents every key with

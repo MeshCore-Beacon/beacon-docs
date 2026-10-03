@@ -18,6 +18,20 @@ docker compose pull
 docker compose up -d
 ```
 
+If your `docker-deployment-type1/` is a git clone, `git pull` will refuse because the 1.x
+layout tracked `.env` and you edited `docker-compose.yml`. Before pulling:
+
+```bash
+cp .env ../my-beacon.env && cp docker-compose.yml ../my-compose.yml   # keep your values
+git checkout -- . && git pull
+cp ../my-beacon.env .env
+```
+
+Then, in `.env`, change `tower` to `beacon` in both places in `POSTGRES_DSN`
+(`postgres://beacon:...@db:5432/beacon`), and put your password back into
+`POSTGRES_PASSWORD` in `docker-compose.yml`. The database user and name are `beacon` now, and
+the fresh database is created with them.
+
 `docker compose down` also lets the network come back with the new fixed subnet. If
 `172.30.0.0/24` is already used on your host, pick another in `docker-compose.yml` and change
 `server.trusted_proxies` in `data/app/config.yaml` to match.

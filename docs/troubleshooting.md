@@ -16,7 +16,7 @@ address unless Beacon is told otherwise. Two things have to be true:
 
 1. `server.trusted_proxies` in `config.yaml` lists the proxy's address as a CIDR: `/32` for one
    IPv4 host, `/128` for one IPv6 host, `172.30.0.0/24` for the all-in-one compose network. A
-   bare address stops startup with `server.trusted_proxies[0] must be a valid CIDR`.
+   bare address stops startup with `failed to load config ... netip.ParsePrefix("10.0.0.5"): no '/'`.
 2. The proxy overwrites `X-Real-IP` with the connecting client's address. The shipped Caddy,
    nginx and Apache configs do; see [Reverse proxy](reverse-proxy.md).
 
@@ -58,7 +58,7 @@ Beacon refuses to run with a setting it cannot honour. The message names the key
 |---|---|
 | `scope "x" needs a region` | Add `region: <slug>` to that `scopes:` entry. |
 | `scope "x" region "y" is not a configured region` | Use a slug that appears under `regions:`. |
-| `server.trusted_proxies[0] must be a valid CIDR` | Write `10.0.0.5/32`, not `10.0.0.5`. |
+| `netip.ParsePrefix("10.0.0.5"): no '/'` | Write `10.0.0.5/32`, not `10.0.0.5`. An empty entry fails with `server.trusted_proxies[0] must be a valid CIDR` instead. |
 | `packets.retention must be at least 24h` | Raise it. Same for `analytics.rollup_retention`. |
 | `meshmapper.scopes.refresh_interval must be between 1h and 24h` | Set it inside that range. Zones and channels intervals are 24h to 168h. |
 | `nodes.mark_foreign requires an iatas.*.borderFile or meshmapper.zones` | Add a border source or turn `mark_foreign` off. |

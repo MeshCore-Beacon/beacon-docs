@@ -46,6 +46,8 @@ leave a private staging dir: `.beacon-backup-*` next to the CLI output, or
 
 ## CLI export
 
+In a beacon-server clone:
+
 ```sh
 go build ./cmd/beacon-backup
 beacon-backup -config /private/config.yaml -output /private/beacon-20260913.tar.gz
@@ -120,17 +122,3 @@ Check the migration journal and some records, review the config, and restore ext
 secrets and files before pointing a new Beacon at it. Never test an export by restoring over
 live data. See [pg_dump](https://www.postgresql.org/docs/16/app-pgdump.html) and
 [libpq environment](https://www.postgresql.org/docs/16/libpq-envars.html).
-
-## Testing
-
-CI runs export, restore round-trip, offline verify and truncated-archive rejection against
-PostgreSQL 16. Locally, with `PG*` pointing at a throwaway server whose role can create
-databases:
-
-```sh
-go build -o "$PWD/beacon-backup" ./cmd/beacon-backup
-BEACON_BACKUP_TEST_POSTGRES=1 BEACON_BACKUP_TEST_BINARY="$PWD/beacon-backup" \
-  go test ./internal/backup -run '^TestExportPostgres$' -v
-```
-
-The test creates, migrates, restores and drops two randomly named databases.

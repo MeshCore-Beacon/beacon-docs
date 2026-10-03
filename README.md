@@ -84,6 +84,8 @@ nano data/app/config.yaml
 - `scopes`: transport scopes, if your mesh uses them. Each one needs a `region`.
 - `packets`, `telemetry`, `analytics`, `routes`: how long things are kept. Packets default to
   7 days.
+- `ingest.allow_countries` is set to `[CA]`, so packets from observers outside Canada are
+  dropped. Change it to your country, or delete the `ingest` block to accept everything.
 - `server.trusted_proxies` is already set to the compose subnet so Beacon sees real visitor
   addresses through Caddy. Change it only if you change the subnet in `docker-compose.yml`.
 
@@ -104,8 +106,9 @@ docker compose ps
 docker compose logs -f app
 ```
 
-Within a minute `app` should log a connection to each broker, then observations arriving.
-Visit `https://<your-domain>`. If something is off, [Troubleshooting](docs/troubleshooting.md)
+Within a minute `app` should log a `connected` line for each broker. Packets themselves are
+not logged at the default level; open `https://<your-domain>` and watch the Packets tab, or
+check `https://<your-domain>/api/v1/observers` fills in. If something is off, [Troubleshooting](docs/troubleshooting.md)
 lists the usual suspects.
 
 To change a `VITE_*` value later, edit `.env` and run `docker compose up -d web`. The web

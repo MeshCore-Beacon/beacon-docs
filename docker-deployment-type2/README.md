@@ -20,11 +20,12 @@ docker-deployment-type2/
 ## Server host
 
 1. Copy `server/` to the host.
-2. Create `.env` from the template and fill in every `CHANGE_*` value. Only the `app` and
-   `caddy` lines matter here; the `VITE_*` lines can be deleted.
+2. Create `.env` from [`app_config/.env.example`](../app_config/.env.example) and fill in every
+   `CHANGE_*` value. Only the `app` and `caddy` lines matter here; the `VITE_*` lines can be
+   deleted. From inside `server/` in a clone of this repo:
 
    ```bash
-   cp ../app_config/.env.example .env
+   cp ../../app_config/.env.example .env
    nano .env
    ```
 
@@ -91,4 +92,5 @@ Rate limits and connection caps work the same as in the all-in-one stack because
 Caddy sets `X-Real-IP` and is trusted through `server.trusted_proxies`; see
 [Reverse proxy](../docs/reverse-proxy.md).
 
-To change a `VITE_*` value later, edit the web host's `.env` and run `docker compose up -d web`.
+To change a `VITE_*` value later, edit the web host's `.env` and run
+`docker compose up -d beacon-web`.
