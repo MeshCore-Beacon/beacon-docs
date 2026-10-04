@@ -1,5 +1,27 @@
 # Beacon roadmap: 2.0 integration and CoreScope parity
 
+## Post-2.0 decision register, 4 October 2026
+
+The [unified Meshat and preview decision register](post-20-feature-decisions-20261004.md)
+is the current review index. It reconciles all three upstream core repositories'
+`main`/`dev` refs with Meshat v1 and the 2.2.1 preview, including existing PRs.
+
+- **✨ Review first:** realtime/API correctness, TRACE evidence safety and list usability,
+  focused My Atlas, bounded Topology reads, truthful telemetry, contact handoff and
+  current IATA-membership freshness.
+- **❕ Design first:** directional evidence/aging/global ambiguity, calculated routes,
+  transit/history/search/sorting, targeted contract/cache work, Collector readiness
+  and optional map/chatter refinements.
+- **❌ No new port:** already-covered mechanisms, duplicate contributions, whole-fork
+  rewrites, deployment-specific defaults and unjustified RF/retention policies.
+
+Use **🟢 KEEP / EXISTS**, **🟡 INTEGRATE / VERIFY / DESIGN**, and **🔴 DO NOT PORT /
+DUPLICATE**, always with the reason. Worth keeping is not proof of upstream acceptance
+or full stability. The register supplies stable R/D/X IDs, sources, dependencies,
+B1–B9 corrections and acceptance gaps. Recommendations do not approve feature work,
+assign owners/releases or remove existing holds. Prior checkpoints and planning phases
+below remain preserved; use their dates rather than treating them as current verification.
+
 ## Current preview checkpoint, 4 October 2026
 
 The [Canadaverse preview](https://canadaverse.org/beacon-dev/) now serves web
@@ -164,7 +186,7 @@ list is separated from release acceptance and production-load qualification.
 | **Hash and prefix tools** | Collision/usage matrix, role-aware prefix-width analysis and a prefix checker with explicit ambiguity | [Hash and prefix analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Beacon already displays width distributions and ambiguous candidates; it lacks the dedicated tools. |
 | **Distance and route patterns** | Valid-coordinate hop/path distances, signal-versus-distance views, common subpath rankings and evidence-linked route alternatives/inspection | [Distance and route-pattern analysis](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/public/analytics.js). Existing route search, detail and 3D layout do not supply geographic-distance analytics. |
 | **Historical replay** | Play/pause/seek, stepping and speed controls over retained observations; one time controller for map and Topology, with visible gaps | [Live/VCR guide](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/live.md#vcr-mode). Beacon's live pause and static route-history windows are not replay. Hourly rollups cannot recreate expired packet paths. |
-| **Geographic area filtering** | Filter nodes and their attributed traffic by advertised location/polygon across views, separately from receiving-IATA groups | [Area filter](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/area-filter.md). Beacon's IATA groups, boundary overlay and optional foreign-node classification do not provide this complete workflow. |
+| **Geographic area filtering** | Filter nodes and their attributed traffic by advertised location/polygon across views, separately from receiving-IATA groups | [Area filter](https://github.com/Kpa-clawbot/CoreScope/blob/093e320c2bda99d1fef317d7fc21fc1240a8cd12/docs/user-guide/area-filter.md#area-filter). Beacon's IATA groups, boundary overlay and optional foreign-node classification do not provide this complete workflow. |
 
 Smaller parity items remain below those analysis workflows: node/channel QR sharing,
 more table/layout preferences, an in-browser theme editor with import/export, and
@@ -177,7 +199,7 @@ Audio/Lab and decorative exhibition modes are optional, not blockers for the cor
 analysis roadmap. Account synchronization/MeshMapper login is a separate ownership
 and authentication decision, not a prerequisite for browser-local Atlas.
 
-## Delivery order
+## Delivery order (earlier planning context)
 
 | Phase | Next package | Completion gate |
 |---|---|---|
@@ -189,11 +211,11 @@ and authentication decision, not a prerequisite for browser-local Atlas.
 | **5 — history and geography** | Retained packet replay, observer reach/timing and GPS-area filtering | Ordered bounded cursors, explicit retention/gaps, no invented paths or clock-based claims of RF propagation. |
 | **Beyond parity** | Evidence-linked MeshMapper scope/boundary crossings, region changes and guided live follow | Distinguish a receiving-IATA change, advertised location, scope label and a geometric crossing; never manufacture neighbour links from catalogue counts. |
 
-**Recommended next new implementation after 2.0:** the node dashboard/trace phase.
+**Earlier recommended next new implementation after 2.0:** the node dashboard/trace phase.
 It builds on the existing node inspector and Atlas instead of adding another
 independent page with different counts. Replay is the largest remaining live-view
 capability gap and needs its retained-evidence contract before UI implementation.
-This update schedules work; it does not start new feature implementation.
+This earlier order is planning context, not approval to start feature implementation.
 
 ## CartoLite-derived follow-ups
 
