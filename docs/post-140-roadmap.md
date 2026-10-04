@@ -1,6 +1,81 @@
 # Beacon roadmap: 2.0 integration and CoreScope parity
 
-## Current: released 2.0 base and verified preview — 3 October 2026
+## Current preview checkpoint, 4 October 2026
+
+The [Canadaverse preview](https://canadaverse.org/beacon-dev/) now serves web
+**2.2.1-n30nex.1**, source
+[`c41e6fa8`](https://github.com/n30nex/beacon-web-contributions/commit/c41e6fa8940fba929704bc2f9a94f119fef4a4ca),
+and server **2.2.0-n30nex.1**, source
+[`84ac3c87`](https://github.com/n30nex/beacon-server-contributions/commit/84ac3c8781ed19f99e7d996e07e8b671dc6efc92).
+Public revision/index checks and current `n30nex-test` heads matched on 4 October.
+Collector revision remains `aa7ddf06`. These are experimental preview versions,
+not upstream release acceptance or a change to the proposed release priorities.
+
+Delivered in this preview, according to the corresponding source and
+[public changelog](https://canadaverse.org/beacon-dev/source.html):
+
+- Atlas has compact aligned cards, expandable environmental telemetry and known
+  neighbours inferred from received packets, without new radio polling. The latest
+  patch reserves the telemetry alignment height only at desktop widths, labels
+  unavailable observer telemetry and keeps compact temperature channel labels readable.
+- Shared sparklines distinguish measured segments, dashed gap estimates and single
+  readings. Missing telemetry is not fabricated; role badges and status styling are
+  consistent across views.
+- Topology Public chatter is bounded to two bubbles, one on phones, and can be
+  disabled. Public identity comes from the actual decryption key rather than a
+  one-byte hash/name. Duplicate/private messages and ambiguous anchors are excluded
+  by the documented behavior; receiver pointers are not claims about the sender's location.
+- `GET /api/v1/routes/topology` supplies unique adjacent, undirected known-route
+  node-ID pairs for 15m/1h/24h windows. Source caps replies at 100,000 links, reports
+  capping/window bounds, uses a 30-second cache and retains API rate limits. It avoids
+  route-page fan-out, not the need to distinguish observed evidence from RF reachability.
+- TRACE handling distinguishes 1/2/4/8-byte hashes from ordinary 1/2/3-byte paths,
+  retains conflicting candidates and all eight bytes for eight-byte matching, and
+  reconstructs original SNR bytes. Unsupported/malformed/ambiguous observations are
+  hidden by default with a retained-evidence inspection option and diagnostic reasons.
+  Suspect or unvisited requested hops cannot become usable mapped/observed routes;
+  malformed traces do not create new neighbour/capability evidence. Raw history remains.
+- The compact shared-region Topology controls, Changelog access and Torchlight's
+  Traces row-height, long-path containment and expand/collapse work remain preserved.
+
+Verification is deliberately bounded. Torchlight checked public revisions/index,
+reviewed the latest web/server commits and inspected fixed desktop/mobile Packets
+and Topology captures. Those captures reported no browser errors or failed responses.
+The default page was Packets, not Atlas: Atlas card interactions, Public chatter
+eligibility, the 24-hour switch, collision-control interactions and mobile-menu
+behavior are not claimed browser-verified by this review. The changelog reports
+native build/lint and **1,274 frontend tests passed**; these were not rerun here.
+Earlier validation totals and deployment statements below belong to their dated
+checkpoints. Keep the prior expanded-Trace-report visual acceptance gap explicit.
+
+## Meshat review queue, not implementation approval
+
+The [Meshat decision brief](meshat-review-20261004.md) adds the supplied fork review
+to this roadmap. Its baseline is released Beacon 2.0.0 with the 2.0.1 deltas checked,
+not this experimental preview. In particular, the new preview TRACE safeguards now
+overlap parts of the collision/protocol review; recheck that delta before opening
+implementation work. A bounded Topology link snapshot is not a weighted route planner.
+
+- **Review first:** global WS-loss notices, write deadlines and shared Retry-After
+  state; bounded resolved list-hop names; current IATA-membership freshness; contact
+  QR/deep links. Reproduce source-level candidates on the target revision first.
+- **Design before scheduling:** global confidence semantics and directional SNR/
+  evidence freshness, then a possible calculated route planner. Transit-node history,
+  retained-history search and generalized sortable keyset paging remain distinct choices.
+- **Optional:** API contract drift checks, shared live-cache policy, richer URL-owned
+  filters, lightweight node mini-maps, radio titles, unknown-channel totals and
+  privacy-reviewed region/owner metadata integrations.
+- **Do not duplicate or blindly import:** already-covered MapLibre resolver, region
+  pending-state and heartbeat mechanisms; working WS route/observer filters; Swedish
+  support in 2.0.1; wholesale framework changes, deployment-specific broker/branding
+  defaults, fixed RF/retention policies or pre-2.0 migration sequences.
+
+These entries remain review candidates. They do not approve a feature, supersede
+an accepted priority, assign an implementation owner or authorize schema/RF changes.
+The existing phase list is retained as planning history; decisions need explicit
+scope, evidence, acceptance criteria and ownership before execution.
+
+## Historical checkpoint: released 2.0 base and verified preview, 3 October 2026
 
 The [Pi preview](https://canadaverse.org/beacon-dev/) runs server **8c7fbb8** and
 web **7e139d5**, retaining My Atlas, Topology and node/route work on top of the
