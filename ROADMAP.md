@@ -53,6 +53,40 @@ reviewable code, tests and the actual environment. Keep the 2.1 scope focused.
 - Fix major and minor defects and address measured performance problems across
   the accepted system. Broader feature ideas remain separately prioritized backlog.
 
+## Future interoperability — firmware-direct telemetry (FW01)
+
+**🟢 Keep the direction; 🟡 design and integration remain. No release assigned.**
+The [owner's 4 October clarification](https://discord.com/channels/1507764602253869197/1507788454774182030/1556384736522281032)
+keeps collaboration with repeater and observer firmware projects open, including
+projects like [MeshCore Observer](https://observer.gessaman.com/).
+
+Wi-Fi-capable devices should be able to opt in and configure a Beacon deployment's
+telemetry collection endpoint, submitting their own readings through the shared,
+versioned API/intake contract. This complements mobile/USB collectors rather than
+requiring an intermediary phone or computer for a device's own telemetry. Keep the
+producer contract reusable across clients; do not tie it to one firmware vendor.
+
+Before claiming support, agree and qualify:
+
+- Endpoint selection, explicit enable/disable and scoped enrollment, authentication
+  and revocation. Wi-Fi and node administration credentials stay local, never in
+  telemetry payloads; intake permissions do not grant remote radio administration.
+- Device/producer identity and provenance, sample timestamps, units and optional
+  sensor fields. Missing/null values must not become fabricated zero readings;
+  authenticated provenance is not hardware attestation or guaranteed sensor truth.
+- Bounded upload cadence, retries/backoff, offline buffering and duplicate handling,
+  with honest freshness/gaps in Atlas/node cards. Transport/schema details and
+  partner compatibility remain design work; no endpoint shape is promised here.
+- Coexistence with existing observer MQTT packet/status ingestion. Uploading a
+  device's own readings over Wi-Fi is not an RF poll. If firmware also polls peers,
+  the existing polling budgets, hop constraints and qualification gates still apply.
+
+The reference project's public setup page documents Wi-Fi and MQTT configuration;
+that is not verification of native Beacon telemetry-API support or a collaboration
+agreement. No partner outreach or firmware qualification has occurred in this update.
+This future direction does not add a new 2.1/2.2 delivery requirement, authorize
+firmware changes or imply remote console/control support.
+
 ## Collector safety and acceptance gates
 
 The one-hour minimum is a maximum polling rate, not an instruction to transmit
