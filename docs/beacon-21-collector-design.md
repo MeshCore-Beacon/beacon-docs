@@ -1,5 +1,15 @@
 # Beacon 2.1: Atlas and Collector planning scratchpad
 
+> **Primary roadmap:** [Beacon 2.1–2.2](../ROADMAP.md), adopted 4 October 2026,
+> controls priorities and agreed requirements. It includes Atlas/Topology plus an
+> initial Beacon agent and working MQTT setup in 2.1.0; telemetry/collection
+> expansion in 2.1.1–2.1.9; and complete Atlas, Topology refinement, bug fixes and
+> performance in 2.2. Mobile BLE and Windows/Linux USB collectors share the hourly
+> maximum, three-hop requirement and flood/learned-route/fallback policy. The
+> hardware enforcement and qualification caveats below remain important. Earlier
+> “proposed,” USB-first, open-hop-threshold and provisional-release statements in
+> this dated scratchpad are historical, not competing primary instructions.
+
 3 October 2026. This is a source-backed planning note, not a deployment instruction
 or an accepted upstream release contract. The supplied discussion proposes Atlas
 and Collector as the 2.1 focus, USB/Wi-Fi first, and MQTT forwarding. Maintainer
