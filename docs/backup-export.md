@@ -22,6 +22,10 @@ changes, PostgreSQL roles and cluster settings, Redis and deployment files are n
 
 ## Requirements and limits
 
+- Keep the MeshMapper API key in `MESHMAPPER_API_KEY`, with `meshmapper.api_key` empty or
+  omitted in the saved YAML. Both CLI exports and admin downloads refuse a nonempty saved
+  MeshMapper key because the YAML is included verbatim. Environment secrets remain excluded;
+  preserve them separately for recovery. See [MeshMapper API key](configuration.md#meshmapper-api-key).
 - `pg_dump` must be in the **same runtime** as the exporter (the CLI's environment, or the
   server's PATH for the download), with a major version at least as new as the database's. A client on
   the Docker host or in another container doesn't count.
