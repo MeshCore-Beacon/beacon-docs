@@ -277,6 +277,7 @@ edges spanning more than 180 degrees are rejected.
 | Endpoint | Notes |
 |---|---|
 | `GET /observers` | Page of observers. Params: location filters, `type` (e.g. `meshcoretomqtt`), `broker`, `status` (`online`/`offline`), `name`, `scope`, `cursor` (`lastSeen` epoch ms), `limit`. |
+| `GET /observers/directory` | Snapshot-stable traffic/name pagination, row counts and type facets. See [observer directory contract](observer-directory.md) for rollout status and exact semantics. |
 | `GET /observers/{observerId}` | Observer detail. |
 | `GET /observers/{observerId}/telemetry?range=24h&interval=1h` | Telemetry history. `interval` is `1h` (default), `6h` or `24h`. `afterId` returns only newer points. |
 | `GET /observers/{observerId}/activity?range=24h&interval=15m` | What the observer heard, bucketed. |
