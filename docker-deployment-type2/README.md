@@ -45,6 +45,11 @@ docker-deployment-type2/
    Caddy redirects anything that is not `/api/*` or `/ws` to that host. The password inside
    `POSTGRES_DSN` must match `POSTGRES_PASSWORD` in `docker-compose.yml`.
 
+   For MeshMapper imports, set `MESHMAPPER_API_KEY` in this server host's `.env`.
+   Your local MeshMapper regional or grouped-region admin can generate the regional or
+   grouped-region key. Do not copy it to the web host or a `VITE_*` setting. See
+   [MeshMapper API key](../docs/configuration.md#meshmapper-api-key).
+
 3. Edit `data/app/config.yaml` for your network (see
    [Configuration](../docs/configuration.md#configyaml)). Because the web app will be served
    from another origin, browsers may only open the WebSocket if that origin is listed:

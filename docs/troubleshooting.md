@@ -93,6 +93,37 @@ The channel's key is not configured, or it was added without a restart. Add it u
 the stored messages for the new key and logs
 `config: backfilled N previously-undecrypted channel message(s)`.
 
+## MeshMapper imports are unconfigured or stale
+
+Read `docker compose logs app` for `component=meshmapper`, `meshmapper.zones`,
+`meshmapper.scopes`, or `meshmapper.channels`. Refresh records include `last_error`,
+`next_attempt`, and, for regional imports, `checked_at`.
+
+| Message | Fix |
+|---|---|
+| `unconfigured: MeshMapper API key is missing` | Set `MESHMAPPER_API_KEY` in the backend environment. An explicitly empty environment value overrides a YAML key. |
+| `unconfigured: MeshMapper API key contains invalid characters` | Re-enter the key supplied by your local MeshMapper regional or grouped-region admin; remove embedded whitespace or control characters. |
+| `authentication failed (HTTP 401)` | Check that you are using the correct regional or grouped-region API key and that MeshMapper Server supports `X-API-Key`. Do not use the mobile App key. |
+| `permission denied (HTTP 403)` | Ask the MeshMapper admin to check access to the requested API and IATA. A group key needs every member IATA, including members added by `import_groups`. |
+| `HTTP 429` or `HTTP 503` | Wait until `next_attempt`. Beacon honours longer `Retry-After` delays and its existing refresh limits. Do not shorten polling intervals or repeatedly restart to force a request. |
+
+After changing `.env`, run `docker compose up -d --force-recreate app` from the backend
+deployment folder. A plain restart does not reload container environment variables.
+Persisted backoff still applies after a restart. Never paste the key into logs, URLs, or
+support messages.
+
+Beacon keeps the last successful cached data and freshness timestamp after a failed
+refresh, including an authentication failure. It does not replace imports with empty
+lists or retry anonymously. See [MeshMapper API key](configuration.md#meshmapper-api-key)
+for setup and rollout requirements.
+
+## Backup export refuses a saved MeshMapper key
+
+Move the key from `meshmapper.api_key` to `MESHMAPPER_API_KEY` in the backend environment,
+clear the saved YAML value, and recreate `app`. Backups include saved YAML verbatim, so
+exports refuse a nonempty MeshMapper key there to keep it out of download responses.
+See [Backup and export](backup-export.md#requirements-and-limits).
+
 ## I changed a `VITE_*` value and nothing changed
 
 Run `docker compose up -d web` (`docker compose up -d beacon-web` in the split deployment). The web container writes the values to `/config.js` when it
