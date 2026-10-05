@@ -93,6 +93,26 @@ docker compose up -d
 Database migrations run when the server starts. Read the release notes first; a release that
 needs a config change says so there. Keep server and web on the same `X.Y`.
 
+## MeshMapper API authentication rollout
+
+When upgrading to a Beacon build with MeshMapper API authentication, configure the key
+before relying on imports. Ask your local MeshMapper regional or grouped-region admin
+for a key covering the required APIs and your region or all member regions. Confirm
+MeshMapper Server supports `X-API-Key` before enforcement; see
+[MeshMapper API key](configuration.md#meshmapper-api-key) for the rollout details.
+
+Set `MESHMAPPER_API_KEY` in the backend `.env`, then recreate the `app` container:
+
+```bash
+docker compose up -d --force-recreate app
+```
+
+Without a key, Beacon keeps running and retains saved imports, but MeshMapper refreshes
+are unconfigured. Existing IP exemptions are not a substitute for a key. After configuring
+one, check the MeshMapper logs for successful refreshes; existing backoff still applies.
+If you use backups, leave `meshmapper.api_key` empty in the saved YAML and keep the key in
+the environment. Exports refuse a nonempty saved YAML key.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
@@ -101,7 +121,10 @@ Beacon reads `config.yaml` once at startup. After editing it, run
 - A newly added channel key decrypts the matching stored messages. Look for
   `config: backfilled N previously-undecrypted channel message(s)` in the log.
 - Border file and MeshMapper import changes take effect.
-- A changed admin key is picked up.
+- Changed admin or MeshMapper keys in the YAML file are picked up.
+
+For environment changes in `.env`, use `docker compose up -d --force-recreate app` instead.
+A container restart reuses its old environment.
 
 The one runtime-only setting is CORS origins: `PUT /api/v1/admin/config` changes them without a
 restart, and nothing is written to the file, so a restart reloads whatever the file says.

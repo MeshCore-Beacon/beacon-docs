@@ -23,6 +23,7 @@ to open).
 | `MQTT_BROKER_1_PASSWORD` | unset | Subscriber password for broker 1. |
 | `MQTT_BROKER_2_URL`, `_USERNAME`, `_PASSWORD` | unset | The same for an optional second broker. A packet heard through both brokers is stored once. |
 | `BEACON_API_KEY` | unset | Bearer key for `/api/v1/admin/*`. When set, even to an empty string, it replaces `auth.api_key` from the config file. See [Admin API key](#admin-api-key). |
+| `MESHMAPPER_API_KEY` | unset | Regional or grouped-region key for enabled MeshMapper imports. When set, even to an empty string, it replaces `meshmapper.api_key`. Missing keys leave imports unconfigured while Beacon keeps running. See [MeshMapper API key](#meshmapper-api-key). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Overrides `log.level`. Anything else stops startup. |
 | `LOG_FORMAT` | `text` | `text` or `json`. Overrides `log.format`. Anything else stops startup. |
 | `BEACON_CPU_PROFILE_DIR`, `BEACON_CPU_PROFILE_UNTIL` | unset | Enable a bounded CPU capture in production. See [Profiling](profiling.md). |
@@ -68,7 +69,7 @@ which ones to read.
 | `log` | Log level and format. | You want JSON logs for a collector. |
 | `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 300 requests a minute. | You get 429s you did not expect. |
-| `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand. | You are in a region MeshMapper covers. |
+| `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
 | `regions` | Groups of IATAs with a name, map centre and zoom. | Always, unless MeshMapper imports them. |
 | `channel_keys` | Hashtag channels and explicit keys for decrypting group messages. | Always. Without keys, channel messages are stored as hashes only. |
@@ -105,6 +106,58 @@ cannot honour. These are the ones people hit:
 - A negative `ratelimit.requests_per_minute`, `ratelimit.burst` or `websocket.max_connects_per_minute`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
   connection instead, so leave it at a positive number.
+
+## MeshMapper API key
+
+MeshMapper APIs require either a regional API key or a grouped-region API key covering
+multiple regions. Your local MeshMapper regional or grouped-region admin can generate
+these keys. Request a key for the APIs Beacon uses, covering your IATA or every member IATA
+in your group, including members added by `meshmapper.zones.import_groups`.
+
+Set `MESHMAPPER_API_KEY` in the deployment's private `.env` or backend environment. Each
+Beacon deployment can use a different key. It overrides `meshmapper.api_key` in
+`config.yaml`, even when the environment value is empty. Both examples leave the key empty.
+Do not use the mobile app's App key, `BEACON_API_KEY`, or a Coverage API key for this setting.
+Never put it in a `VITE_*` value, browser configuration, logs, or git.
+
+After changing `.env`, recreate the backend container from the deployment folder
+(`docker-deployment-type2/server` for the split deployment):
+
+```bash
+docker compose up -d --force-recreate app
+```
+
+A plain `docker compose restart app` does not load changed container environment variables.
+If you use the YAML setting instead, restarting Beacon is enough. Prefer the environment
+setting when using [backups](backup-export.md): exports refuse a nonempty
+`meshmapper.api_key` in the saved YAML so the key cannot enter a download.
+
+Beacon sends `X-API-Key` to `get_zones.php`, `get_geojson.php`, `get_scopes.php`, and
+`get_channels.php`. Its shared client supports the same header for `get_repeaters.php`,
+although Beacon does not currently fetch repeaters. Requests use trusted HTTPS MeshMapper
+endpoints and do not follow redirects. `get_zones.php` still needs its `country` parameter;
+a key covering multiple regions does not change the request shape or remove rate limits.
+IP exemptions are not authentication.
+
+With no key, MeshMapper imports report unconfigured and make no requests. Beacon keeps
+running and restores saved imports. Failed refreshes keep the last successful cached data
+and its freshness timestamp; 401 reports authentication failure and 403 reports permission
+failure, without falling back to anonymous requests. Existing backoff and longer
+`Retry-After` delays on 429/503 remain in effect. See
+[MeshMapper troubleshooting](troubleshooting.md#meshmapper-imports-are-unconfigured-or-stale).
+
+### Coordinate the MeshMapper rollout
+
+Before enforcement, confirm with the MeshMapper admin that Server supports `X-API-Key`,
+that the key covers the required APIs and IATAs, and that these calls do not consume Coverage
+quota. Header support must not be assumed deployed. The first four endpoints can require
+keys before the app rollout; repeater enforcement waits for app 1.4.1 and its forced update.
+Key issuance, permissions, quotas, and enforcement switches remain MeshMapper Server work,
+tracked in [MeshMapper_Server#431](https://github.com/MeshMapper/MeshMapper_Server/issues/431).
+
+Existing `coverage.php` consumers keep their own keys, scopes, quotas, and supported
+`?key=` authentication. Do not move them to header-only authentication without confirmed
+server support; Beacon's importer does not call `coverage.php`.
 
 ## Admin API key
 

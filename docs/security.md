@@ -1,7 +1,8 @@
 # Securing a deployment
 
 Beacon is a read-mostly public service. The things worth protecting are the admin key, the API
-listener, your broker credentials, and the database, which holds decrypted channel messages.
+listener, your broker and MeshMapper credentials, and the database, which holds decrypted
+channel messages.
 
 ## The admin key
 
@@ -13,6 +14,14 @@ environment wins over the file) are in [Configuration](configuration.md#admin-ap
 
 If you do not need the admin endpoints, do not set a key. They answer `503` and nothing else
 changes.
+
+## The MeshMapper API key
+
+Obtain a regional or grouped-region API key from your local MeshMapper admin and keep it
+in `MESHMAPPER_API_KEY` in the backend environment. Never use the mobile App key, publish
+the key through a `VITE_*` setting, or commit it. Beacon sends it only as `X-API-Key` to
+the supported HTTPS MeshMapper API endpoints and refuses redirects. This is separate
+from Beacon's admin authentication. See [MeshMapper API key](configuration.md#meshmapper-api-key).
 
 ## Keep the API listener private
 
@@ -49,6 +58,6 @@ if you enable it, contains everything the database holds, so keep archives priva
 
 ## Secrets in files
 
-`.env` holds the database password, broker credentials and the admin key. It is gitignored in
+`.env` holds the database password, broker credentials, admin key, and MeshMapper API key. It is gitignored in
 the deployment folders; keep it that way, and keep its permissions tight on the host.
 `data/app/config.yaml` holds channel keys. Neither belongs in a public backup.
