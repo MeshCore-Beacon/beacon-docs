@@ -1,179 +1,118 @@
 # Observer directory
 
 Status: pending [server PR #212](https://github.com/MeshCore-Beacon/beacon-server/pull/212),
-not yet deployed. Web and Flutter can use this contract once server support is available.
-The existing `/observers` endpoint and its cursor semantics are unchanged.
+not yet deployed. The existing `/observers` endpoint remains unchanged.
 
 ## Requests
 
-`GET /api/v1/observers/directory`
-
-First page example:
-
-```text
-/api/v1/observers/directory?iata=YVR&sort=traffic&limit=50
-```
+`GET /api/v1/observers/directory?iata=YVR&sort=traffic&limit=50`
 
 | Parameter | Contract |
 |---|---|
 | `sort` | `traffic` (default) or `name`. |
-| `limit` | Positive integer, default 50, capped at 200. This limits a page, not the directory. |
-| `since`, `until` | Positive epoch milliseconds, inclusive start and exclusive end. Both round down to UTC hours. Rounded window must be 1 hour through 31 days; `until` cannot be in the future. |
-| `iata`, `iatas` | Case-insensitive IATA or comma-separated IATAs. Nonempty `iatas` takes precedence over `iata`. |
-| `regionId`, `region` | Expand a region ID or slug to IATAs and union with explicit IATAs. Region ID takes precedence over slug. An empty region with no explicit IATAs matches nothing. |
-| `name` | Case-insensitive display-name substring match, using SQL ILIKE semantics (`%` and `_` are wildcards). |
-| `type`, `broker`, `scope` | Exact observer type, broker membership or transport scope name. URL-encode `#` in scope names. |
+| `limit` | Positive integer, default 50, capped at 200 per page. No directory-wide row cap. |
+| `cursor` | Nonnegative integer offset, default 0. Pass the returned `nextCursor`. |
+| `since`, `until` | Positive epoch milliseconds, inclusive start and exclusive end, rounded down to UTC hours. Window must be 1 hour through 31 days; `until` cannot be in the future. Required when cursor is nonzero. |
+| `iata`, `iatas` | Case-insensitive IATA or comma-separated IATAs. Nonempty `iatas` takes precedence. |
+| `regionId`, `region` | Expand region ID or slug and union with explicit IATAs. ID takes precedence. An empty region without explicit IATAs matches nothing. |
+| `name` | Case-insensitive display-name substring using SQL ILIKE semantics (`%` and `_` are wildcards). |
+| `type`, `broker`, `scope` | Exact observer type, broker membership or transport scope name. URL-encode `#` in scopes. |
 | `status` | `online` or `offline`. |
 
 All filters apply before ordering and pagination. Type, broker, name and scope
-values are limited to 200 UTF-8 bytes each. At most 200 IATAs may be supplied after
-region expansion and before deduplication. Unknown or repeated parameters fail
-with 400 instead of being ignored.
+are limited to 200 UTF-8 bytes each. At most 200 IATAs are accepted after region
+expansion and before deduplication. Unknown/repeated parameters return 400.
 
-The default `until` is `floorToUtcHour(now - 95 minutes) + 1 hour`, the end of the
-latest hour eligible for rollup. Default `since` is 24 hours before `until`.
-Counts therefore exclude the latest 35 to 95 minutes and are not live counters.
-Explicit windows can include unrolled hours, but those have unavailable counts.
+The first page defaults to `until = floorToUtcHour(now - 95 minutes) + 1 hour`,
+and `since = until - 24 hours`. This excludes the latest 35 to 95 minutes;
+these are hourly analytics counts, not live packet counters.
 
-Continue using only the returned snapshot and cursor, plus an optional page size:
+For every continuation, repeat all filters and sort, pass the first response's
+`windowStart` as `since` and `windowEnd` as `until`, and use `nextCursor`:
 
 ```text
-/api/v1/observers/directory?snapshot=2cb04420-719d-4b8c-9c74-2c1b9c43fdc3&cursor=50&limit=50
+/api/v1/observers/directory?iata=YVR&sort=traffic&since=1767225600000&until=1767312000000&cursor=50&limit=50
 ```
-
-The snapshot is an opaque UUID. The cursor is a nonnegative integer position,
-not an observer ID or timestamp. Treat it as opaque and use `nextCursor` exactly;
-do not compute offsets. A nonzero cursor without a snapshot fails with 400.
-Continuation rejects all filter, sort and window parameters, even unchanged ones.
-The page size may change between requests. Omitting cursor with a snapshot
-replays its first page. A cursor past the end returns an empty terminal page.
 
 ## Response
 
-Example shape; timestamps and identifiers are illustrative:
+Items contain the existing `ObserverSummary` fields plus required nullable
+`observationCount`. Optional names, type, radio and empty scopes may be omitted.
 
 ```json
 {
   "items": [
-    {
-      "id": "00000000-0000-0000-0000-000000000001",
-      "displayName": "North receiver",
-      "observerType": "meshcoretomqtt",
-      "iata": "YVR",
-      "status": "online",
-      "radio": "910.525,62.5,7",
-      "scopes": ["#test"],
-      "observationCount": 1200
-    }
+    {"id": "00000000-0000-0000-0000-000000000001", "displayName": "North receiver", "iata": "YVR", "status": "online", "observationCount": 1200}
   ],
   "nextCursor": 1,
   "hasMore": true,
-  "snapshot": "2cb04420-719d-4b8c-9c74-2c1b9c43fdc3",
   "generatedAt": 1767314100000,
-  "expiresAt": 1767315000000,
   "windowStart": 1767225600000,
   "windowEnd": 1767312000000,
   "sort": "traffic",
   "effectiveSort": "traffic",
-  "coverage": {
-    "status": "complete",
-    "expectedHours": 24,
-    "completeHours": 24,
-    "partialHours": 0,
-    "missingHours": 0
-  },
+  "coverage": {"status": "complete", "expectedHours": 24, "completeHours": 24, "partialHours": 0, "missingHours": 0},
   "maxObservationCount": 1200,
   "observerTypes": ["meshcore-ha", "meshcoretomqtt"]
 }
 ```
 
-Each item contains the existing `ObserverSummary` fields plus a required nullable
-`observationCount`. Optional names, type, radio and empty scopes may be omitted.
-All timestamps are epoch milliseconds. `items` and `observerTypes` are arrays,
-including for an empty result. On the last page `hasMore` is false and
-`nextCursor` is omitted.
+Timestamps are epoch milliseconds. `items` and `observerTypes` are always arrays.
+A terminal page has `hasMore: false` and no `nextCursor`. A cursor past the end
+returns an empty terminal page.
 
-`observationCount` sums stored observation counts from
-`analytics_hourly_observer_identity` over `[windowStart, windowEnd)`. These are
-packet hearings per observer, deduplicated across MQTT brokers. They are not
-unique packets across observers, MQTT message counts, or the observer detail's
-cumulative presence counter. The directory performs no raw-observation scan.
+Counts sum `analytics_hourly_observer_identity` for the requested window. They
+represent stored hearings per observer, deduplicated across brokers, not MQTT
+messages or the observer detail's cumulative presence counter. No raw observation
+scan is needed. Directory membership uses current observer IATA; counts include
+only observations in selected IATAs, or all IATAs without a location filter.
+Broker and scope filter membership, not the source of counted observations.
 
-Directory location membership uses each observer's current IATA at snapshot
-creation. Within that listing, counts include only observations in the selected
-IATAs; without a location filter, they include all IATAs. Broker and scope filter
-observer membership, not the source of counted observations. Observers deleted
-before snapshot creation are excluded even if historical analytics remain.
-
-Every requested hour must be marked complete to report any count. For complete
-coverage, an observer without matching analytics has count **0**. If any hour is
-partial or missing, every count and `maxObservationCount` is **null**, and
-`effectiveSort` is `name`, including when `sort` requested `traffic`. Coverage is
-`complete` when every hour is complete, `partial` when at least one hour is
-complete or partial but not all complete, and `unavailable` when all are missing.
-Missing includes hours with no rollup status record. Never render null as zero.
+When every requested hour is complete, missing observer analytics mean **0**.
+If any hour is partial or missing, every count and `maxObservationCount` is
+**null**, and `effectiveSort` is `name`. Coverage is `complete` when all hours are
+complete, `partial` when some are complete or partial but not all complete, and
+`unavailable` when all are missing. Absent rollup records count as missing.
+Never render null as zero.
 
 Traffic order is count descending, then lowercase display name ascending using
-PostgreSQL `C` collation, then observer UUID ascending. Name order uses the latter
-two keys. Missing names sort as empty strings. Clients must preserve server order.
+PostgreSQL `C` collation, then UUID ascending. Name order uses the last two keys.
+Missing names sort as empty strings. Online status means last status or last
+seen within five minutes at request time.
 
-`maxObservationCount` is the maximum across the entire filtered snapshot, even
-with name ordering. It is 0 for a complete empty result. Use count/max for bars
-when max is positive, zero-width bars when both are zero, and an unavailable
-state when either is null. It never changes between pages.
+`maxObservationCount` covers the whole filtered result, including in name order.
+It is 0 for an empty complete result. `observerTypes` includes all distinct
+nonempty types matching every filter except the type filter itself, independent
+of pagination.
 
-`observerTypes` contains every distinct nonempty type matching all active filters
-**except the type filter itself**. It is independent of pagination and can populate
-the type selector without loading every observer.
+## Consistency and client behavior
 
-## Lifetime and errors
+Each request reads current data. There is no stored snapshot, expiry, new table
+or snapshot capacity limit. Keeping the window fixed avoids hourly window drift,
+but analytics corrections and metadata changes can still move rows between
+pages, causing repeats or skips. Counts, coverage, type choices and maximum can
+also change. This endpoint is a browsing list, not a consistent export.
 
-Rows, metadata, status, counts, coverage, ordering, type choices and maximum are
-frozen for 15 minutes from `generatedAt`. Online means a last status or last seen
-within five minutes at creation. Ingestion, renames, moves, offline transitions,
-rollup corrections and observer deletion do not alter existing pages.
-Snapshots persist in PostgreSQL and work across server replicas and restarts.
-Identical first-page criteria may reuse a snapshot until expiry, irrespective of
-page size. A first-page reload therefore need not produce fresh metadata.
+Use one infinite query keyed by server, filters, window and sort. A query change
+starts from page one and discards stale responses. Preserve server order, allow
+one continuation in flight, deduplicate by observer UUID, and stop on
+`hasMore=false` or a missing/repeated cursor. Fetch again near the scroll end,
+including when the viewport is not filled. No per-row count requests or separate
+top-observers request is needed.
 
-| Status | Meaning and client action |
-|---|---|
-| 400 | Invalid parameters or unknown region. Correct the request; do not retry unchanged. |
-| 404 | An older server without this endpoint (for a valid default probe). |
-| 410 | Snapshot absent or expired. Discard its pages and restart from page one. |
-| 503 | Snapshot creation busy or capacity exceeded. `Retry-After: 5`; retain existing rows and retry with backoff. |
-| 500 | Store/query failure. Retain existing rows and offer retry. |
+For stable bars while scrolling, retain the first page's maximum and clamp
+count/max to [0,1]; reset on refresh. Render unavailable when count or maximum is
+null, and zero width when the maximum is zero. If `effectiveSort` changes between
+pages as coverage changes, restart from page one rather than mixing orderings.
+Live status badges can update separately. Refresh the list to update membership
+or order; selection and deep links continue to use UUIDs.
 
-Errors use the existing `APIError` envelope. Successful pages and store errors
-send `Cache-Control: no-store`. Creation has a five-second database operation
-budget, a global maximum of 1,024 active distinct snapshots, a 128 MiB combined
-stored JSON budget (items plus metadata), and a 16 MiB items limit per snapshot.
-The stored JSON budget excludes table/index overhead and PostgreSQL working memory. Capacity failure returns an error; it never truncates the listing.
-Expired snapshots are removed on subsequent creation. New searches can consume
-capacity, so debounce name input and avoid requesting on every keystroke.
-Existing snapshots remain readable when creation capacity is exhausted.
+Invalid parameters and unknown regions return 400. Database failures return 500;
+retain loaded rows and offer retry. Successful pages and store errors send
+`Cache-Control: no-store`; database reads have a five-second operation budget.
 
-## Web and Flutter integration
-
-Use one infinite query keyed by server, location, window, sort and all filters.
-Default to traffic order. On any query change, cancel or ignore previous responses
-and start a new snapshot; never append old-query pages. Do not combine this API
-with a separate top-observers request or fetch counts per row.
-
-Fetch the next page near the scroll end, including when the viewport is not yet
-filled. Allow only one continuation in flight, deduplicate by observer ID, and
-stop on `hasMore=false`, a missing cursor or a repeated cursor. Keep loaded rows
-on transient next-page errors and retry the same snapshot/cursor. On 410, replace
-the whole list with a new first page; never append a replacement snapshot.
-
-Live status badges may update separately, but must not reorder rows or change
-snapshot filter membership/counts. Selection and deep links use observer UUIDs;
-detail requests may return 404 for an observer deleted after the snapshot formed.
-
-For compatibility, probe `/api/v1/observers/directory?limit=1`. Support means a
-200 response with the snapshot contract. Older servers may return 404, or the
-legacy detail route's 400 with message `failed to parse observer UUID`. Recognize
-that specific response only; arbitrary 400/500/503 responses do not prove lack of
-support. Keep the legacy listing as an explicitly limited fallback or show an
-upgrade-required state. Do not send new parameters to the old `/observers` route
-and assume they were honored. Retry capability detection after server upgrades.
+Probe `/api/v1/observers/directory?limit=1` for compatibility. A supported server
+returns the response above. Older servers may return 404, or the legacy detail
+route's 400 with message `failed to parse observer UUID`. Other errors do not
+prove lack of support. Use an explicitly limited legacy fallback or request a
+server upgrade; do not assume the old `/observers` route honors new parameters.
