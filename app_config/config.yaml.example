@@ -45,7 +45,14 @@ ratelimit:
   # A 429 returns error.code=rate_limited and Retry-After (1 or 60 seconds).
   burst: 300
 
-# MeshMapper integrations (optional, no API key). Import transport scopes and
+# MeshMapper integrations (optional, require a regional or grouped-region API key).
+# Your local MeshMapper regional or grouped-region admin can generate the key.
+# A grouped-region key covers multiple regions, including imported group members.
+# MESHMAPPER_API_KEY overrides meshmapper.api_key, even when empty. Use the
+# environment for secrets, especially with backups; never use the mobile App key.
+# Missing keys leave imports unconfigured; cached data and the rest of Beacon remain.
+# 401/403 failures retain cached data and report authentication/permission errors.
+# Import transport scopes and
 # IATA border outlines from MeshMapper instead of maintaining scopes: and
 # iatas.*.borderFile by hand.
 #
@@ -63,6 +70,7 @@ ratelimit:
 # Region-filtered scope lists and scope stats show imported names only under the
 # IATAs whose catalogue lists them; IATAs without a catalogue show manual scopes only.
 #meshmapper:
+#  api_key: ""
 #  scopes:
 #    enabled: false
 #    refresh_interval: 1h  # 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
@@ -262,6 +270,14 @@ websocket:
 # retained observations, telemetry and ownership records prevent deletion.
 #observers:
 #  delete_after: 720h           # opt in to 30 days unseen
+
+# BEACON Mobile settings, published unauthenticated at GET /api/v1/info.
+# min_app_version: oldest app release allowed to use this server. Older apps
+# show an "update required" screen for this server. Strict X.Y.Z (digits only,
+# no "v" prefix or -beta suffix); any other value prevents startup.
+# Omitted or empty (default) means no requirement. Takes effect on restart.
+#mobile:
+#  min_app_version: "0.1.1"   # default: "" (no requirement)
 
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.

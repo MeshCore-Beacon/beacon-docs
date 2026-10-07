@@ -74,6 +74,11 @@ Everything else in the file is optional and explained in
 [Configuration](docs/configuration.md): the admin API key, log settings, Redis, and the
 web app's map view, tabs, themes, name and banner.
 
+If you enable MeshMapper imports, also set `MESHMAPPER_API_KEY`. Your local MeshMapper
+regional or grouped-region admin can generate a regional key or a key covering multiple
+regions. See [MeshMapper API key](docs/configuration.md#meshmapper-api-key) for setup and
+the server rollout requirements. Keep this key out of `VITE_*` settings.
+
 ### 3. Describe your network in `config.yaml`
 
 ```bash
