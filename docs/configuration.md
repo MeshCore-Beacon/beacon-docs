@@ -83,6 +83,7 @@ which ones to read.
 | `websocket` | Connections per client, upgrade attempts per minute, and which other sites may open `/ws`. | The web app is served from a different host than the API. |
 | `nodes` | When a node is marked stale, when it is deleted, the clock-drift threshold, and the optional foreign repeater flag. | You want `possiblyForeign` on repeaters. |
 | `observers` | Optional deletion of observers not seen for a long time. Off by default. | Rarely. |
+| `mobile` | `min_app_version`: the oldest BEACON Mobile release allowed to use this server. Older apps show an update screen. Unset by default. | You need users on a newer app release. |
 | `cors` | Browser cross-origin rules for REST. Default allows any origin, read-only methods. | You are building an admin UI on another origin. |
 | `cache` | Redis TTLs per response category. | Rarely. |
 | `ingest` | Only store packets from observers in listed countries or continents. | You run a regional instance and want to ignore the rest of the world. |
@@ -102,6 +103,7 @@ cannot honour. These are the ones people hit:
 - A `borderFile` that is missing or not a valid GeoJSON Polygon or MultiPolygon Feature, or
   `nodes.mark_foreign: true` with no border source at all.
 - `log.level` or `log.format` set to anything other than the listed values.
+- `mobile.min_app_version` that is not a plain `X.Y.Z` release (`v1.2.3` and `1.2.3-beta` are rejected).
 - An admin key under 16 characters or containing whitespace.
 - A negative `ratelimit.requests_per_minute`, `ratelimit.burst` or `websocket.max_connects_per_minute`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every

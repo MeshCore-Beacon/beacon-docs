@@ -591,13 +591,32 @@ A list item:
 lastHeardAt, rawPath, resolvedRoute }`. `rawPath` is `[{ hash, snr }]` as received; `resolvedRoute` uses the
 resolved hop shape from packet detail.
 
+### Server info
+
+```
+GET /api/v1/info
+```
+
+Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-cache`.
+
+```json
+{ "minAppVersion": "0.1.1", "serverVersion": "2.0.2" }
+```
+
+`minAppVersion` is the server's `mobile.min_app_version`: the oldest BEACON Mobile release
+allowed to use this server, as a strict `X.Y.Z` string, or `null` when the operator has not set
+one. `serverVersion` is the server's release version (`X.Y.Z`, no `v`). It is omitted on builds
+that carry no release version, such as development builds and the Docker image, so treat it as
+optional. Servers older than this endpoint return `404`. See
+[Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
+
 ### Admin
 
 All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status). No credentials, broker addresses, channel material or database settings. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status), and `mobile.min_app_version` (read-only; `null` when unset). No credentials, broker addresses, channel material or database settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins` until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
@@ -855,6 +874,14 @@ Flutter on iOS background suspension and Android battery saver will kill the Web
 3. On return to foreground: reopen, re-subscribe, and fire a REST refresh on whatever screen is active to backfill anything missed.
 
 The protocol doesn't need to know about backgrounding; the client just treats reconnection as the recovery mechanism.
+
+**Minimum app version.** The app calls `GET /info` on launch, on return to foreground and when
+the user switches servers. When the app's own version is lower than `minAppVersion` (compared
+numerically, part by part), it blocks that server behind an "update required" screen until the
+app is updated. Other servers stay usable. `minAppVersion: null` means no requirement. A `404`
+comes from a server that predates the endpoint and also means no requirement. Network errors,
+timeouts and other failures do not block: the app keeps using the server and checks again next
+time.
 
 ---
 
