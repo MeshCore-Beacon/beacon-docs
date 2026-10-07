@@ -11,6 +11,8 @@ This repo is where you deploy and operate it. The code lives in
 > **Coming from 1.x?** 2.0.0 needs a fresh database and a few config changes. Read
 > [Upgrading](docs/upgrading.md) before you pull new images.
 
+The [experimental roadmap](docs/post-140-roadmap.md) and [integration guide](docs/post-20-integration.md) track My Atlas, Topology and the separate Collector service. These changes remain on `n30nex-test`; production acceptance and stable releases remain separate.
+
 ## Deploy the all-in-one stack
 
 One server runs everything: the API, Postgres, Redis, the web frontend and Caddy with automatic
@@ -61,6 +63,7 @@ Set every `CHANGE_*` value. The ones you cannot skip:
 
 | Variable | What to set |
 |---|---|
+| `BEACON_SERVER_IMAGE` / `BEACON_WEB_IMAGE` | Reviewed tags or immutable digests. Keep server/web major and minor versions aligned; patches may differ. |
 | `POSTGRES_DSN` | The database connection string. Change `CHANGE_DB_PASS` to a strong password. **The same password must go in `POSTGRES_PASSWORD` in `docker-compose.yml`.** |
 | `MQTT_BROKER_1_URL`, `_USERNAME`, `_PASSWORD` | Your MeshCore MQTT broker and the subscriber account on it. The template also lists a second broker; if you have only one, clear `MQTT_BROKER_2_URL` (an empty URL disables that worker). |
 | `DOMAIN` | Your public hostname, for example `beacon.example.com`. Caddy requests a Let's Encrypt certificate for it. |

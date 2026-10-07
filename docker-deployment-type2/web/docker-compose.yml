@@ -1,3 +1,9 @@
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   caddy:
     image: caddy:2-alpine
@@ -11,6 +17,7 @@ services:
       - ./data/Caddy/data:/data/caddy/
       - ./data/Caddy/config:/config/caddy/
     restart: unless-stopped
+    logging: *bounded-logging
 
   beacon-web:
     image: ${BEACON_WEB_IMAGE:?Set BEACON_WEB_IMAGE to a reviewed release tag or digest}
@@ -29,3 +36,4 @@ services:
       # Notice above the header, e.g. on a dev instance; unset = none
       - VITE_BANNER=${VITE_BANNER:-}
     restart: unless-stopped
+    logging: *bounded-logging

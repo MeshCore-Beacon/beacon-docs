@@ -1,0 +1,298 @@
+{
+  "verified_at": "2026-09-30T15:54:13.053817+00:00",
+  "web_version": "1.3.2 candidate",
+  "server": {
+    "accepted_dev": "689bc2326a0462bb387c6087f5cb3514cca636f1",
+    "source_tree": "a9c3c47b8111b26decffa945d4963952060442f5",
+    "running_revision": "689bc2326a0462bb387c6087f5cb3514cca636f1",
+    "identical_tree": true,
+    "accepted": [
+      {
+        "pr": 166,
+        "commit": "97cc22a5a0aa2256b4f8f9abe163bd3bc9c8deca",
+        "accepted_head": "319df7da5246a71f9693f923d2124bf831eabb82",
+        "merged_at": "2026-09-30T11:33:46Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/166"
+      },
+      {
+        "pr": 167,
+        "commit": "fd7c6b3eb7b520eeb171e8fc1378846ec1954a05",
+        "accepted_head": "0c19e95132760eda1bdcf550ae1b01865bbf3c41",
+        "merged_at": "2026-09-30T11:16:27Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/167"
+      },
+      {
+        "pr": 169,
+        "commit": "b8a8188fbcee30ba456223029044fbd4e59821df",
+        "accepted_head": "b8a8188fbcee30ba456223029044fbd4e59821df",
+        "merged_at": "2026-09-30T11:31:11Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/169"
+      },
+      {
+        "pr": 172,
+        "commit": "831148ff5f403fcef9c48943390e420c00b39ae8",
+        "accepted_head": "831148ff5f403fcef9c48943390e420c00b39ae8",
+        "merged_at": "2026-09-30T11:31:12Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/172"
+      },
+      {
+        "pr": 174,
+        "commit": "7e01abf5a08156d161257974bb6115189925fbd2",
+        "accepted_head": "7e01abf5a08156d161257974bb6115189925fbd2",
+        "merged_at": "2026-09-30T11:31:11Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/174"
+      },
+      {
+        "pr": 176,
+        "commit": "6bf58acb805ffc34bee1a3791e2b1cb76ab24e6a",
+        "accepted_head": "6bf58acb805ffc34bee1a3791e2b1cb76ab24e6a",
+        "merged_at": "2026-09-30T11:31:11Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/176"
+      },
+      {
+        "pr": 184,
+        "commit": "89a376c29198ea0bd006953ff3b319e69d9a4082",
+        "accepted_head": "c39df3043931dbe37d51a73d15f050a1c61d1a3b",
+        "merged_at": "2026-09-30T11:33:54Z",
+        "url": "https://github.com/MeshCore-Beacon/beacon-server/pull/184"
+      }
+    ],
+    "verified_at": "2026-09-30T15:54:13.053817+00:00"
+  },
+  "web": {
+    "accepted_dev": "00d859d9a2e5e104c0950b36c57e097061d6303d",
+    "revision": "00d859d9a2e5e104c0950b36c57e097061d6303d",
+    "tree": "1a3499c464341fb103f68a1c1db6a5e5c452a5b1",
+    "prs": [
+      {
+        "title": "Keep header controls on narrow screens",
+        "number": 44,
+        "state": "merged"
+      },
+      {
+        "title": "Prevent region-input focus zoom",
+        "number": 45,
+        "state": "merged"
+      },
+      {
+        "title": "Show advert summaries in packet rows",
+        "number": 46,
+        "state": "merged"
+      },
+      {
+        "title": "Keep the desktop region picker right-anchored",
+        "number": 47,
+        "state": "merged"
+      },
+      {
+        "title": "Observer comparison with dates, overlap counts and percentages",
+        "number": 48,
+        "state": "merged"
+      },
+      {
+        "title": "Node list and detail badges for the optional foreign-repeater flag",
+        "state": "merged",
+        "number": 49
+      },
+      {
+        "number": 52,
+        "title": "Traffic trends, hourly heatmap and reception share",
+        "state": "included via #99"
+      },
+      {
+        "number": 53,
+        "title": "Regional scope charts and exact counts",
+        "state": "merged"
+      },
+      {
+        "number": 55,
+        "title": "RF / Signal charts, sample coverage and exact values",
+        "state": "merged"
+      },
+      {
+        "number": 57,
+        "title": "Paths & Hashes charts and exact counts",
+        "state": "merged"
+      },
+      {
+        "number": 59,
+        "title": "Distinct analytics navigation icons",
+        "state": "merged"
+      },
+      {
+        "number": 61,
+        "title": "Exclude reset and invalid node locations from maps and paths",
+        "state": "merged"
+      },
+      {
+        "number": 62,
+        "title": "English and French navigation with matching header dropdowns",
+        "state": "merged"
+      },
+      {
+        "number": 63,
+        "title": "Signal translation",
+        "state": "included via #99"
+      },
+      {
+        "number": 64,
+        "title": "Paths translation",
+        "state": "included via #99"
+      },
+      {
+        "number": 65,
+        "title": "Traffic translation",
+        "state": "included via #99"
+      },
+      {
+        "number": 66,
+        "title": "Scopes translation",
+        "state": "included via #99"
+      },
+      {
+        "number": 69,
+        "title": "Clock Drift and stable table sorting",
+        "state": "included via #99"
+      },
+      {
+        "number": 70,
+        "title": "Shared timestamp translation",
+        "state": "merged"
+      },
+      {
+        "number": 68,
+        "title": "Talkers data state correction",
+        "state": "merged"
+      },
+      {
+        "number": 72,
+        "title": "Mesh data state correction",
+        "state": "merged"
+      },
+      {
+        "number": 73,
+        "title": "Packet summaries in the endpoint cell",
+        "state": "merged"
+      },
+      {
+        "number": 91,
+        "title": "Mirror optional WebSocket repeat and observer-key fields",
+        "state": "merged"
+      },
+      {
+        "number": 75,
+        "title": "fix(packets): show all ambiguous endpoint candidates",
+        "state": "included via #99",
+        "head": "f4092a492c506c0b81c8067a62c1f7635607b782"
+      },
+      {
+        "number": 79,
+        "title": "feat(observers): open a unified monitoring destination",
+        "state": "included via #99",
+        "head": "ab5bc0c38963cfb91a64b3fb18c8c2e3d64b4bba"
+      },
+      {
+        "number": 80,
+        "title": "feat(observers): lead with activity and readable health metrics",
+        "state": "included via #99",
+        "head": "368ba1801681afcf77a65d54a4d411c5962e36ba"
+      },
+      {
+        "number": 81,
+        "title": "feat(observers): compare aligned dashboard activity and retained overlap",
+        "state": "included via #99",
+        "head": "4b207fafd28c5637177f44f1b0025072ce90cd6d"
+      },
+      {
+        "number": 83,
+        "title": "feat(packets): connect retained reports to observers and path maps",
+        "state": "included via #99",
+        "head": "327ea06e92a1fbbdc2674d14ec8386216ce63a2a"
+      },
+      {
+        "number": 85,
+        "title": "feat(routes): inspect retained packets and reporting observers",
+        "state": "included via #99",
+        "head": "7a82605e8ecbf343bc5f0d9d4b800a43d7243ab5"
+      },
+      {
+        "number": 87,
+        "title": "fix(navigation): preserve observer investigation and keyboard return",
+        "state": "included via #99",
+        "head": "c0c11829bc6013ff90294557c3150844a5cfa09c"
+      },
+      {
+        "number": 89,
+        "title": "feat(channels): show and filter recorded transport scopes",
+        "state": "included via #99",
+        "head": "19bbbd124982584841e76a4f6e14a61474c87e3a"
+      },
+      {
+        "number": 92,
+        "title": "fix(packets): prevent route and scope overlap",
+        "state": "included via #99",
+        "head": "fa64057c67fad158072ddf823b0edb0cbc4ad184"
+      },
+      {
+        "number": 95,
+        "title": "fix(history): align chart periods with retained packet data",
+        "state": "included via #99",
+        "head": "041a000d9c23c325a65290907fadaa017623132b"
+      },
+      {
+        "number": 99,
+        "title": "fix(ui): prepare compact observer monitoring for 1.3.2",
+        "state": "merged",
+        "head": "eb241ca78b320364aa0eaf1c35e41f45a2362023"
+      },
+      {
+        "number": 100,
+        "title": "build(deps-dev): bump brace-expansion from 5.0.9 to 5.0.12",
+        "state": "merged",
+        "head": "b4fd148f17ecb220667524efb4fc2bf587df03fb"
+      },
+      {
+        "number": 101,
+        "title": "fix: follow up on the #75-#99 stack review",
+        "state": "merged",
+        "head": "8c3a58d335ff86306dc684f547ed3364d33e7c34"
+      },
+      {
+        "number": 102,
+        "title": "fix: follow up on last week's merges (#55-#101)",
+        "state": "merged",
+        "head": "0ac58e1a8bf0e6c0efa953e905db8f54b8b608ed"
+      },
+      {
+        "number": 103,
+        "title": "fix(nodes): clear a node's position when nodeUpdate sends null",
+        "state": "merged",
+        "head": "c16b2c3ad5e48fb3f5935ba9d444d882f53ef611"
+      }
+    ],
+    "tests": 1017,
+    "source_sha256": "0ff0d89546d520da48dcc992cbb80623856eba1f7d9ab3b12e1596395a0e7e1d",
+    "dist_sha256": "ea0aa1c67cf4fd8628fcb3fcd7183c9d2767066214a2d2ba2d8a5ed1953a1166",
+    "public_assets": 21
+  },
+  "post_release_atlas": {
+    "pr": 97,
+    "parent": "eb241ca78b320364aa0eaf1c35e41f45a2362023",
+    "head": "66ae0cc222a6580b52f62051025453a992956cc6",
+    "tests": 975,
+    "deployed": false,
+    "needs_rebase": true
+  },
+  "excluded_candidates": {
+    "server": [],
+    "web": [
+      97
+    ]
+  },
+  "recovery": {
+    "server_checkpoint": "latest-cutover-20260930T152333Z",
+    "web_checkpoint": "web-20260930T155009Z",
+    "config_sha256": "b3d96f52b25e38a0f3ecfb15cd2e492db1d4f494b18774598a4cfad295e2d62f",
+    "server_binary_sha256": "2749858070ef9be1cb92757b88f41dfa55fa0d82366eb6b1fc0f906c76058bcc"
+  }
+}
