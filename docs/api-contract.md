@@ -600,14 +600,13 @@ GET /api/v1/info
 Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-cache`.
 
 ```json
-{ "minAppVersion": "0.1.1", "serverVersion": "2.0.2" }
+{ "minAppVersion": "0.1.1", "serverVersion": "2.0.3" }
 ```
 
 `minAppVersion` is the server's `mobile.min_app_version`: the oldest BEACON Mobile release
 allowed to use this server, as a strict `X.Y.Z` string, or `null` when the operator has not set
-one. `serverVersion` is the server's release version (`X.Y.Z`, no `v`). It is omitted on builds
-that carry no release version, such as development builds and the Docker image, so treat it as
-optional. Servers older than this endpoint return `404`. See
+one. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value Swagger shows. Servers
+older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
 
 ### Admin
@@ -616,7 +615,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status), and `mobile.min_app_version` (read-only; `null` when unset). No credentials, broker addresses, channel material or database settings. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status), and `mobile.min_app_version` (read-only; `""` when unset). No credentials, broker addresses, channel material or database settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins` until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
