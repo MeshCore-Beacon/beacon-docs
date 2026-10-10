@@ -430,8 +430,8 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 | Endpoint | Notes |
 |---|---|
 | `GET /routes` | Plain array, newest `lastSeen` first. Params: `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50). |
-| `GET /routes/search?iata=&from=&to=` | Routes in one IATA between two node hash prefixes (hex). All required. |
-| `GET /routes/cross?fromIata=&fromHash=&toIata=&toHash=` | Routes that cross IATA boundaries. All required. |
+| `GET /routes/search?from=&to=[&iatas=]` | Routes within one IATA between two node hash prefixes. `from`, `to` required (hex, 1–4 bytes; widths may differ). `iatas` optional: comma list, at most 100, omitted = every IATA; the single `iata` is still accepted. At most 500 results, shortest first. `hops` is trimmed to source…destination and `hopCount` = `hops.length`. |
+| `GET /routes/cross?fromHash=&toHash=[&iatas=]` | Routes that cross from one IATA into another. `fromHash`, `toHash` required. `iatas` optional: 2–100 codes, omitted = every IATA. The legacy `fromIata`+`toIata` pair is still accepted, but not together with `iatas`. At most 500 results, sorted by `totalHops`, then `crossHop.lastSeen` newest first. |
 | `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. |
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
@@ -451,7 +451,9 @@ To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `
 }
 ```
 
-`/routes/cross` returns `[{ sourceSegment, crossHop, targetSegment, totalHops }]`, where the segments are hop arrays as above and `crossHop` is `{ fromNode, toNode, fromIata, toIata, lastSeen }`.
+`/routes/cross` returns `[{ sourceSegment, crossHop, targetSegment, totalHops }]`, where the segments are hop arrays as above and `crossHop` is `{ fromNode, toNode, fromIata, toIata, lastSeen }`. `sourceSegment` runs from the source node to the boundary node and `targetSegment` from its neighbor across the boundary to the destination node; `fromNode`/`toNode` are that boundary pair (the last and first hops of the segments). `totalHops` is the two segment lengths combined.
+
+Both searches return `400` for bad input, and also `hash matches too many areas; use a longer hash or fewer iatas` when a short hash resolves in too many IATAs; show that message to the user. A search that hits the 15s timeout returns `503`.
 
 The observations endpoint returns `{ items, hasMore, nextPageCursor, route, windowStart, windowEnd, generatedAt, matchType, matchAvailable, hashSize, pathBytes }`. Each item is `{ id, packetHash, observerId, observerName, heardAt, payloadType, payloadTypeName, rssi, snr }`. It matches on the route's full path bytes, hash size and hop count within its IATA; `limit` is capped at 200. Evidence expires with raw packets, so a route can outlive every observation that produced it.
 
@@ -600,14 +602,19 @@ GET /api/v1/info
 Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-cache`.
 
 ```json
-{ "minAppVersion": "0.1.1", "serverVersion": "2.0.3" }
+{ "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4" }
 ```
 
-`minAppVersion` is the server's `mobile.min_app_version`: the oldest BEACON Mobile release
-allowed to use this server, as a strict `X.Y.Z` string, or `null` when the operator has not set
-one. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value Swagger shows. Servers
-older than this endpoint return `404`. See
+`minAppVersion` and `minWebVersion` are the oldest BEACON Mobile and Beacon Web releases allowed
+to use this server, as strict `X.Y.Z` strings, or `null` when there is no requirement. Each is the
+higher of the server's built-in floor and the operator's `mobile.min_app_version` /
+`web.min_web_version`. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
+Swagger shows. Servers older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
+
+Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
+its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
+app. A `404`, a `null` or malformed value, and network errors never block.
 
 ### Admin
 
@@ -615,7 +622,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, and `ingest.broker_count` (configured broker workers, not connection status), and `mobile.min_app_version` (read-only; `""` when unset). No credentials, broker addresses, channel material or database settings. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors; `""` when there is none). No credentials, broker addresses, channel material or database settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins` until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |

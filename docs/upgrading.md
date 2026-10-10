@@ -93,6 +93,10 @@ docker compose up -d
 Database migrations run when the server starts. Read the release notes first; a release that
 needs a config change says so there. Keep server and web on the same `X.Y`.
 
+Since server 2.0.4, a server can require a minimum Beacon Web version (`minWebVersion` at
+`GET /api/v1/info`; see `web.min_web_version` in [Configuration](configuration.md)). An older web
+build shows a "reload" screen instead of the app, so pull the web image together with the server.
+
 ## MeshMapper API authentication rollout
 
 When upgrading to a Beacon build with MeshMapper API authentication, configure the key

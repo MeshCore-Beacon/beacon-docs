@@ -39,12 +39,14 @@ signed. The flow is the same in both repos; only the version bump differs.
    - beacon-web: `version` in `package.json`.
 
    Commit as `chore: bump version to vX.Y.Z`.
-3. Fast-forward `main` to `dev`: `git checkout main && git merge --ff-only dev`.
-4. Tag and push: `git tag vX.Y.Z && git push origin main --tags`.
+3. Open a PR from `dev` into `main` titled `Release vX.Y.Z` and merge it with **Create a merge
+   commit**. `main` only accepts merge commits, so `dev`'s own commits land on `main` and the next
+   release PR lists only what is new.
+4. Tag the merge commit and push it: `git tag -a vX.Y.Z origin/main -m "vX.Y.Z" && git push origin vX.Y.Z`.
 5. The tag builds and publishes the container image in both repos. In beacon-server it also
    builds binaries for every supported platform and attaches them to a draft GitHub release.
-   Open the draft, paste the release notes and publish it.
-6. Rebase `dev` on `main` so the histories stay in sync: `git checkout dev && git rebase main`.
+   Open the draft (or create the release in beacon-web), paste the release notes and publish it.
+6. Fast-forward `dev` to `main` so the branches match: `git push origin origin/main:dev`.
 
 ## Where to find release notes
 
