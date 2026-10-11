@@ -243,11 +243,47 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | Endpoint | Notes |
 |---|---|
 | `GET /nodes` | Page of node summaries. Cursor is `lastSeen` epoch ms. Default limit 50. |
-| `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers. |
+| `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
+
+#### MeshMapper repeater details
+
+With `meshmapper.repeaters.enabled`, node detail carries `meshmapper` when MeshMapper's repeater
+list has the node's full public key. It is omitted otherwise. Times are epoch ms; `fetchedAt` is
+when Beacon last fetched the list. Text is admin-entered on MeshMapper, so escape it.
+
+```json
+"meshmapper": {
+  "iata": "YOW",
+  "fetchedAt": 1791234600000,
+  "site": {
+    "power": "1W", "hardware": "RAK4631", "antenna": "5.8 dBi fibreglass",
+    "heightM": 12, "heightAslM": 341.6, "powerSource": "solar",
+    "notes": "On the fire tower, east face"
+  },
+  "carpeater": false,
+  "admins": ["MrAlders0n"],
+  "scopes": [
+    { "scope": "yow", "observedAt": 1791200000000, "observedPackets": 37, "proof": "multibyte", "reportedAt": 1791100000000 }
+  ],
+  "scopesCheckedAt": 1791100000000,
+  "defaultScope": { "name": "yow", "state": "named", "updatedAt": 1791230000000, "source": "advert" }
+}
+```
+
+- `site` is always an object; each field is omitted when unset. `powerSource` is `mains`,
+  `solar`, `battery` or `poe`. `heightAslM` can lag a new `heightM` by a few minutes.
+- `carpeater` marks a repeater riding in a car: its position moves.
+- `scopes` lists scopes MeshMapper confirmed it carrying. `proof` is `multibyte` or `floor`;
+  `observedAt`/`observedPackets` (seen forwarding), `reportedAt` (an observer asked it) and
+  `uploadedAt` (a wardriver's app asked it) are omitted for sources that never confirmed it.
+  `scopesCheckedAt` present with empty `scopes` means it answered with none.
+- `defaultScope.state` is `named`, `unknown` (it sets one MeshMapper can't name yet) or
+  `none`; `name` is only sent when `named`; `source` is `advert` or `reported`. This is
+  MeshMapper's view; the top-level `defaultScope` is what Beacon matched from adverts.
 
 #### Foreign repeater indication
 
