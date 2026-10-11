@@ -60,7 +60,7 @@ Beacon refuses to run with a setting it cannot honour. The message names the key
 | `scope "x" region "y" is not a configured region` | Use a slug that appears under `regions:`. |
 | `netip.ParsePrefix("10.0.0.5"): no '/'` | Write `10.0.0.5/32`, not `10.0.0.5`. An empty entry fails with `server.trusted_proxies[0] must be a valid CIDR` instead. |
 | `packets.retention must be at least 24h` | Raise it. Same for `analytics.rollup_retention`. |
-| `meshmapper.scopes.refresh_interval must be between 1h and 24h` | Set it inside that range. Zones and channels intervals are 24h to 168h. |
+| `meshmapper.scopes.refresh_interval must be between 1h and 24h` | Set it inside that range. Repeaters is also 1h to 24h; zones and channels intervals are 24h to 168h. |
 | `nodes.mark_foreign requires an iatas.*.borderFile or meshmapper.zones` | Add a border source or turn `mark_foreign` off. |
 | `not a well-formed GeoJSON Feature`, `ring 0 is not closed`, `geometry must be Polygon or MultiPolygon` | The border file is invalid. It must be a single GeoJSON Feature with a closed Polygon or MultiPolygon in longitude, latitude order. |
 | `log level must be debug, info, warn or error` | Check `log.level` and `LOG_LEVEL`. `log format must be text or json` is the same for format. |
@@ -96,7 +96,7 @@ the stored messages for the new key and logs
 ## MeshMapper imports are unconfigured or stale
 
 Read `docker compose logs app` for `component=meshmapper`, `meshmapper.zones`,
-`meshmapper.scopes`, or `meshmapper.channels`. Refresh records include `last_error`,
+`meshmapper.scopes`, `meshmapper.channels`, or `meshmapper.repeaters`. Refresh records include `last_error`,
 `next_attempt`, and, for regional imports, `checked_at`.
 
 | Message | Fix |

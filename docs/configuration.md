@@ -69,7 +69,7 @@ which ones to read.
 | `log` | Log level and format. | You want JSON logs for a collector. |
 | `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 300 requests a minute. | You get 429s you did not expect. |
-| `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
+| `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
 | `regions` | Groups of IATAs with a name, map centre and zoom. | Always, unless MeshMapper imports them. |
 | `channel_keys` | Hashtag channels and explicit keys for decrypting group messages. | Always. Without keys, channel messages are stored as hashes only. |
@@ -99,8 +99,9 @@ cannot honour. These are the ones people hit:
 - `server.trusted_proxies` entries that are not CIDRs. One host is `10.0.0.5/32`, not `10.0.0.5`.
 - `packets.retention` or `analytics.rollup_retention` under `24h`, or any negative duration
   (`observers.delete_after` is the exception: zero or negative turns it off).
-- MeshMapper refresh intervals outside their range: `scopes.refresh_interval` 1h to 24h,
-  `zones.refresh_interval` and `channels.refresh_interval` 24h to 168h.
+- MeshMapper refresh intervals outside their range: `scopes.refresh_interval` and
+  `repeaters.refresh_interval` 1h to 24h, `zones.refresh_interval` and
+  `channels.refresh_interval` 24h to 168h.
 - A `borderFile` that is missing or not a valid GeoJSON Polygon or MultiPolygon Feature, or
   `nodes.mark_foreign: true` with no border source at all.
 - `log.level` or `log.format` set to anything other than the listed values.
@@ -135,9 +136,8 @@ If you use the YAML setting instead, restarting Beacon is enough. Prefer the env
 setting when using [backups](backup-export.md): exports refuse a nonempty
 `meshmapper.api_key` in the saved YAML so the key cannot enter a download.
 
-Beacon sends `X-API-Key` to `get_zones.php`, `get_geojson.php`, `get_scopes.php`, and
-`get_channels.php`. Its shared client supports the same header for `get_repeaters.php`,
-although Beacon does not currently fetch repeaters. Requests use trusted HTTPS MeshMapper
+Beacon sends `X-API-Key` to `get_zones.php`, `get_geojson.php`, `get_scopes.php`,
+`get_channels.php`, and `get_repeaters.php`. Requests use trusted HTTPS MeshMapper
 endpoints and do not follow redirects. `get_zones.php` still needs its `country` parameter;
 a key covering multiple regions does not change the request shape or remove rate limits.
 IP exemptions are not authentication.
