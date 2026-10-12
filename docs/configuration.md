@@ -40,7 +40,7 @@ Visitors get the new values on their next page load. Any characters are fine in 
 | `VITE_API_BASE` | yes | REST base URL as the browser sees it, for example `https://beacon.example.com/api/v1`. It must be the public address, never `localhost`. |
 | `VITE_WS_URL` | yes | WebSocket URL as the browser sees it, for example `wss://beacon.example.com/ws`. |
 | `VITE_MAP_CENTER`, `VITE_MAP_ZOOM` | no | Fallback map view as decimal `lat,lon` and a zoom from 0 to 22, used before airports load or when the selected region has no location. Unset is a world view. |
-| `VITE_DISABLED_TABS` | no | Comma-separated tabs to hide. Options: `Packets,Channels,Map,Nodes,Observers,Routes,Traces,Analytics`. |
+| `VITE_DISABLED_TABS` | no | Comma-separated tabs to hide. Options: `Packets,Channels,Map,Nodes,Observers,Routes,Traces,Analytics,MyAtlas`. |
 | `VITE_ENABLED_THEMES` | no | Comma-separated theme ids. When set, only these themes are offered. Listing `meshmapper_dark` or `meshmapper_light` is the only way to enable those two. |
 | `VITE_APP_NAME` | no | Wordmark text in the top left. Default `BEACON`. |
 | `VITE_SKIP_SPLASH` | no | `true` skips the once-per-session loading splash. |

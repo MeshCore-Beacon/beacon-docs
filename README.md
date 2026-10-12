@@ -154,6 +154,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 - [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
+- [My Atlas](docs/my-atlas.md): the per-browser node watchlist and what its cards mean.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
 **Change it**
