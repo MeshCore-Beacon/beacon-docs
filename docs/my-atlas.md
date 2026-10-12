@@ -35,9 +35,14 @@ Each card is the Analytics Signal row for one node, over the selected window:
   included. These describe the receivers' side, not the node's radio health.
 - **Active hours** — hours in the window with at least one reception.
 - The freshness badge is the server's `stale` verdict; the client does not infer online/offline.
-- **Heard by** lists the observers of the newest loaded packet, with when it was heard, and opens
-  that packet in the analyzer. It is not lifetime reach.
+- **Heard by** swaps the tiles for the observers of the newest loaded packet, with when it was
+  heard, and a link to open that packet in the analyzer; the button then reads **Analytics** to
+  flip back. The card keeps its height either way. It is not lifetime reach.
 - On a narrow card the action buttons drop under the name rather than crowding it.
+
+Cards are reordered by dragging the grip at the top right of a card to another slot (mouse or
+touch); the Left and Right arrow keys on a focused grip move it one slot. The order is saved with
+the rest of the collection.
 
 Every card polls once a minute while the tab is open, keeps polling through a failed refresh, and
 pauses while the server is rate-limiting.
