@@ -1,0 +1,10 @@
+{
+  "kind": "web",
+  "repo": "beacon-web",
+  "upstream": "MeshCore-Beacon/beacon-web",
+  "fork": "YOUR_ACCOUNT/beacon-web-contributions",
+  "remote": "contribution",
+  "allowed_skips": ["Analyze"],
+  "preview_overlays": [],
+  "entries": []
+}

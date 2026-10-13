@@ -1,0 +1,73 @@
+{
+  "release": "Beacon/web 1.4.0",
+  "verified_at": "2026-09-30T21:20:04.255270+00:00",
+  "release_published": false,
+  "production_switched": false,
+  "roles": {
+    "production": "https://live.meshcore.ca/",
+    "development": "https://dev.meshcore.ca/",
+    "review": "https://canadaverse.org/beacon-dev/"
+  },
+  "server": {
+    "pr": 189,
+    "revision": "61b0322a5d2041987f154b7cea3870e848723890",
+    "base": "14354b03dc84fa5318914c8fc86444251f3f23cf",
+    "tree": "9d586f58e12bccef57f489e08c3a2ed5422d235e",
+    "binary_sha256": "d86c81b1821daa8726172701d4e5b86d8f1ee202fe364fe3d1c99dec9a2fd248",
+    "source_sha256": "93b0944a09a1bbdea0cd3c9f2d70ea7528feed6b0f20d99397528b5792434b41",
+    "version_policy": "Independent server version; do not downgrade to web 1.4.0."
+  },
+  "web": {
+    "pr": 105,
+    "revision": "157525ef3dd517e74cd40a404d5512ef14603845",
+    "base": "e2d272e08ee3cf043951f55f867375e3892d9bc8",
+    "tree": "cc73c740da440d1fa1d659a145d1a02eb741fc25",
+    "version": "1.4.0",
+    "tests": 1035,
+    "source_sha256": "54ee7da23149401d829f2d1bc28f573ebe764423a401636764a5d507a0f9c004",
+    "dist_sha256": "95ad4ccb50ef05748211edfa39a9c8ca69bbae540b0f27e103482acd2560346c",
+    "index_sha256": "722254ca9585a751735d80eec5683baafe014e28dadb15460deba481d3686f8b",
+    "public_assets": 21
+  },
+  "atlas": {
+    "pr": 97,
+    "head": "66ae0cc222a6580b52f62051025453a992956cc6",
+    "hold": "After 1.4.0",
+    "deployed": false,
+    "needs_rebase": true
+  },
+  "validation": {
+    "native_postgres": true,
+    "restored_migration": "045_clean_partial_observer_telemetry.sql",
+    "replay_inputs": 3200,
+    "replay_fixture_drops": 0,
+    "image_tag_cases": 8,
+    "compose_cases": 6,
+    "public_boundaries": 26,
+    "windows_and_pi_web_tests": 1035,
+    "restored_partial_rows_removed": 485,
+    "live_partial_rows_saved": 489,
+    "readiness_test_repetitions_each": 100,
+    "current_base_checks": true,
+    "published_head_ci": true
+  },
+  "recovery": {
+    "server_checkpoint": "sync140-cutover-20260930T204913Z",
+    "web_checkpoint": "web-20260930T211410Z",
+    "config_sha256": "b3d96f52b25e38a0f3ecfb15cd2e492db1d4f494b18774598a4cfad295e2d62f",
+    "server_recipe": "evidence/sync-140-20260930/deploy-server.py rollback",
+    "web_recipe": "evidence/sync-140-20260930/deploy-beacon-web.py rollback --evidence-dir sync-140-20260930",
+    "frontend_only_restores": "23945d5907b031345f8bc5e85b926532272d238b with server 61b0322a",
+    "backend_restores": "9054acd89f96fa3e117db954c384b778a33f7aad / 23945d5907b031345f8bc5e85b926532272d238b",
+    "data_policy": "Keep new traffic and compatible cleanup; private dump and 489-row export support selective recovery."
+  },
+  "remaining": [
+    "Alderson review/acceptance and exact accepted-head CI",
+    "24h/3d raw-history requirement versus upstream 7d/30d controls",
+    "Physical iPhone Safari and production-host load/data validation",
+    "Stable image/tag publication and owner-controlled CoreScope cutover"
+  ],
+  "web_cutoff": "Accepted dev e2d272e0 through #111, plus release PR #105. Later changes need review and validation.",
+  "web_validation_evidence": "sync-140-20260930",
+  "server_validation_evidence": "sync-140-20260930"
+}
