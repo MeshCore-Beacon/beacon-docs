@@ -33,17 +33,16 @@ appear to be unreviewed AI output may be closed without further comment.
 
 ## Branches
 
-beacon-server and beacon-web:
+Every Beacon repo, docs included:
 
 - `main` holds stable releases only and is protected. Never target it directly.
 - `dev` is active development. All PRs target `dev`.
 
-beacon-docs has only `main`. PRs target `main`, and the docs there describe the current
-release.
+In beacon-docs, `main` describes the current release and `dev` describes what is coming next.
 
 ## Workflow
 
-1. Fork, or create a branch from `dev` (code repos) or `main` (docs).
+1. Fork, or create a branch from `dev`.
 2. Make your change.
 3. Run that repo's checklist (below for docs; in each code repo's CONTRIBUTING for code).
 4. Open a pull request with a clear description of what changed and why, referencing any
