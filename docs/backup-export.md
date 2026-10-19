@@ -122,6 +122,16 @@ needed extensions:
 psql -X --set ON_ERROR_STOP=on --single-transaction --file database.sql
 ```
 
+Dumps of a database where migration 010 created `pg_stat_statements` contain
+`CREATE EXTENSION IF NOT EXISTS pg_stat_statements` and a `COMMENT ON EXTENSION
+pg_stat_statements` line. Restoring as a superuser needs nothing extra. As any other role,
+with `ON_ERROR_STOP` the first stops the restore unless a superuser has created the extension
+in the new database first, and the comment stops it even then, because only the extension's
+owner may comment on it. So delete both lines from `database.sql`, restore, and have a
+superuser run `CREATE EXTENSION pg_stat_statements;` afterwards if you want statement
+statistics. They also need `shared_preload_libraries` on the new server; see
+[Statement statistics](operations.md#statement-statistics).
+
 Check the migration journal and some records, review the config, and restore external
 secrets and files before pointing a new Beacon at it. Never test an export by restoring over
 live data. See [pg_dump](https://www.postgresql.org/docs/16/app-pgdump.html) and

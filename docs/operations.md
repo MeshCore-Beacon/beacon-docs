@@ -260,7 +260,9 @@ Notes:
 - `max_wal_size = '16GB'` lets WAL grow that far between checkpoints. Make sure the volume
   under `data/postgres/` has the room, or pick a smaller value on a small host.
 - `pg_stat_statements` only collects once it is in `shared_preload_libraries`, which needs a
-  restart. If it is not there yet, add it at the restart in the next section.
+  restart. If it is not there yet, add it at the restart in the next section. Beacon's
+  migration 010 creates the extension itself where it can; see
+  [Statement statistics](#statement-statistics).
 - `DROP INDEX CONCURRENTLY` cannot run inside a transaction block; run it on its own in
   autocommit mode, as `psql` does by default. It takes a brief `SHARE UPDATE EXCLUSIVE` lock
   and waits for older transactions, so run the pre-deploy check above first. It frees about
@@ -362,6 +364,254 @@ before trying again:
 SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;
 DROP INDEX CONCURRENTLY IF EXISTS idx_known_routes_keyset_ccnew;       -- or idx_known_routes_iata_keyset_ccnew
 ```
+
+## Database pools and connections
+
+Beacon opens a separate connection pool per workload, sized by `database.api_plan_layout`
+(see [Configuration](configuration.md#database-pools-and-cost-guards)). Each pool sets its own
+session settings and an `application_name`, so `pg_stat_activity` shows which one a
+connection belongs to:
+
+| Pool | `application_name` | Size | Session settings |
+|---|---|---:|---|
+| `api_legacy` | `beacon-api_legacy` | 8 | Server defaults. Runs the few API statements that keep the previous plan behaviour. |
+| `api_custom` | `beacon-api_custom` | 8 (7 under `split`) | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`, `statement_timeout=35s`, `idle_in_transaction_session_timeout=30s` |
+| `api_cached` | `beacon-api_cached` | 5, `split` only | As `api_custom`, with `plan_cache_mode=force_generic_plan` |
+| `ingest` | `beacon-ingest` | 6, or one per CPU above 6 | `plan_cache_mode=auto`, `jit=off`, no statement timeout: an ingest write waits out a lock rather than drop a packet |
+| `maint` | `beacon-maint` | 4 | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`. Background jobs, importers, backups and admin queries. |
+
+The `single` layout opens only `api_legacy`, `ingest` and `maint`.
+
+- **Headroom.** `SHOW max_connections;` must leave room for the total (26 by default on up to
+  6 CPUs) plus every other client: `psql` sessions, backups, monitoring. If your deploy starts
+  the new server before the old one stops, count both.
+- **Checking.** Parallel workers carry their leader's `application_name`, so count client
+  backends only:
+
+  ```sql
+  SELECT application_name, count(*) FROM pg_stat_activity
+  WHERE application_name LIKE 'beacon-%' AND backend_type = 'client backend' GROUP BY 1;
+  ```
+
+  No pool should go above its size, and `beacon-api_cached` should be absent under
+  `custom_all`.
+- **`pool_max_conns`.** A `pool_max_conns` in `POSTGRES_DSN` is overridden by the pool sizes;
+  the server logs that at startup.
+- **PgBouncer.** The session settings are sent as startup parameters. Behind PgBouncer,
+  `ignore_startup_parameters` must list `plan_cache_mode`, `jit`, `statement_timeout`,
+  `idle_in_transaction_session_timeout` and `max_parallel_workers_per_gather`, or connections
+  are refused. PgBouncer then drops them, so the pools run on the server defaults; connect
+  Beacon to Postgres directly where you can.
+- **Background jobs** share the 4 `maint` connections without parallel plans, so a job may
+  take a little longer than before. `beacon_job_duration_seconds` shows it.
+
+### Small hosts
+
+Each hourly analytics rollup sets `work_mem` to 256 MB for its own transaction, and Postgres
+may use that much for every sort or hash step in it. On a host with little memory, watch the
+`db` container's memory while rollups run (about 95 minutes past each hour).
+
+## Statement statistics
+
+`GET /api/v1/admin/db/statements` sums `pg_stat_statements` by statement name (format in the
+[API contract](api-contract.md#admin)). It needs the extension created and preloaded:
+
+- **Created.** Migration `010_pg_stat_statements.sql` creates the extension when the server
+  offers it and the database role may. If not, it logs a notice and is still recorded, so
+  startup never fails over it. The shipped stacks connect as the superuser, so it is created.
+  Otherwise run `CREATE EXTENSION pg_stat_statements;` as a superuser.
+- **Preloaded.** It only collects once `shared_preload_libraries` includes it, which needs a
+  Postgres restart. Add it to the `db` service's command at the next restart (see
+  [Settings that need a restart](#settings-that-need-a-restart)), keeping any `-c` values
+  already there:
+
+  ```yaml
+    db:
+      command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+  ```
+
+Until both are true the endpoint returns `503`. Check with `SHOW shared_preload_libraries;`
+and a request to the endpoint with the admin key.
+
+Planning time (`plan_ms`) is only recorded while `pg_stat_statements.track_planning` is on. It
+adds overhead, so turn it on for one day to measure, then off again; both apply on reload:
+
+```sql
+ALTER SYSTEM SET pg_stat_statements.track_planning = on;
+SELECT pg_reload_conf();
+-- a day later
+ALTER SYSTEM RESET pg_stat_statements.track_planning;
+SELECT pg_reload_conf();
+```
+
+API statements are planned on every call, so summed `plan_ms` should stay a small fraction of
+summed `exec_ms`, under about 7%.
+
+## Metrics
+
+With `server.admin_listen` set, the server opens a second listener that serves only
+`GET /metrics` in Prometheus format. It has no authentication. `/metrics` is not served on the
+public port.
+
+In the Docker stack the listener runs inside the `app` container, so bind it to all of the
+container's interfaces and publish it on the host's loopback only:
+
+```yaml
+# config.yaml
+server:
+  admin_listen: "0.0.0.0:9090"
+```
+
+```yaml
+# docker-compose.yml, app service
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9090:9090"
+```
+
+Never route it through Caddy. Scrape it from the host:
+
+```yaml
+scrape_configs:
+  - job_name: beacon
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+```
+
+| Metric | Type | Labels | What it is |
+|---|---|---|---|
+| `beacon_http_request_seconds` | histogram | `route`, `family` | HTTP request time by route pattern |
+| `beacon_db_time_seconds` | histogram | `statement`, `pool` | Time per database statement |
+| `beacon_pool_acquire_seconds` | histogram | `pool` | Wait for a pooled connection |
+| `beacon_guard_db_seconds` | histogram | `family`, `class` | Database time per guarded request |
+| `beacon_guard_would_refuse_total` | counter | `family`, `guard` | Requests a guard would refuse if its family enforced |
+| `beacon_guard_refused_total` | counter | `family`, `guard` | Requests a guard refused |
+| `beacon_ingest_queue_depth` | gauge | | Messages waiting in the ingest queue |
+| `beacon_ingest_dropped_total` | counter | | Messages dropped because the ingest queue was full |
+| `beacon_job_duration_seconds` | histogram | `job` | Background job run time (`cleanup`, `analytics_rollup`, `reconfirm`, `route_retention`, ...) |
+| `beacon_job_rows_total` | counter | `job` | Rows removed by background jobs, today `reconfirm` and `route_retention` |
+| `beacon_index_bytes` | gauge | `index` | Size of each index, hourly |
+| `beacon_index_bloat_ratio` | gauge | `index` | Bytes per row against the last rebuild, hourly. See [Index health](#index-health). |
+| `beacon_pg_wal_bytes_total` | counter | | WAL written, cluster-wide |
+| `beacon_pg_checkpoints_total` | counter | `kind` | Checkpoints, `timed` or `requested` |
+| `beacon_pg_xid_age` | gauge | | Age of the oldest transaction ID in the database |
+
+`guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
+minute; the index gauges first appear an hour after startup. Go runtime and process metrics
+are included too.
+
+### Example alert rules
+
+```yaml
+groups:
+  - name: beacon
+    rules:
+      - alert: BeaconGuardWouldRefuse          # any would-refuse delays enforcing that family
+        expr: sum by (family, guard) (increase(beacon_guard_would_refuse_total[1h])) > 0
+      - alert: BeaconDeadlineHits
+        expr: sum(increase(beacon_guard_refused_total{guard="deadline"}[1h])) > 20
+      - alert: BeaconListSlow                  # list-class database time p99 over 1 s
+        expr: histogram_quantile(0.99, sum by (le) (rate(beacon_guard_db_seconds_bucket{class="list"}[15m]))) > 1
+        for: 15m
+      - alert: BeaconPoolAcquireSlow
+        expr: histogram_quantile(0.99, sum by (le, pool) (rate(beacon_pool_acquire_seconds_bucket[5m]))) > 0.5
+        for: 10m
+      - alert: BeaconCleanupLong               # a cleanup run over 10 min in the last 2 h
+        expr: increase(beacon_job_duration_seconds_count{job="cleanup"}[2h]) - increase(beacon_job_duration_seconds_bucket{job="cleanup",le="600"}[2h]) > 0
+      - alert: BeaconKeysetBloat
+        expr: beacon_index_bloat_ratio{index=~"idx_known_routes_(iata_)?keyset"} > 4
+      - alert: BeaconCheckpointsRequested
+        expr: increase(beacon_pg_checkpoints_total{kind="requested"}[1d]) > increase(beacon_pg_checkpoints_total{kind="timed"}[1d])
+      - alert: BeaconWALAboveBaseline          # set the baseline from your own steady state
+        expr: rate(beacon_pg_wal_bytes_total[1h]) > <baseline bytes/s>
+      - alert: BeaconXIDAge
+        expr: beacon_pg_xid_age > 300e6
+```
+
+Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
+recheck has no metric yet; at `debug` level it logs a `route reconfirm` line per slice, and
+`wrapped=true` marks the end of a full cycle.
+
+## Enforcing a guard family
+
+Every guard family only observes until you enforce it (see
+[Configuration](configuration.md#database-pools-and-cost-guards)). Observe for 7 days with
+metrics on, then enforce a family only when all three hold for it over those 7 days. With
+`routes` as the example (Prometheus needs at least 7 days of retention):
+
+1. No would-refuse from any guard. Every series must be 0:
+
+   ```promql
+   sum by (guard) (increase(beacon_guard_would_refuse_total{family="routes"}[7d]))
+   ```
+
+2. The p99 database time of each class is at most a quarter of its limit: entity 1.25 s, list
+   2.5 s, aggregation 7.5 s.
+
+   ```promql
+   histogram_quantile(0.99, sum by (le, class) (rate(beacon_guard_db_seconds_bucket{family="routes"}[7d])))
+   ```
+
+3. No request used more than half its limit. Histograms have no exact maximum, so check that
+   no request landed above the bucket at or under half the limit: `le="2.5"` for entity,
+   `le="5"` for list, `le="10"` for aggregation (stricter than 15 s, which has no bucket). Each
+   must be 0:
+
+   ```promql
+   sum(increase(beacon_guard_db_seconds_count{family="routes",class="list"}[7d]))
+     - sum(increase(beacon_guard_db_seconds_bucket{family="routes",class="list",le="5"}[7d]))
+   ```
+
+Then enforce it at runtime, listing every family that should enforce (the list replaces the
+current one):
+
+```bash
+curl -s -X PUT https://<your-domain>/api/v1/admin/config \
+  -H "Authorization: Bearer $BEACON_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"guards":{"enforce":["other","routes"]}}'
+```
+
+The response's `config.guards.enforce` shows the new list. Add the same list to
+`guards.enforce` in `config.yaml`, or the next restart goes back to the old one. To stop
+enforcing, `PUT` the list without that family (`[]` for none). `beacon_guard_refused_total`
+then counts real refusals.
+
+`other` and `routes` are the families to start with. The rest are not ready in this release:
+`channel_messages` statements are not guarded yet, and the packet and stats families still
+run statements that later releases make cheaper. Their release notes will say when each is
+ready, roughly `channel_messages` first, then `packets_global`, then `packets_region` and
+`packets_window`, then `stats` and `packet_detail`. `packets_window` may stay observed for
+good.
+
+## Index health
+
+Once an hour the server records each index's size (`beacon_index_bytes`) and its bytes per
+row against a baseline (`beacon_index_bloat_ratio`). The baseline is taken the first time the
+server sees the index and again whenever it is rebuilt, so the ratio is growth since the last
+rebuild, not absolute bloat: 1 means as compact as then, 4 means four times the bytes per
+row. An index that has never been analyzed has no ratio.
+
+The first run, and then one run a week, also logs `indexes with no scans since the last
+statistics reset` with each unused non-unique index and its size. An index that stays on that
+list for weeks is a candidate to drop; check that no rare job reads it first.
+
+When `BeaconKeysetBloat` fires, rebuild that index as in
+[Rebuilding the route keyset indexes](#rebuilding-the-route-keyset-indexes). The rebuild resets
+its baseline, and the ratio drops back to about 1 on the next hourly run.
+
+## Rolling back the pool layout
+
+If the new pools or plans misbehave, set this and restart the server:
+
+```yaml
+database:
+  api_plan_layout: single
+```
+
+It puts every API statement on one pool with the previous session settings and makes every
+guard family observe, whatever `guards.enforce` says. The alternative is the previous server
+image. It ignores migration 010; the `pg_stat_statements` extension stays installed and
+harmless.
 
 ## CPU profiling
 

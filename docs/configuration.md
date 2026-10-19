@@ -67,8 +67,10 @@ which ones to read.
 |---|---|---|
 | `auth` | The admin API key, if you would rather keep it in the file than in `BEACON_API_KEY`. | You want the admin endpoints. |
 | `log` | Log level and format. | You want JSON logs for a collector. |
-| `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
+| `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. `admin_listen`: an optional private listener for Prometheus `/metrics`. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 600 requests a minute. | You get 429s you did not expect. |
+| `database` | `api_plan_layout`: how API statements are spread over database connection pools. | You check `max_connections`, or need the rollback layout. See [Database pools and cost guards](#database-pools-and-cost-guards). |
+| `guards` | Which request families the cost guards may refuse. All of them only observe by default. | After a week of observing. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
 | `regions` | Groups of IATAs with a name, map centre and zoom. | Always, unless MeshMapper imports them. |
@@ -107,10 +109,70 @@ cannot honour. These are the ones people hit:
 - `log.level` or `log.format` set to anything other than the listed values.
 - `mobile.min_app_version` or `web.min_web_version` that is not a plain `X.Y.Z` release (`v1.2.3` and `1.2.3-beta` are rejected).
 - An admin key under 16 characters or containing whitespace.
+- `database.api_plan_layout` other than `custom_all`, `split` or `single`; a `guards.enforce`
+  entry that is not a family name; `guards.budget` other than `shadow`; `server.admin_listen`
+  that is not `host:port` with a port from 1 to 65535.
 - A negative `ratelimit.requests_per_minute`, `ratelimit.burst`, `websocket.max_connects_per_minute`
   or `routes.reconfirm_rows_per_hour`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
   connection instead, so leave it at a positive number.
+
+## Database pools and cost guards
+
+Beacon opens one PostgreSQL connection pool per workload. Pools open connections only when
+needed, so these are peaks:
+
+| `database.api_plan_layout` | `api_legacy` | `api_custom` | `api_cached` | `ingest` | `maint` | Total |
+|---|---:|---:|---:|---:|---:|---:|
+| `custom_all` (default) | 8 | 8 | - | 6 | 4 | 26 |
+| `split` | 8 | 7 | 5 | 6 | 4 | 30 |
+| `single` (rollback) | 8 | - | - | 6 | 4 | 18 |
+
+`ingest` has one connection per CPU on hosts with more than 6 CPUs, which adds to each total.
+The startup log line `database pools open` shows the real figure. Postgres `max_connections`
+must cover it plus every other client. A `pool_max_conns` in `POSTGRES_DSN` is ignored; the
+layout sets the sizes.
+
+- **`custom_all`** plans every API statement for its own parameters on every call, so no
+  statement can switch to a slow generic plan. Use it.
+- **`split`** would run a list of proven statements on cached generic plans. That list is empty
+  in this release, so `split` only opens a pool nothing uses. Keep `custom_all`.
+- **`single`** is the rollback: one API pool on the previous session settings, and every guard
+  family only observes, whatever `guards.enforce` says.
+
+The layout changes at a restart. What each pool sets is in
+[Operations](operations.md#database-pools-and-connections).
+
+```yaml
+database:
+  api_plan_layout: custom_all
+
+guards:
+  enforce: []      # routes, channel_messages, packets_global, packets_region,
+                   # packets_window, packet_detail, stats, other
+  budget: shadow
+```
+
+The cost guards cover public `/api/v1` requests, not `/ws` or `/api/v1/admin/*`. Each request
+belongs to a family and a class (the table is in the
+[API contract](api-contract.md#cost-guards)). Per family, three guards decide whether a request
+may use the database: at most 4 database-backed requests at once per client IP, waiting up to
+5 s for a slot; a database connection within 5 s; and a database time limit of 5 s (entity),
+10 s (list) or 30 s (aggregation). A family listed in `guards.enforce` refuses with `429` or
+`503`. Every other family only counts what it would have refused, in
+`beacon_guard_would_refuse_total`. The default `[]` refuses nothing.
+
+`guards.enforce` is the boot default. `PUT /api/v1/admin/config` replaces it at runtime, and a
+restart goes back to the file, so make the same change in both. When to enforce a family is in
+[Operations](operations.md#enforcing-a-guard-family).
+
+`guards.budget` must be `shadow`. The per-client database time budget (30 s, refilling at one
+second per second) only counts; it never refuses.
+
+`server.admin_listen` (default empty, off) opens a second listener, for example
+`127.0.0.1:9090`, that serves only `GET /metrics`. It has no authentication, so bind it to
+loopback or a private network and never publish it through the proxy. See
+[Operations](operations.md#metrics).
 
 ## MeshMapper API key
 
