@@ -770,7 +770,7 @@ Public reads and the WebSocket need no credentials. The `/api/v1/admin/*` subtre
 returns 503. It currently covers inspecting the running config and replacing CORS origins at runtime,
 operator account records (no login or sessions yet), and the backup download below.
 
-`/api/v1/*` is rate limited per client IP (`ratelimit:`, 300/min by default, IPv6 grouped by /64).
+`/api/v1/*` is rate limited per client IP (`ratelimit:`, 600/min by default, IPv6 grouped by /64).
 WebSocket upgrades have their own per-IP rate and concurrency limits and a same-origin check
 (`websocket:`). The client IP is the TCP peer, or `X-Real-IP` when the peer is listed in
 `server.trusted_proxies`; `X-Forwarded-For` and `True-Client-IP` are never trusted.

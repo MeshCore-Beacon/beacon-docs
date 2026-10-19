@@ -85,9 +85,10 @@ sudo fail2ban-client set beacon-api-flood banip <phone-on-cellular>   # site unr
 sudo fail2ban-client set beacon-api-flood unbanip <phone-on-cellular>
 ```
 
-beacon-server's own per-IP limit (`ratelimit.requests_per_minute`, 300 by default) answers first
-with 429s; the flood `maxretry` of 900 is 3× that allowance. Re-derive it if you change the server
-limit. Consider `bantime.increment` only after a clean week.
+beacon-server's own per-IP limit (`ratelimit.requests_per_minute`, 600 by default) answers first
+with 429s; the flood `maxretry` of 900 sits 1.5× above that allowance, so only a client that keeps
+going after its 429s gets banned (the web app waits out Retry-After). Re-derive it if you change the
+server limit. Consider `bantime.increment` only after a clean week.
 
 ## 3. Finding scrapers by hand
 
