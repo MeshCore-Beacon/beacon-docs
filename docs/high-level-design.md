@@ -664,7 +664,7 @@ bounded batches:
 | Observer telemetry | `telemetry.retention` | `744h` (31 days) |
 | Nodes not heard from | `nodes.delete_after` | `720h` (30 days) |
 | Observers not heard from | `observers.delete_after` | off (opt in; only with one ingest process per database) |
-| Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the `background.reconfirm` task |
+| Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the route retention task, run every `background.reconfirm` |
 
 Changing a value needs a restart.
 

@@ -474,6 +474,8 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
+An `iata` that ends in a blank (`YYZ` followed by a space) matches no region and returns `200 []`.
+
 `/routes` and `/routes/search` return a plain array of routes:
 
 ```json
