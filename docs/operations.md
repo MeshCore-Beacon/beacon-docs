@@ -176,14 +176,14 @@ Migrations `025` to `033` (2.1.0) change `packets`:
 - `033` creates the statistics object `packets_heard_inverted_stat` and runs `ANALYZE packets`.
 
 Ingest only stores types decoded from the packet header, which always fit, so only rows
-changed by hand can fail the checks. Before upgrading, confirm none exist; this reads the whole
-table, so run it off-peak:
+changed by hand can fail the checks. Before upgrading, confirm none exist; when none do, this
+reads the whole table, so run it off-peak:
 
 ```sql
-SELECT count(*) FROM packets WHERE payload_type NOT BETWEEN 0 AND 15 OR route_type NOT BETWEEN 0 AND 3;
+SELECT EXISTS (SELECT 1 FROM packets WHERE payload_type NOT BETWEEN 0 AND 15 OR route_type NOT BETWEEN 0 AND 3);
 ```
 
-It must return `0`. Otherwise `026` or `028` fails and stops startup on every attempt; fix or
+It must return `f`. Otherwise `026` or `028` fails and stops startup on every attempt; fix or
 delete those rows first.
 
 ### Pre-building the route hop index
