@@ -148,6 +148,29 @@ type check in the same section. A large deployment can pre-build the four indexe
 deployments can skip that: the server builds them at startup and serves the API once they are
 done.
 
+## Observer adverts index and payload-type backfill
+
+The release that adds migration `034` changes no API and keeps the minimum web and app versions.
+On a large deployment, pre-build `idx_observations_adverts` off-peak before deploying; see
+[Pre-building the observer adverts index](operations.md#pre-building-the-observer-adverts-index).
+Other deployments can skip that: the server builds it at startup.
+
+After the deploy, a background job fills in missing observation payload types; on a large
+deployment it takes about 80 minutes. Until it reports done, observer adverts pages use the
+previous release's statement. See
+[After upgrading: observation payload types](operations.md#after-upgrading-observation-payload-types),
+which also shows how to mark it done by hand. Five stats and traces statements move to the
+`api_custom` pool; see
+[After upgrading: stats and traces on the custom pool](operations.md#after-upgrading-stats-and-traces-on-the-custom-pool).
+
+- Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only after migration
+  `034` is recorded.
+- Don't upgrade to a release that drops `idx_observations_observer_id` until
+  `SELECT value FROM background_state WHERE key = 'observation_payload_type'` shows
+  `"done": true`. Before then the previous adverts statement still runs and needs that index.
+- To roll back, deploy the previous image. See the rollback notes in the two operations
+  sections above.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run

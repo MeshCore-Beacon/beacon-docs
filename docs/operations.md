@@ -186,6 +186,12 @@ SELECT EXISTS (SELECT 1 FROM packets WHERE payload_type NOT BETWEEN 0 AND 15 OR 
 It must return `f`. Otherwise `026` or `028` fails and stops startup on every attempt; fix or
 delete those rows first.
 
+Migration `034_observations_adverts.sql` builds the partial index `idx_observations_adverts` on
+`packet_observations` with `CREATE INDEX CONCURRENTLY`; see
+[Pre-building the observer adverts index](#pre-building-the-observer-adverts-index). The same
+release starts a background job that fills in missing observation payload types; see
+[After upgrading: observation payload types](#after-upgrading-observation-payload-types).
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -249,6 +255,57 @@ To go back to the previous server image, deploy it. It ignores the new indexes, 
 statistics. Leave them in place: their migrations stay recorded, so a later upgrade would not
 build them again.
 
+### Pre-building the observer adverts index
+
+Migration `034` builds `idx_observations_adverts`, which `/observers/{observerId}/adverts` reads
+once the [payload-type backfill](#after-upgrading-observation-payload-types) is done. The
+server builds it at startup while the API and ingest wait. On a large `packet_observations`
+table (hundreds of millions of rows) that should take a minute or two and about 150 MB of
+disk, so build it yourself off-peak before deploying. Run the
+[pre-deploy check](#before-deploying-a-release) first: the long-transaction query must return
+no rows. Then, in `psql` as above, on its own in autocommit mode, run exactly this text, byte
+for byte the same as the migration:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_observations_adverts ON packet_observations (observer_id, id) WHERE payload_type = 4;
+```
+
+Then check it:
+
+```sql
+SELECT indisvalid, indisready, pg_get_indexdef(indexrelid), pg_size_pretty(pg_relation_size(indexrelid))
+FROM pg_index WHERE indexrelid = 'idx_observations_adverts'::regclass;
+```
+
+It must read `t | t`, with the definition
+`CREATE INDEX idx_observations_adverts ON public.packet_observations USING btree (observer_id, id) WHERE (payload_type = 4)`.
+If `indisvalid` is `f`, the build was interrupted; drop the index and build it again:
+
+```sql
+DROP INDEX CONCURRENTLY idx_observations_adverts;
+```
+
+When the server starts and finds a valid index with that name, it records migration `034` as
+applied without building anything, so startup is instant. If you skip this step, the same
+build runs at startup instead, and the API and ingest wait for it.
+
+Turn on the [daily plan check](#turning-on-the-daily-check) only after migration `034` is
+recorded. Some of its adverts checks need this index; without it they take 1 to 16 seconds
+instead of 78 ms. To confirm:
+
+```sql
+SELECT filename FROM schema_migrations WHERE filename = '034_observations_adverts.sql';
+```
+
+To go back to the previous server image, deploy it. The index stays and nothing reads it: about
+150 MB, plus one entry for each advert observation stored. You can leave it. If you drop it
+(`DROP INDEX CONCURRENTLY idx_observations_adverts;`), also delete its migration record, so a
+later upgrade builds it again:
+
+```sql
+DELETE FROM schema_migrations WHERE filename = '034_observations_adverts.sql';
+```
+
 ### After upgrading: route maintenance
 
 The release that adds migration 006 changes how known routes are cleaned up. Deploy it
@@ -268,6 +325,92 @@ off-peak and expect the following.
   The first cycle reaches routes older releases never got to, and deletes the ones the same
   rule already condemned, typically a few percent of the table. About half of those come back
   the next time they are heard.
+
+### After upgrading: observation payload types
+
+Observations stored by servers older than the observation `payload_type` column have no payload
+type of their own. The release with migration `034` adds a background job, on the `maint` pool,
+that gives each of them its own packet's payload type. It walks `packet_observations` by id in
+spans of one million ids, ten spans a minute, so about 10 million ids a minute. Each statement
+writes at most 50,000 rows, and the job saves its position after every span, so a restart
+resumes where it stopped. When the walk passes the highest id it read at the start of its run,
+it records `done`. Rows stored later are typed by ingest.
+
+How long it takes depends on the id range, not on how many rows need a type: a database whose
+ids run to about 830 million needs about 80 minutes. On a database whose observations are all
+typed, each statement reads its span and updates nothing.
+
+Until the job reports `done`, `/observers/{observerId}/adverts` serves the same statement as the
+previous release, on the same index and pool. Once a server process reads `done`, it switches
+to the statement that reads `idx_observations_adverts` and keeps it until restart. The
+responses are the same either way.
+
+Check progress, read-only:
+
+```sql
+SELECT value, updated_at FROM background_state WHERE key = 'observation_payload_type';
+```
+
+`next_id` climbs about 10 million a minute, and the value ends as `{"next_id": ..., "done": true}`.
+
+**Marking it done by hand.** You can skip the walk on a database that has no untyped
+observations. First check, read-only. This reads all of `packet_observations` once, so run it
+off-peak:
+
+```sql
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '10min';
+SELECT EXISTS (SELECT 1 FROM packet_observations WHERE payload_type IS NULL) AS any_untyped;
+ROLLBACK;
+```
+
+Only if it prints `f`, and after the job's first run has created the key (the progress query
+returns a row), run:
+
+```sql
+UPDATE background_state SET value = '{"next_id": 0, "done": true}'::jsonb, updated_at = now()
+WHERE key = 'observation_payload_type';
+```
+
+It should report `UPDATE 1`. A run that was already in flight can write `"done": false` once
+more, so run the progress query again two minutes later and repeat the `UPDATE` if needed. Each
+server process picks up `done` on its next adverts request; no restart is needed.
+
+On a deployment that had untyped observations, the backfill corrects two things: the
+per-observer payload breakdown's unknown (`-1`) bucket shrinks into the real types, and route
+evidence starts to include those rows.
+
+Don't upgrade to a release that drops `idx_observations_observer_id` until the progress query
+shows `"done": true`. Until then the adverts statement of the previous release still runs, and
+it uses that index.
+
+Going back to the previous server image needs nothing here. Older servers ignore the
+`observation_payload_type` key, and rows the job typed stay typed, which older servers read the
+same way.
+
+### After upgrading: stats and traces on the custom pool
+
+In the release with migration `034`, five statements move from the `api_legacy` pool to
+`api_custom`, under both `custom_all` and `split`: `GetTopNodes`, `GetStatsTopAdvertisers`,
+`GetPathStats`, `GetStatsSeries` and `ListTraceTags`. That pool has a 35 s statement timeout,
+`jit=off` and no parallel workers (see [Database pools and connections](#database-pools-and-connections)).
+They are also guarded, but a guard's deadline applies only if its family is listed in
+`guards.enforce`, which is empty by default.
+
+For top nodes, top advertisers and paths, requests with at most 32 distinct IATAs and
+whole-hour bounds use new statements that read the hourly rollups one hour and IATA at a time.
+Only wider lists, such as every IATA at once, still run the previous statements, now without
+parallel workers. Measured over all 625 IATAs for 7 days on a copy of a large production
+database, they stay far inside the timeout:
+
+| Statement | With parallel workers | Without |
+|---|---:|---:|
+| top nodes | 276 ms | 556 ms |
+| top advertisers | 1.47 s | 3.63 s |
+| paths | 1.63 s | 1.58 s |
+
+Responses are unchanged. Under `split`, `ListObserverAdverts` and `GetObserverTelemetrySince`
+run on cached generic plans; see [Configuration](configuration.md#database-pools-and-cost-guards).
 
 ### After upgrading: compacting observers and channels
 
