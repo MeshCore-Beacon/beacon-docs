@@ -706,6 +706,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors; `""` when there is none), and `guards` (below). No credentials, broker addresses, channel material or database connection settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins`, `guards.enforce` or both until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/db/statements` | `pg_stat_statements` for this database, summed by statement name. `503` when the extension is missing or not preloaded. |
+| `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
@@ -738,6 +739,58 @@ item has `name` (the statement name; statements without one are summed as `(unna
 Times are milliseconds rounded to microseconds. `plan_ms` stays 0 unless `pg_stat_statements.track_planning` is on.
 Counters run from the last `pg_stat_statements` reset. Setup is in
 [Operations](operations.md#statement-statistics).
+
+`GET /admin/db/planguard` reports the daily plan check (see
+[Configuration](configuration.md#daily-plan-check)). It is admin-only and changes nothing in the
+public API. Like the other `/admin/db/` reports, its fields are snake_case, and `started_at` is
+an RFC 3339 timestamp rather than epoch milliseconds:
+
+```json
+{
+  "tier": "prod",
+  "started_at": "2026-10-19T14:02:11.482Z",
+  "duration_ms": 41873.2,
+  "clean": true,
+  "counts": { "ok": 120, "RETIRED_INDEX": 2, "SKIP": 640 },
+  "failures": [],
+  "runs": [
+    {
+      "entry": "routes.byiata.R01_SEA_first_l50",
+      "stmt": "ListKnownRoutesByIATA",
+      "mode": "custom",
+      "verdict": "ok",
+      "drivers": ["known_routes:Index Scan:idx_known_routes_iata_keyset"]
+    }
+  ]
+}
+```
+
+- `clean` is true when no run is `FALSE_POSITIVE`, `MISSED` or `ERROR`.
+- `counts` maps each verdict to its number of runs.
+- `runs` has one item per corpus entry and plan mode (`custom` or `generic`): `entry`, `stmt`,
+  `mode`, `verdict`, and when they apply `failures` (the plan rules the run broke), `drivers`
+  (`relation:node:index` of each driving scan) and `skip` (why the run was not made).
+- `failures` holds the failing runs in the same shape. It is `[]`, never null, when there are
+  none.
+- `verdict` is one of `ok`, `DETECTED`, `MISSED`, `FALSE_POSITIVE`, `RETIRED_INDEX`,
+  `KNOWN_ISSUE`, `SKIP` or `ERROR`. What each means is in
+  [Operations](operations.md#plan-checks-planguard).
+
+Without `fresh`, it returns the last successful report, or `404` with
+`planguard has not run yet` (the first run is about an hour after startup) or
+`planguard daily check is disabled`. A read-only server cannot turn the check on, so it always
+answers the latter.
+
+`?fresh=true` runs the check now and waits for it, which can take minutes. A request during a run
+joins that run. Within 5 minutes of the end of the last run it starts nothing and returns the last
+successful report (`started_at` gives its age), or `500` when no run has succeeded yet. A run
+that fails is a `500` too. A run started this way keeps going if the client gives up, for at most
+15 minutes. A `fresh` value that is not a boolean is a `400`.
+
+The check also feeds two metrics on the [metrics listener](operations.md#metrics):
+`beacon_planguard_failures{entry,mode}` (1 for each failing run of the last check) and
+`beacon_planguard_last_run_timestamp_seconds` (when the last successful check finished; 0 until
+the first one, and absent while the check is off).
 
 `POST /admin/accounts` takes `{"name": "..."}` in a body of at most 4 KiB. The name is trimmed,
 case-sensitive, 1 to 128 characters with no control characters, and unique among active

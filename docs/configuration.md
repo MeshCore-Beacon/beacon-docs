@@ -67,9 +67,10 @@ which ones to read.
 |---|---|---|
 | `auth` | The admin API key, if you would rather keep it in the file than in `BEACON_API_KEY`. | You want the admin endpoints. |
 | `log` | Log level and format. | You want JSON logs for a collector. |
-| `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. `admin_listen`: an optional private listener for Prometheus `/metrics`. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
+| `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. `admin_listen`: an optional private listener for Prometheus `/metrics`. `read_only`: boot a server that never writes, for comparing two builds (default `false`). | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md) and [Read-only mode](#read-only-mode). |
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 600 requests a minute. | You get 429s you did not expect. |
 | `database` | `api_plan_layout`: how API statements are spread over database connection pools. | You check `max_connections`, or need the rollback layout. See [Database pools and cost guards](#database-pools-and-cost-guards). |
+| `planguard` | `daily_check`: a daily read-only check that the database still plans Beacon's queries the way they were designed. Off by default. | You run a large deployment. See [Daily plan check](#daily-plan-check). |
 | `guards` | Which request families the cost guards may refuse. All of them only observe by default. | After a week of observing. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
@@ -112,6 +113,8 @@ cannot honour. These are the ones people hit:
 - `database.api_plan_layout` other than `custom_all`, `split` or `single`; a `guards.enforce`
   entry that is not a family name; `guards.budget` other than `shadow`; `server.admin_listen`
   that is not `host:port` with a port from 1 to 65535.
+- `planguard.daily_check: true` together with `server.read_only: true`. A read-only server runs
+  no background jobs, so it cannot run the check.
 - A negative `ratelimit.requests_per_minute`, `ratelimit.burst`, `websocket.max_connects_per_minute`
   or `routes.reconfirm_rows_per_hour`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
@@ -135,8 +138,10 @@ layout sets the sizes.
 
 - **`custom_all`** plans every API statement for its own parameters on every call, so no
   statement can switch to a slow generic plan. Use it.
-- **`split`** would run a list of proven statements on cached generic plans. That list is empty
-  in this release, so `split` only opens a pool nothing uses. Keep `custom_all`.
+- **`split`** runs the statements the plan corpus admits as safe on cached generic plans, in
+  the `api_cached` pool. Today that is `GetNodeByID`, `ListKnownRoutesByIATA` and
+  `ListKnownRoutesGlobal`. Keep `custom_all` unless the [plan check](operations.md#plan-checks-planguard)
+  has run clean against this deployment's database.
 - **`single`** is the rollback: one API pool on the previous session settings, and every guard
   family only observes, whatever `guards.enforce` says.
 
@@ -173,6 +178,49 @@ second per second) only counts; it never refuses.
 `127.0.0.1:9090`, that serves only `GET /metrics`. It has no authentication, so bind it to
 loopback or a private network and never publish it through the proxy. See
 [Operations](operations.md#metrics).
+
+## Read-only mode
+
+```yaml
+server:
+  read_only: false
+```
+
+`server.read_only: true` boots a server that never writes to the database. It skips the
+migrations, the seeding of configured IATAs, regions and scopes, the boot backfill of channel
+messages, MQTT ingest, the presence writer, the rollup catch-up, every background job and the
+MeshMapper imports. Every database session it opens is read-only
+(`default_transaction_read_only`), so anything that would still write, such as
+`POST /api/v1/admin/accounts`, fails with SQLSTATE `25006` instead of changing data. The server
+logs a warning at startup saying so.
+
+The REST API and `/ws` still serve what is in the database, but nothing new arrives. Because no
+migrations run, the database must already be at the schema the build expects. Its use is
+comparing two builds side by side against one copy of a database; see
+[Operations](operations.md#comparing-two-builds). Do not run it as a production instance.
+
+## Daily plan check
+
+```yaml
+planguard:
+  daily_check: false
+```
+
+`planguard.daily_check: true` makes the server check, once a day, that PostgreSQL still plans
+each of Beacon's statements the way it was designed: the expected driving index and no
+forbidden scans, in both custom and generic plan mode. The first run is about an hour after
+startup. It plans only, with plain `EXPLAIN` on the maintenance pool, inside read-only
+transactions with a 1 s lock timeout and 5 s per plan, so it never executes a statement or
+changes data.
+
+It is off by default because the expected plans assume production-sized tables. On a small
+database the planner legitimately picks other plans, and the check would report failures that
+are not real. Turn it on for a large deployment; see
+[Operations](operations.md#turning-on-the-daily-check). The report is served at
+`GET /api/v1/admin/db/planguard` ([API contract](api-contract.md#admin)) and exported as
+metrics.
+
+It cannot be combined with `server.read_only: true`; the server refuses to start with both.
 
 ## MeshMapper API key
 
