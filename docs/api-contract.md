@@ -150,6 +150,8 @@ Most list and stats endpoints take the same location filters:
 | `region` / `regionId` | Region slug or ID; expands to its member IATAs and adds them to any `iatas`. An unknown region or malformed ID is a `400`; a failed lookup is a `500`. |
 | `scope` | Transport scope name, URL-encoded (`%23bc` for `#bc`) |
 
+Comma-separated list params (`iatas`, `scopes`, `payloadTypes`, `routeTypes`) take at most 1000 values; more is a `400`.
+
 ---
 
 ## REST endpoints
