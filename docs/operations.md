@@ -152,6 +152,53 @@ Migration `004_drop_known_routes_iata_last_seen.sql` drops `idx_known_routes_iat
 which no query reads and which can reach about 10 GB on a large deployment. If you already
 dropped it by hand (see below), the migration does nothing.
 
+### Pre-building the route hop index
+
+Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
+uses when a request filters by `hopCount`. The server builds it with `CREATE INDEX
+CONCURRENTLY` during startup and does not serve the API until it finishes. On a large
+`known_routes` table (tens of millions of rows) that takes 10 to 25 minutes and needs 0.2 to
+0.4 GB of disk. To keep that out of the upgrade, build it yourself off-peak before deploying,
+in `psql` as above:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_known_routes_hop_iata ON known_routes (hop_count, iata);
+SELECT indisvalid, indisready FROM pg_index WHERE indexrelid = 'idx_known_routes_hop_iata'::regclass;
+```
+
+Run the `CREATE` on its own in autocommit mode, not inside a transaction block. The check must
+return `t | t`. Anything else means the build was interrupted and left an invalid index; drop
+it and build again:
+
+```sql
+DROP INDEX CONCURRENTLY idx_known_routes_hop_iata;
+CREATE INDEX CONCURRENTLY idx_known_routes_hop_iata ON known_routes (hop_count, iata);
+```
+
+When the server starts and finds a valid index with that name, it records the migration as
+applied without building anything. If you skip this step, the migration still works; startup
+just takes longer. Run the pre-deploy check above before either.
+
+### After upgrading: route maintenance
+
+The release that adds migration 006 changes how known routes are cleaned up. Deploy it
+off-peak and expect the following.
+
+- Route retention runs every `background.reconfirm` (default `1h`). Its first run after the
+  upgrade is a full pass over the grace window (routes under `routes.min_observations` older
+  than `routes.grace`). On a table of about 30 million routes that takes 12 to 14 minutes, in
+  statements of a minute or less. The clock hour of that first run becomes the hour of a weekly
+  full pass; a change to `routes.grace` or `routes.min_observations` also triggers one. Other
+  runs only cover what aged out since the previous run.
+- Stale neighbor edges are cleared at the end of every retention run. The first run may
+  delete a backlog; later runs take a few seconds.
+- The route recheck (routes with a hop that has departed or become ambiguous) runs every 5
+  minutes and works through the table at `routes.reconfirm_rows_per_hour` (default `81000`). A
+  full cycle takes the route count divided by that rate: about 16 days for 32.5 million routes.
+  The first cycle reaches routes older releases never got to, and deletes the ones the same
+  rule already condemned, typically a few percent of the table. About half of those come back
+  the next time they are heard.
+
 ## Postgres settings
 
 The stacks in this repo run stock `postgres:16-alpine` with no tuning. The settings below suit
@@ -272,6 +319,49 @@ SELECT max(age(datfrozenxid)) FROM pg_database;
 
 Rollback: `ALTER SYSTEM RESET autovacuum_freeze_max_age; ALTER SYSTEM RESET vacuum_freeze_table_age;`,
 put the old command back, and restart again.
+
+## Rebuilding the route keyset indexes
+
+`/routes` paging and route retention read two indexes on `known_routes`,
+`idx_known_routes_keyset` and `idx_known_routes_iata_keyset`. Steady deletes and upserts leave
+them bloated, so rebuild them every 7 to 14 days, and once after upgrading to the release that
+drops the unused route indexes (`idx_known_routes_last_seen`, `idx_known_routes_hop_count`
+and `idx_known_routes_reconfirm`).
+
+Rebuild one index at a time, off-peak. Each rebuild writes a full new copy before it drops
+the old one, so check first that the volume under `data/postgres/` has more than twice the
+index's size free:
+
+```sql
+SELECT pg_size_pretty(pg_relation_size('idx_known_routes_keyset')),
+       pg_size_pretty(pg_relation_size('idx_known_routes_iata_keyset'));
+```
+
+```bash
+df -h data/postgres
+```
+
+Then run the pre-deploy check above and, in autocommit mode:
+
+```sql
+REINDEX INDEX CONCURRENTLY idx_known_routes_keyset;
+```
+
+When it has finished, check the disk again and run:
+
+```sql
+REINDEX INDEX CONCURRENTLY idx_known_routes_iata_keyset;
+```
+
+Reads and writes carry on during the rebuild. If one is interrupted (cancelled, connection
+lost, server restarted), it leaves an invalid copy named after the index with a `_ccnew`
+suffix. The original index is still in place and still used. Find the leftover and drop it
+before trying again:
+
+```sql
+SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;
+DROP INDEX CONCURRENTLY IF EXISTS idx_known_routes_keyset_ccnew;       -- or idx_known_routes_iata_keyset_ccnew
+```
 
 ## CPU profiling
 

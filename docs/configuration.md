@@ -79,7 +79,7 @@ which ones to read.
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
 | `presence` | How observer and packet last-seen timestamps are batched before writing. | Rarely. |
-| `routes` | How long known routes are kept, with a shorter window for routes seen only a few times. | Rarely. |
+| `routes` | How long known routes are kept, with a shorter window for routes seen only a few times, and `reconfirm_rows_per_hour`: how many routes an hour are rechecked for a departed or now-ambiguous hop (default `81000`, run in 5-minute slices; `0` or omitted means the default). | Rarely. |
 | `websocket` | Connections per client, upgrade attempts per minute, and which other sites may open `/ws`. | The web app is served from a different host than the API. |
 | `nodes` | When a node is marked stale, when it is deleted, the clock-drift threshold, and the optional foreign repeater flag. | You want `possiblyForeign` on repeaters. |
 | `observers` | Optional deletion of observers not seen for a long time. Off by default. | Rarely. |
@@ -88,7 +88,7 @@ which ones to read.
 | `cors` | Browser cross-origin rules for REST. Default allows any origin, read-only methods. | You are building an admin UI on another origin. |
 | `cache` | Redis TTLs per response category. | Rarely. |
 | `ingest` | Only store packets from observers in listed countries or continents. | You run a regional instance and want to ignore the rest of the world. |
-| `background` | How often cleanup, route reconfirmation and preset rebuilds run. | Rarely. |
+| `background` | How often cleanup, route retention and preset rebuilds run. `reconfirm` (default `1h`) sets the route retention run, which also clears stale neighbor edges; the route recheck itself always runs every 5 minutes at `routes.reconfirm_rows_per_hour`. | Rarely. |
 
 ### Things that stop startup
 
@@ -107,7 +107,8 @@ cannot honour. These are the ones people hit:
 - `log.level` or `log.format` set to anything other than the listed values.
 - `mobile.min_app_version` or `web.min_web_version` that is not a plain `X.Y.Z` release (`v1.2.3` and `1.2.3-beta` are rejected).
 - An admin key under 16 characters or containing whitespace.
-- A negative `ratelimit.requests_per_minute`, `ratelimit.burst` or `websocket.max_connects_per_minute`.
+- A negative `ratelimit.requests_per_minute`, `ratelimit.burst`, `websocket.max_connects_per_minute`
+  or `routes.reconfirm_rows_per_hour`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
   connection instead, so leave it at a positive number.
 
