@@ -110,6 +110,169 @@ If `pg_restore` reports errors the app is not started; read them before trying a
 A 1.x dump cannot be restored into 2.0.0; the server refuses the old schema. See
 [Upgrading](upgrading.md#upgrading-to-200-from-1x).
 
+## Before deploying a release
+
+Migrations run when the server starts, and some need a lock on a busy table. Check two things
+in `psql` before you pull a new image:
+
+```bash
+docker compose exec db psql -U beacon -d beacon
+```
+
+```sql
+-- No transaction older than five minutes. This must return no rows.
+SELECT pid, now()-xact_start, state, left(query,80) FROM pg_stat_activity WHERE xact_start < now() - interval '5 minutes';
+
+-- No anti-wraparound autovacuum on the tables the release touches.
+SELECT pid, now()-xact_start, query FROM pg_stat_activity WHERE query LIKE 'autovacuum:%to prevent wraparound%';
+```
+
+A long transaction holds back the locks a migration waits for. An anti-wraparound autovacuum
+does not give way to a lock request the way an ordinary autovacuum does, so a migration on
+that table waits until the vacuum ends. Let either finish, or end a stuck client session with
+`SELECT pg_cancel_backend(<pid>);`, then deploy.
+
+### How startup migrations wait for locks
+
+Each migration statement runs with `lock_timeout = 30s`. When a statement times out on a lock,
+the server logs a `migration lock wait timed out` warning listing the sessions that blocked it
+(pid, state, `xact_start` and the first 200 characters of the query), waits, and tries the
+file again: three attempts in all, 10 s after the first and 20 s after the second. A file
+still blocked after about two minutes stops startup with `migrations failed`, the server exits
+with status 1, and Docker restarts it (`restart: unless-stopped`), which starts the same check
+again. A restart loop with these warnings means a session in the blocker list is holding the
+lock; deal with it and the next start goes through.
+
+Retrying is safe. A file without `CONCURRENTLY` runs in one transaction and rolls back whole.
+An interrupted `CREATE INDEX CONCURRENTLY` leaves an invalid index, which the server drops and
+rebuilds on the next attempt. An interrupted `DROP INDEX CONCURRENTLY` is finished by the
+`IF EXISTS` drop on the next attempt.
+
+Migration `004_drop_known_routes_iata_last_seen.sql` drops `idx_known_routes_iata_last_seen`,
+which no query reads and which can reach about 10 GB on a large deployment. If you already
+dropped it by hand (see below), the migration does nothing.
+
+## Postgres settings
+
+The stacks in this repo run stock `postgres:16-alpine` with no tuning. The settings below suit
+a busy deployment. Run them as the database superuser (`POSTGRES_USER`, `beacon` in the shipped
+compose files) in `psql` as above.
+
+### Command line or `ALTER SYSTEM`
+
+A setting passed on the Postgres command line (`postgres -c name=value`, in the `command:` of
+the `db` service) wins over `ALTER SYSTEM`, and `ALTER SYSTEM` cannot change it. Check where
+each setting comes from first:
+
+```sql
+SELECT name, setting, source FROM pg_settings WHERE name IN ('jit','wal_compression','max_wal_size','checkpoint_timeout','checkpoint_completion_target','bgwriter_lru_maxpages','bgwriter_lru_multiplier','bgwriter_delay','track_io_timing','session_preload_libraries','log_autovacuum_min_duration','log_lock_waits','log_temp_files','log_min_duration_statement');
+```
+
+For a row whose `source` is `command line`, change the value in the container command instead;
+it takes effect at the next Postgres restart. The shipped compose files set no command, so
+there everything comes from `ALTER SYSTEM` or the defaults.
+
+### Settings that apply on reload
+
+These take effect without a restart. Two checks first:
+
+- `docker compose exec db pg_test_timing` must report a per-loop time under 100 ns. If it is
+  higher, skip `track_io_timing`; timing every read would cost more than it tells you.
+- `LOAD 'auto_explain';` must succeed in `psql`. If it fails, do not set
+  `session_preload_libraries`: a library that cannot load there breaks every new connection,
+  Beacon's included.
+
+Then:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;      -- track=top, max=5000 are already the defaults
+ALTER SYSTEM SET jit = off;
+ALTER SYSTEM SET max_wal_size = '16GB';
+ALTER SYSTEM SET checkpoint_timeout = '30min';
+ALTER SYSTEM SET checkpoint_completion_target = 0.9;
+ALTER SYSTEM SET bgwriter_lru_maxpages = 1000;
+ALTER SYSTEM SET bgwriter_lru_multiplier = 4;
+ALTER SYSTEM SET bgwriter_delay = '100ms';
+ALTER SYSTEM SET log_autovacuum_min_duration = '60s';
+ALTER SYSTEM SET log_lock_waits = on;
+ALTER SYSTEM SET log_temp_files = '64MB';
+ALTER SYSTEM SET log_min_duration_statement = '5s';
+ALTER SYSTEM SET wal_compression = 'zstd';               -- only if its source is not 'command line'
+LOAD 'auto_explain';                                     -- must succeed first: a bad name breaks every new connection
+ALTER SYSTEM SET session_preload_libraries = 'auto_explain';
+ALTER SYSTEM SET auto_explain.log_min_duration = '2s';
+ALTER SYSTEM SET auto_explain.log_format = 'json';
+ALTER SYSTEM SET auto_explain.log_analyze = off;
+ALTER SYSTEM SET track_io_timing = on;                   -- only after pg_test_timing in the container shows < 100 ns
+SELECT pg_reload_conf();
+DROP INDEX CONCURRENTLY idx_known_routes_iata_last_seen;
+```
+
+Notes:
+
+- `max_wal_size = '16GB'` lets WAL grow that far between checkpoints. Make sure the volume
+  under `data/postgres/` has the room, or pick a smaller value on a small host.
+- `pg_stat_statements` only collects once it is in `shared_preload_libraries`, which needs a
+  restart. If it is not there yet, add it at the restart in the next section.
+- `DROP INDEX CONCURRENTLY` cannot run inside a transaction block; run it on its own in
+  autocommit mode, as `psql` does by default. It takes a brief `SHARE UPDATE EXCLUSIVE` lock
+  and waits for older transactions, so run the pre-deploy check above first. It frees about
+  10 GB on a large deployment. Leave `idx_packets_payload_type` and `idx_packets_route_type`
+  alone; packet queries still use them.
+
+Verify:
+
+```sql
+SELECT name, setting, source, pending_restart FROM pg_settings WHERE name IN ('jit','wal_compression','max_wal_size','checkpoint_timeout','checkpoint_completion_target','bgwriter_lru_maxpages','bgwriter_lru_multiplier','bgwriter_delay','track_io_timing','session_preload_libraries','log_autovacuum_min_duration','log_lock_waits','log_temp_files','log_min_duration_statement');
+SELECT to_regclass('idx_known_routes_iata_last_seen');  -- NULL once the index is gone
+```
+
+`pending_restart` must be false on every row. Open a new `psql` session and run
+`SHOW session_preload_libraries;`; it should connect and show `auto_explain`. Statements over
+2 s then appear in `docker compose logs db` with their plans as JSON.
+
+Rollback: `ALTER SYSTEM RESET <name>;` for each setting, then `SELECT pg_reload_conf();`. If
+new connections fail after the `session_preload_libraries` change, reset that one first from a
+session that is still open. The dropped index had no readers; if you ever want it back, build
+it with `CREATE INDEX CONCURRENTLY idx_known_routes_iata_last_seen ON known_routes (iata, last_seen DESC);`.
+
+### Settings that need a restart
+
+Raise the freeze ages, so autovacuum starts its anti-wraparound passes later and less often:
+
+```sql
+ALTER SYSTEM SET autovacuum_freeze_max_age = 400000000;
+ALTER SYSTEM SET vacuum_freeze_table_age = 300000000;
+```
+
+`autovacuum_freeze_max_age` only changes at a restart, so restart Postgres off-peak. It takes
+about 10 seconds; expect a short ingest catch-up after it.
+
+At the same restart, apply anything from the reload step whose source is `command line`, for
+example `wal_compression=zstd`, and `shared_preload_libraries=pg_stat_statements` if that is
+not loaded yet. Put them in the `db` service's command:
+
+```yaml
+  db:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "wal_compression=zstd"]
+```
+
+If the service already has a `command:`, edit its `-c` values rather than adding a second one.
+Then `docker compose up -d db` if you changed the command, or `docker compose restart db` if
+you only ran the `ALTER SYSTEM` lines.
+
+Verify:
+
+```sql
+SHOW autovacuum_freeze_max_age;
+SHOW wal_compression;
+SELECT max(age(datfrozenxid)) FROM pg_database;
+```
+
+Rollback: `ALTER SYSTEM RESET autovacuum_freeze_max_age; ALTER SYSTEM RESET vacuum_freeze_table_age;`,
+put the old command back, and restart again.
+
 ## CPU profiling
 
 Bounded CPU captures on a running instance are described in [Profiling](profiling.md).
