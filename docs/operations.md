@@ -152,6 +152,15 @@ Migration `004_drop_known_routes_iata_last_seen.sql` drops `idx_known_routes_iat
 which no query reads and which can reach about 10 GB on a large deployment. If you already
 dropped it by hand (see below), the migration does nothing.
 
+Migrations `011` to `024` (the small-table release) are one statement per file: one small
+`CREATE INDEX CONCURRENTLY` on `node_iatas`, eleven small index drops on `node_iatas`, `nodes`,
+`observers` and `channels`, one rename, and `fillfactor = 50` on `observers` and `channels`.
+Together they take seconds at boot. Each drop needs a brief lock on its table, so run the
+check above first and don't start an external `pg_dump` or a long transaction against those
+four tables during the upgrade; a blocked drop stops startup after about two minutes as
+described below, and the next start resumes where it stopped. Afterwards, compact the two
+tables once; see [Compacting observers and channels](#after-upgrading-compacting-observers-and-channels).
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -198,6 +207,81 @@ off-peak and expect the following.
   The first cycle reaches routes older releases never got to, and deletes the ones the same
   rule already condemned, typically a few percent of the table. About half of those come back
   the next time they are heard.
+
+### After upgrading: compacting observers and channels
+
+The small-table release (migrations `011` to `024`) drops the indexes that made every observer
+presence update and every channel hearing rewrite index entries, and sets `fillfactor = 50` on
+`observers` and `channels` so those updates stay on the same page (HOT updates). The fillfactor
+only applies to pages written from then on. A table that bloated before the upgrade keeps its
+size until it is rewritten once: on a large deployment `observers` held about 4,000 rows in
+52 MB, and about 6 MB after the rewrite.
+
+**When.** Once, off-peak, after the release is live and its last migration is recorded. This
+must return `1`:
+
+```sql
+SELECT count(*) FROM schema_migrations WHERE filename LIKE '024_%';
+```
+
+Not before: without the fillfactor and the dropped indexes, the tables bloat again.
+
+**Is it worth it?** Check the sizes in `psql` as above:
+
+```sql
+SELECT relname, relpages, pg_size_pretty(pg_relation_size(oid)) AS heap, reltuples::bigint AS rows
+FROM pg_class WHERE relname IN ('observers', 'channels');
+```
+
+If both are already a few MB, skip it.
+
+**Run** as the table owner (the `beacon` user) or a superuser, each statement on its own in
+autocommit mode, not inside a transaction block:
+
+```sql
+SET lock_timeout = '3s';
+VACUUM FULL observers;
+VACUUM FULL channels;
+```
+
+- Each `VACUUM FULL` rewrites the table and its indexes under an `ACCESS EXCLUSIVE` lock, which
+  blocks reads and writes on that table while it runs. On tables of this size that is a few
+  seconds, so ingest's observer and channel updates and the observer and channel API pages
+  wait that long.
+- If it reports `canceling statement due to lock timeout`, another session held the table;
+  run the same statement again.
+- It needs free disk equal to the table's new size plus its indexes, a few MB here. The old
+  files are freed when it finishes.
+
+**Verify.** Re-run the size query: `relpages` and the heap size should drop. With fillfactor
+50 a table is about twice its packed size, so `observers` ends near 6 MB for 4,000 rows. Then
+check that updates are now HOT. The counters are cumulative, so take two samples an hour or so
+apart and compare the change:
+
+```sql
+SELECT relname, n_tup_upd, n_tup_hot_upd,
+       round(100.0 * n_tup_hot_upd / nullif(n_tup_upd, 0), 1) AS hot_pct
+FROM pg_stat_user_tables WHERE relname IN ('observers', 'channels');
+```
+
+Between the two samples, nearly all new updates (`n_tup_hot_upd` growth over `n_tup_upd`
+growth) should be HOT; before this release only a few percent were. Sessions holding long
+snapshots lower it somewhat.
+
+**Rollback.** None needed for the rewrite; it changes no data.
+
+To go back to the previous server image, just deploy it: it works without the dropped
+indexes, but type-filtered node pages (`/nodes` with a node type) are slower until the indexes
+are rebuilt. It ignores the channel id cache and goes back to using a sequence value per
+channel hearing. If you want the indexes back, rebuild them with `CREATE INDEX CONCURRENTLY`
+using the definitions in the server's `db/migrations/001_baseline.sql`, for example:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_nodes_type_last_seen ON nodes USING btree (node_type, last_seen DESC);
+```
+
+The baseline's `idx_node_iatas_iata` on `(iata, last_heard DESC)` has been replaced by an index
+of the same name on `(iata)`; leave it in place.
 
 ## Postgres settings
 
