@@ -67,6 +67,8 @@ Most lists return a page:
 
 Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last page. What the cursor holds depends on the list (a timestamp in epoch ms, or an ID), as noted per endpoint. `limit` has a per-endpoint default, must be positive, and is clamped to 200.
 
+ID cursors are 64-bit integers: the observation ID `cursor` of `/observers/{id}/adverts` and `/nodes/{id}/observations`, telemetry `afterId`, the message ID `cursor` of `/messages`, and the backfill `afterObservationId` and `afterId` ([Backpressure and reconnection](#backpressure-and-reconnection)). The same goes for the IDs they come from. Store and send them as full integers; never narrow them to 32 bits, since a busy server passes 2^31. As JSON numbers they stay exact up to 2^53, so a JavaScript `number` or a Dart `int` holds them.
+
 A few lists return a plain array instead: the backfill endpoints, `/routes*`, `/traces` and the stats endpoints.
 
 ## Common filters

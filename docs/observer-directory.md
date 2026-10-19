@@ -111,8 +111,12 @@ Invalid parameters and unknown regions return 400. Database failures return 500;
 retain loaded rows and offer retry. Successful pages and store errors send
 `Cache-Control: no-store`; database reads have a five-second operation budget.
 
-Probe `/api/v1/observers/directory?limit=1` for compatibility. A supported server
-returns the response above. Older servers may return 404, or the legacy detail
-route's 400 with message `failed to parse observer UUID`. Other errors do not
-prove lack of support. Use an explicitly limited legacy fallback or request a
-server upgrade; do not assume the old `/observers` route honors new parameters.
+To decide whether a server has the directory, read `GET /api/v1/info` (see
+[Server info](api-contract.md#server-info)). The directory shipped in server 2.0.2
+and `/info` in 2.0.3, so Beacon Web treats a `serverVersion` of 2.0.2 or later as
+supported, and a malformed version as supported too. A 404 on `/info` means the
+server predates the directory. Any other failure is an error: show it with a
+retry, not a fallback. On an unsupported server use an explicitly limited legacy
+fallback or request a server upgrade; do not assume the old `/observers` route
+honors new parameters. The Flutter app requests the directory directly and relies
+on its version gate, which also reads `/info`.
