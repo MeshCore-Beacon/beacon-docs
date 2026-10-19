@@ -165,6 +165,27 @@ four tables during the upgrade; a blocked drop stops startup after about two min
 described below, and the next start resumes where it stopped. Afterwards, compact the two
 tables once; see [Compacting observers and channels](#after-upgrading-compacting-observers-and-channels).
 
+Migrations `025` to `033` (2.1.0) change `packets`:
+
+- `025` and `027` add the checks `packets_payload_type_domain` (`payload_type` 0 to 15) and
+  `packets_route_type_domain` (`route_type` 0 to 3) without checking existing rows. Each needs
+  a brief lock on `packets`.
+- `026` and `028` validate them. Each scans `packets`; writes continue meanwhile.
+- `029` to `032` build four indexes with `CREATE INDEX CONCURRENTLY`; see
+  [Pre-building the packets indexes](#pre-building-the-packets-indexes).
+- `033` creates the statistics object `packets_heard_inverted_stat` and runs `ANALYZE packets`.
+
+Ingest only stores types decoded from the packet header, which always fit, so only rows
+changed by hand can fail the checks. Before upgrading, confirm none exist; this reads the whole
+table, so run it off-peak:
+
+```sql
+SELECT count(*) FROM packets WHERE payload_type NOT BETWEEN 0 AND 15 OR route_type NOT BETWEEN 0 AND 3;
+```
+
+It must return `0`. Otherwise `026` or `028` fails and stops startup on every attempt; fix or
+delete those rows first.
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -191,6 +212,42 @@ CREATE INDEX CONCURRENTLY idx_known_routes_hop_iata ON known_routes (hop_count, 
 When the server starts and finds a valid index with that name, it records the migration as
 applied without building anything. If you skip this step, the migration still works; startup
 just takes longer. Run the pre-deploy check above before either.
+
+### Pre-building the packets indexes
+
+Migrations `029` to `032` build four indexes on `packets` with `CREATE INDEX CONCURRENTLY`
+while the API and ingest wait. On a small database that is seconds. On a large one, build them
+yourself off-peak before deploying, in `psql` as above, each statement on its own in
+autocommit mode. Use exactly these names and definitions:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_packets_last_heard_hash ON packets USING btree (last_heard_at DESC, packet_hash DESC);
+CREATE INDEX CONCURRENTLY idx_packets_type_last_heard ON packets USING btree (payload_type, route_type, last_heard_at DESC, packet_hash DESC);
+CREATE INDEX CONCURRENTLY idx_packets_scope_last_heard ON packets USING btree (scope_id, last_heard_at DESC, packet_hash DESC) INCLUDE (payload_type, route_type, first_heard_at) WHERE (scope_id IS NOT NULL);
+CREATE INDEX CONCURRENTLY idx_packets_heard_inverted ON packets USING btree (first_heard_at) INCLUDE (last_heard_at, packet_hash, payload_type, route_type, scope_id) WHERE ((first_heard_at > last_heard_at) IS TRUE);
+```
+
+Then check them. Every row must read `t | t`:
+
+```sql
+SELECT c.relname, i.indisvalid, i.indisready, pg_size_pretty(pg_relation_size(c.oid)) AS size
+FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+WHERE c.relname IN ('idx_packets_last_heard_hash', 'idx_packets_type_last_heard',
+                    'idx_packets_scope_last_heard', 'idx_packets_heard_inverted');
+```
+
+An invalid index means the build was interrupted; drop it with `DROP INDEX CONCURRENTLY` and
+build it again. When the server finds a valid index with one of these names, it records that
+migration as applied without building anything. It checks only the name, so a different
+definition under the same name is kept as it is.
+
+Pre-build only these indexes. Don't create the two checks or `packets_heard_inverted_stat`
+yourself: migrations `025`, `027` and `033` fail on an object that already exists, and
+startup stops.
+
+To go back to the previous server image, deploy it. It ignores the new indexes, checks and
+statistics. Leave them in place: their migrations stay recorded, so a later upgrade would not
+build them again.
 
 ### After upgrading: route maintenance
 

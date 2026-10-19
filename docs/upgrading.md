@@ -134,6 +134,20 @@ ratelimit:
 Then run `docker compose restart app`. If you run the [fail2ban jails](../app_config/fail2ban/README.md),
 the flood jail's `maxretry` of 900 still sits above the new limit.
 
+## Upgrading to 2.1
+
+Server 2.1.0 adds exact page cursors (`nextPageCursor` and `pageCursor`) to `/packets`, `/nodes`
+and `/observers`; see [Exact page cursors](api-contract.md#exact-page-cursors). The change is
+additive and the minimum web and app versions stay where they were, so older clients keep
+working. Pull Beacon Web 2.1 with the server.
+
+Migrations `025` to `033` add two checks, four indexes and a statistics object to `packets`.
+Before deploying, run the [pre-deploy check](operations.md#before-deploying-a-release) and the
+type check in the same section. A large deployment can pre-build the four indexes off-peak; see
+[Pre-building the packets indexes](operations.md#pre-building-the-packets-indexes). Other
+deployments can skip that: the server builds them at startup and serves the API once they are
+done.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run

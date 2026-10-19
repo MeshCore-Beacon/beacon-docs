@@ -112,6 +112,33 @@ ID cursors are 64-bit integers: the observation ID `cursor` of `/observers/{id}/
 
 A few lists return a plain array instead: the backfill endpoints, `/routes*`, `/traces` and the stats endpoints.
 
+### Exact page cursors
+
+A numeric `cursor` holds a millisecond, so rows that share the last row's millisecond can fall
+between two pages. `/packets`, `/nodes`, `/observers` and `/channels` also return
+`nextPageCursor` on a page with `hasMore`: an opaque string of at most 160 characters that marks
+the exact last row. Send it back as `pageCursor`. A walk by `pageCursor` returns every row once,
+including those ties. Don't parse or build it; today it reads `v1:<epoch µs>:<packet hash hex>`
+on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
+
+| Endpoint | `pageCursor` | `nextPageCursor` |
+|---|---|---|
+| `/packets` without `iata`, `iatas`, `region`, `regionId` or `hashPrefix` | Wins over `cursor` when both are sent. | When `hasMore` |
+| `/packets` with an IATA or region filter, or `hashPrefix` | Checked, then ignored; `cursor` pages. | Not returned |
+| `/nodes`, `/observers` | Wins over `cursor` when both are sent. | When `hasMore` |
+| `/channels` | Can't be combined with a positive `cursor` (`400`). | When `hasMore` |
+
+- `nextCursor` stays on every page with `hasMore` and keeps its meaning: rows strictly older than
+  that millisecond. Paging by `cursor` alone gives the same pages as before and still skips
+  rows tied on the boundary millisecond.
+- On `/packets`, `/nodes` and `/observers`, send both: `cursor` set to `nextCursor` and
+  `pageCursor` set to `nextPageCursor` when the page has both, `cursor` alone otherwise. A server
+  older than 2.1.0 ignores `pageCursor` and still moves forward by `cursor`. Treat
+  `nextPageCursor` as optional on every list. `/channels` takes only one of the two.
+- A malformed `pageCursor` is a `400` with message `invalid pageCursor` on those three
+  endpoints, on every path, including the `/packets` paths that ignore it. Start again from
+  the first page without it. An empty `pageCursor` counts as absent.
+
 ## Common filters
 
 Most list and stats endpoints take the same location filters:
@@ -135,7 +162,9 @@ Most list and stats endpoints take the same location filters:
 | `GET /packets/{packetHash}` | Full packet with every observation. `404` if unknown. |
 | `GET /packets/backfill?afterObservationId=<id>` | Packets with observations after that ID, oldest first, plain array. Default limit 100. For reconnect backfill. |
 
-`/packets` params: `payloadType` or `payloadTypes` (comma-separated integers), `payloadTypeName` (`advert`, `group_text`, `trace`, ...; used when no number is given), `routeType` or `routeTypes`, the location filters, `scope` or `scopes` (comma-separated), `since`, `until`, `cursor`, `limit`. Filters OR within themselves and AND across each other. The cursor is epoch ms: global `lastHeardAt` order without an IATA filter, and the time heard at the requested sites when one is set, so a filtered list stays bounded to those IATAs.
+`/packets` params: `payloadType` or `payloadTypes` (comma-separated integers), `payloadTypeName` (`advert`, `group_text`, `trace`, ...; used when no number is given), `routeType` or `routeTypes`, the location filters, `scope` or `scopes` (comma-separated), `since`, `until`, `hashPrefix` (4 to 16 hex characters of the packet hash), `cursor`, `pageCursor`, `limit`. Filters OR within themselves and AND across each other. The cursor is epoch ms: global `lastHeardAt` order without an IATA filter, and the time heard at the requested sites when one is set, so a filtered list stays bounded to those IATAs. With `hashPrefix` the order and cursor use global `lastHeardAt` even when an IATA filter is set.
+
+Without an IATA or region filter or `hashPrefix`, the list is ordered by `lastHeardAt`, newest first, and packets heard in the same instant by `packetHash`, descending. `pageCursor` applies there (see [Exact page cursors](#exact-page-cursors)). Repeated values in the type and scope lists count once, and type values outside the header's range (payload type 0 to 15, route type 0 to 3) are dropped; a type list left with no valid value returns an empty page, not a `400`. When several observations of a packet share the newest time, `latestObserver` comes from the one with the highest observation ID, so the choice is stable.
 
 `/packets/backfill` takes single `payloadType`/`payloadTypeName`, `routeType`, the location filters, `scope` and `limit`.
 
@@ -285,12 +314,12 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /nodes` | Page of node summaries. Cursor is `lastSeen` epoch ms. Default limit 50. |
+| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending. Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
-`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
+`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
 
 #### MeshMapper repeater details
 
@@ -355,12 +384,18 @@ edges spanning more than 180 degrees are rejected.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /observers` | Page of observers. Params: location filters, `type` (e.g. `meshcoretomqtt`), `broker`, `status` (`online`/`offline`), `name`, `scope`, `cursor` (`lastSeen` epoch ms), `limit`. |
+| `GET /observers` | Page of observers, most recently seen first, ties by `id` descending. Params: location filters, `type` (e.g. `meshcoretomqtt`), `broker`, `status` (`online`/`offline`), `name`, `scope`, `cursor` (last-seen epoch ms), `pageCursor`, `limit`. |
 | `GET /observers/directory` | Traffic/name pagination, row counts and type facets. See [observer directory contract](observer-directory.md) for rollout status and exact semantics. |
 | `GET /observers/{observerId}` | Observer detail. |
 | `GET /observers/{observerId}/telemetry?range=24h&interval=1h` | Telemetry history. `interval` is `1h` (default), `6h` or `24h`. `afterId` returns only newer points. |
 | `GET /observers/{observerId}/activity?range=24h&interval=15m` | What the observer heard, bucketed. |
 | `GET /observers/{observerId}/adverts` | Page of adverts the observer heard. Cursor is the observation ID. |
+
+`/observers` pages by each observer's last-seen time, which the summary does not include. Since
+2.1.0 `nextCursor` is that time for the last row and is present whenever `hasMore` is true.
+Before, it came from the last status message and was missing when the last row had none, so a
+walk by `cursor` skipped most observers. Paging by `cursor` alone can still skip observers that
+share a millisecond (presence updates often stamp many at once); `pageCursor` reaches all of them.
 
 Telemetry response is a time-bucketed array suitable for direct chart consumption. `airtimeTxSecs` and
 `airtimeRxSecs` are seconds of radio time as reported by the observer: cumulative since boot on
