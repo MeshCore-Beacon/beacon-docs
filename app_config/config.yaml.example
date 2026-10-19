@@ -58,9 +58,9 @@ ratelimit:
 # Keep max_connections well above that. A pool_max_conns in POSTGRES_DSN is overridden.
 #database:
 #  # custom_all (default): every API statement gets a custom plan.
-#  # split: statements admitted to the generic-plan class (GetNodeByID, ListKnownRoutesByIATA,
-#  #   ListKnownRoutesGlobal, ListPacketsByTypes, ListPacketsPage) run on cached generic plans.
-#  #   Keep custom_all unless the plan check is clean.
+#  # split: statements admitted to the generic-plan class (GetNodeByID, GetObserverTelemetrySince,
+#  #   ListKnownRoutesByIATA, ListKnownRoutesGlobal, ListObserverAdverts, ListPacketsByTypes,
+#  #   ListPacketsPage) run on cached generic plans. Keep custom_all unless the plan check is clean.
 #  # single: rollback. One API pool on the previous settings; every guard family observes.
 #  api_plan_layout: custom_all
 

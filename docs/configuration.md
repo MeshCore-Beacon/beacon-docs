@@ -139,9 +139,12 @@ layout sets the sizes.
 - **`custom_all`** plans every API statement for its own parameters on every call, so no
   statement can switch to a slow generic plan. Use it.
 - **`split`** runs the statements the plan corpus admits as safe on cached generic plans, in
-  the `api_cached` pool. Today that is `GetNodeByID`, `ListKnownRoutesByIATA`,
-  `ListKnownRoutesGlobal`, `ListPacketsByTypes` and `ListPacketsPage`. Keep `custom_all` unless the [plan check](operations.md#plan-checks-planguard)
-  has run clean against this deployment's database.
+  the `api_cached` pool. Today that is `GetNodeByID`, `GetObserverTelemetrySince`,
+  `ListKnownRoutesByIATA`, `ListKnownRoutesGlobal`, `ListObserverAdverts`, `ListPacketsByTypes`
+  and `ListPacketsPage`. `ListObserverAdverts` runs there only once the
+  [payload-type backfill](operations.md#after-upgrading-observation-payload-types) is done. Keep
+  `custom_all` unless the [plan check](operations.md#plan-checks-planguard) has run clean against
+  this deployment's database.
 - **`single`** is the rollback: one API pool on the previous session settings, and every guard
   family only observes, whatever `guards.enforce` says.
 
