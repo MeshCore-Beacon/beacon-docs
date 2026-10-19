@@ -28,7 +28,7 @@ Send the key only over HTTPS.
 
 ## Rate limiting
 
-On by default for `/api/v1/*` (not `/ws` or `/swagger`). Each client gets `ratelimit.requests_per_minute` (default 300) per minute, plus a one-second window capped at `ratelimit.burst` (defaults to the per-minute value). Clients are keyed by IP after the trusted-proxy step below; IPv6 clients share a budget per /64. Over the limit:
+On by default for `/api/v1/*` (not `/ws` or `/swagger`). Each client gets `ratelimit.requests_per_minute` (default 600) per minute, plus a one-second window capped at `ratelimit.burst` (defaults to the per-minute value). Clients are keyed by IP after the trusted-proxy step below; IPv6 clients share a budget per /64. Over the limit:
 
 ```
 HTTP/1.1 429 Too Many Requests

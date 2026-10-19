@@ -117,6 +117,23 @@ one, check the MeshMapper logs for successful refreshes; existing backoff still 
 If you use backups, leave `meshmapper.api_key` empty in the saved YAML and keep the key in
 the environment. Exports refuse a nonempty saved YAML key.
 
+## REST rate limit raised to 600
+
+Newer builds default `ratelimit.requests_per_minute` (and `burst`) to 600 a minute instead
+of 300. Opening the Map and Nodes tabs on a region of a few thousand nodes could run past
+300 and leave the map half loaded. The shipped `config.yaml` templates set the value
+explicitly, so an existing deployment keeps 300 until you change it:
+
+```yaml
+ratelimit:
+  enabled: true
+  requests_per_minute: 600
+  burst: 600
+```
+
+Then run `docker compose restart app`. If you run the [fail2ban jails](../app_config/fail2ban/README.md),
+the flood jail's `maxretry` of 900 still sits above the new limit.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run

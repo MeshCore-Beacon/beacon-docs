@@ -41,7 +41,7 @@ is authenticated.
 
 ## Rate limits and bans
 
-REST is limited to 300 requests a minute per client by default, WebSocket upgrades to 10 a
+REST is limited to 600 requests a minute per client by default, WebSocket upgrades to 10 a
 minute, with 5 open sockets per client. Behind a proxy none of that works until
 `server.trusted_proxies` is set; see
 [Reverse proxy](reverse-proxy.md#rate-limits-and-connection-caps). For repeat offenders, the

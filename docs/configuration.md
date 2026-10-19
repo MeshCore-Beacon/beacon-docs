@@ -68,7 +68,7 @@ which ones to read.
 | `auth` | The admin API key, if you would rather keep it in the file than in `BEACON_API_KEY`. | You want the admin endpoints. |
 | `log` | Log level and format. | You want JSON logs for a collector. |
 | `server` | `trusted_proxies`: the proxy addresses allowed to tell Beacon the real client IP. | Always, if Beacon sits behind a proxy. See [Reverse proxy](reverse-proxy.md). |
-| `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 300 requests a minute. | You get 429s you did not expect. |
+| `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 600 requests a minute. | You get 429s you did not expect. |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
 | `regions` | Groups of IATAs with a name, map centre and zoom. | Always, unless MeshMapper imports them. |
