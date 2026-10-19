@@ -41,6 +41,47 @@ Retry-After: 60
 
 **Client IP.** The server only accepts `X-Real-IP`, and only from a direct peer listed in `server.trusted_proxies`. `X-Forwarded-For` and `True-Client-IP` are always ignored and stripped. Behind a reverse proxy that isn't listed, every client shares the proxy's budget.
 
+## Cost guards
+
+Every public `/api/v1` request also passes through cost guards (not `/ws`, not `/api/v1/admin/*`). By default they only count what they would refuse, and no response changes. A guard refuses only for a family the operator has listed in `guards.enforce` (see [Configuration](configuration.md#database-pools-and-cost-guards)). Clients should still handle the three refusals:
+
+| Status | `code` | `Retry-After` | When |
+|---|---|---|---|
+| `429` | `rate_limited` | `1` | More than 4 database-backed requests at once from one client, and no slot freed within 5 s. Cache hits don't count. |
+| `503` | `service_unavailable` | `2` | No database connection within 5 s. |
+| `503` | `deadline_exceeded` | `5` | The request's database time passed its class limit: entity 5 s, list 10 s, aggregation 30 s, counted from its first statement. |
+
+```
+HTTP/1.1 503 Service Unavailable
+Retry-After: 5
+
+{"error":{"code":"deadline_exceeded","message":"The request ran past its database time limit. Retry later."}}
+```
+
+The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
+
+Each request falls in one family and one class:
+
+| Path | Condition | Family | Class |
+|---|---|---|---|
+| `/packets`, `/packets/backfill` | `since` or `until` set (`/packets` only) | `packets_window` | aggregation |
+| `/packets`, `/packets/backfill` | region set | `packets_region` | list |
+| `/packets`, `/packets/backfill` | otherwise (including `hashPrefix`) | `packets_global` | list |
+| `/packets/{hash}` | | `packet_detail` | entity |
+| `/routes` | | `routes` | list |
+| `/routes/cross`, `/routes/search` | | `routes` | aggregation |
+| `/routes/{iata}/{pathKey}/observations` | | `routes` | entity |
+| `/channels/{id}/messages`, `/messages`, `/messages/backfill` | | `channel_messages` | list |
+| `/stats/*` | | `stats` | aggregation |
+| `/channels`, `/nodes`, `/observers`, `/traces`, `/nodes/{id}/observations`, `/observers/{id}/adverts` | | `other` | list |
+| `/observers/directory` | region set | `other` | list |
+| `/observers/directory` | otherwise | `other` | aggregation |
+| `/observers/{id}/activity` | | `other` | aggregation |
+| `/observers/{id}`, `/observers/{id}/telemetry`, `/nodes/{id}`, `/nodes/{id}/neighbors`, `/channels/{id}`, `/traces/{tag}` | | `other` | entity |
+| everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/brokers`, unknown paths) | | `other` | entity |
+
+"Region set" means a non-empty `iata`, `iatas`, `region` or `regionId`.
+
 ## Versioning
 
 Path is the contract: `/api/v1/`. Breaking changes get `/api/v2/`. Backward-compatible additions just expand the existing payloads. WebSocket messages include a `type` discriminator and a top-level `v: 1` field so we can evolve in place.
@@ -53,7 +94,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
@@ -662,19 +703,41 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors; `""` when there is none). No credentials, broker addresses, channel material or database settings. |
-| `PUT /admin/config` | Replaces `cors.allowed_origins` until the next restart. JSON body up to 16 KiB. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors; `""` when there is none), and `guards` (below). No credentials, broker addresses, channel material or database connection settings. |
+| `PUT /admin/config` | Replaces `cors.allowed_origins`, `guards.enforce` or both until the next restart. JSON body up to 16 KiB. |
+| `GET /admin/db/statements` | `pg_stat_statements` for this database, summed by statement name. `503` when the extension is missing or not preloaded. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
 
-`PUT /admin/config` accepts only `{"cors":{"allowed_origins":[...]}}` and applies the new list
-immediately. It is runtime-only: nothing is written to disk, and a restart reloads the file. The
-response carries `config`, `persisted: false` and `requires_restart: false`. Send 1 to 32 ASCII
-http(s) origins of at most 512 bytes each, with an optional single hostname wildcard; a lone `*`
-allows all. Empty or null lists, paths, queries, credentials, control characters and unknown
-fields are rejected. Concurrent updates apply one at a time; requests already in flight may see
-the old list.
+`PUT /admin/config` accepts `{"cors":{"allowed_origins":[...]}}`, `{"guards":{"enforce":[...]}}`
+or both, and applies them immediately. Both are validated before either is applied, so a rejected
+update changes nothing. It is runtime-only: nothing is written to disk, and a restart reloads the
+file. The response carries `config`, `persisted: false` and `requires_restart: false`. Send 1 to
+32 ASCII http(s) origins of at most 512 bytes each, with an optional single hostname wildcard; a
+lone `*` allows all. Empty or null lists, paths, queries, credentials, control characters and
+unknown fields are rejected. Concurrent updates apply one at a time; requests already in flight
+may see the old settings.
+
+`guards` in the config reports the [cost guards](#cost-guards):
+
+```json
+{ "enforce": ["other", "routes"], "observe_only": false, "budget": "shadow", "api_plan_layout": "custom_all" }
+```
+
+`enforce` lists the families that refuse; every other family only counts. `observe_only` is true
+under `database.api_plan_layout: single`, where every family observes whatever `enforce` says.
+`budget` is always `shadow`. In a `PUT`, `guards.enforce` is a list of family names (`routes`,
+`channel_messages`, `packets_global`, `packets_region`, `packets_window`, `packet_detail`,
+`stats`, `other`), deduplicated and returned in that order. `[]` makes every family observe; an
+unknown name is a `400`. The change applies to requests that start afterwards.
+
+`GET /admin/db/statements` returns `{"items":[...]}`, highest total execution time first. Each
+item has `name` (the statement name; statements without one are summed as `(unnamed)`), `calls`,
+`exec_ms`, `plan_ms`, `shared_hit` and `shared_read` (buffer blocks), `rows` and `wal_bytes`.
+Times are milliseconds rounded to microseconds. `plan_ms` stays 0 unless `pg_stat_statements.track_planning` is on.
+Counters run from the last `pg_stat_statements` reset. Setup is in
+[Operations](operations.md#statement-statistics).
 
 `POST /admin/accounts` takes `{"name": "..."}` in a body of at most 4 KiB. The name is trimmed,
 case-sensitive, 1 to 128 characters with no control characters, and unique among active
