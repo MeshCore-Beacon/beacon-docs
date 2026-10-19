@@ -132,6 +132,10 @@ does not give way to a lock request the way an ordinary autovacuum does, so a mi
 that table waits until the vacuum ends. Let either finish, or end a stuck client session with
 `SELECT pg_cancel_backend(<pid>);`, then deploy.
 
+If you run the [daily plan check](#turning-on-the-daily-check), also confirm its report is clean
+before and after the deploy. Maintainers run the plan checks before every server release; see
+[Before a release](#before-a-release).
+
 ### How startup migrations wait for locks
 
 Each migration statement runs with `lock_timeout = 30s`. When a statement times out on a lock,
@@ -579,9 +583,12 @@ scrape_configs:
 | `beacon_pg_wal_bytes_total` | counter | | WAL written, cluster-wide |
 | `beacon_pg_checkpoints_total` | counter | `kind` | Checkpoints, `timed` or `requested` |
 | `beacon_pg_xid_age` | gauge | | Age of the oldest transaction ID in the database |
+| `beacon_planguard_failures` | gauge | `entry`, `mode` | 1 for each corpus entry and plan mode that failed the last [plan check](#turning-on-the-daily-check) |
+| `beacon_planguard_last_run_timestamp_seconds` | gauge | | Unix time the last successful plan check finished; 0 until the first one |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
-minute; the index gauges first appear an hour after startup. Go runtime and process metrics
+minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
+gauges exist only with `planguard.daily_check: true`. Go runtime and process metrics
 are included too.
 
 ### Example alert rules
@@ -610,6 +617,11 @@ groups:
         expr: rate(beacon_pg_wal_bytes_total[1h]) > <baseline bytes/s>
       - alert: BeaconXIDAge
         expr: beacon_pg_xid_age > 300e6
+      # The two plan check rules only matter with planguard.daily_check: true.
+      - alert: BeaconPlanguardFailures         # the last plan check found a regression
+        expr: sum(beacon_planguard_failures) > 0
+      - alert: BeaconPlanguardStale            # no successful plan check for 26 h
+        expr: time() - beacon_planguard_last_run_timestamp_seconds > 26*3600 and on() time() - process_start_time_seconds > 26*3600
 ```
 
 Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
@@ -682,6 +694,172 @@ list for weeks is a candidate to drop; check that no rare job reads it first.
 When `BeaconKeysetBloat` fires, rebuild that index as in
 [Rebuilding the route keyset indexes](#rebuilding-the-route-keyset-indexes). The rebuild resets
 its baseline, and the ratio drops back to about 1 on the next hourly run.
+
+## Plan checks (planguard)
+
+planguard checks that PostgreSQL still plans each of Beacon's statements the way it was designed.
+Its corpus, in the server repo under `db/planguard/`, lists every API and job statement with
+parameters and what its plan must look like: the driving index and its index conditions, the
+scans it must never use, and buffer, row and time budgets. It runs at three tiers against three
+databases:
+
+| Tier | Database | How it plans | Checks | Who runs it |
+|---|---|---|---|---|
+| `fixture` | A synthetic database built through the migrations | Plain `EXPLAIN` | Plan shapes, against the committed `baseline/fixture` | CI, on every server pull request |
+| `local` | A copy of a large production database, or a restored dump | `EXPLAIN (ANALYZE, BUFFERS)`, read-only | Plan shapes and budgets, against your own `baseline/local` | Maintainers, before a release |
+| `prod` | A live production database | Plain `EXPLAIN`, read-only, 5 s per plan | Plan shapes only, no baseline | The server's [daily check](#turning-on-the-daily-check), or by hand through psql |
+
+Every tier runs each statement inside a `READ ONLY` transaction with a 1 s lock timeout and rolls
+it back. Only the `local` tier executes statements, and then only reads; writes are only ever
+planned.
+
+Each run gets a verdict:
+
+| Verdict | Meaning | Blocks a release |
+|---|---|---|
+| `ok` | The plan matches its expectations. | No |
+| `FALSE_POSITIVE` | A statement that should pass broke a rule: a real regression, or an expectation that no longer holds on this database. | Yes |
+| `MISSED` | A planted regression (an entry that must fail) passed, so the check itself is not catching what it should. | Yes |
+| `ERROR` | The statement could not be planned. | Yes |
+| `DETECTED` | A planted regression failed, as it should. | No |
+| `RETIRED_INDEX` | The only failures name an index that a pending change drops. Expected until that change ships. | No |
+| `KNOWN_ISSUE` | A failure the corpus already records as known. | No |
+| `SKIP` | The run was not made, for example a statement whose feature is not built yet or whose parameters found no value. | No |
+
+The command line tool is `cmd/planguard` in the server repo. Run it from a checkout of the commit
+you are about to release. It exits 0 when no run fails and 1 when one does, and writes its
+results to `planguard-out/`.
+
+### Fixture tier
+
+CI builds the fixture and runs this tier on every pull request. To run it yourself you need an
+empty database with C collation on PostgreSQL 16 (CI pins 16.15):
+
+```sql
+CREATE DATABASE planguard TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C' ENCODING 'UTF8';
+```
+
+```bash
+go run ./cmd/planguard run --tier fixture --dsn 'postgres://...:5432/planguard'
+```
+
+The first run builds the fixture through the migrations, which takes a minute or two; later runs
+reuse it while its inputs are unchanged. The builder refuses a database that already holds data
+or is not C-collated.
+
+### Local tier
+
+The local tier is the release gate. Run it against a copy of a large production database, or a
+restored dump, never against the live one: it executes every read statement. The copy needs its
+own baseline (written to `db/planguard/baseline/local/` in your checkout), so write one on the
+first run, review it, then check against it:
+
+```bash
+go run ./cmd/planguard run --tier local --dsn "$COPY_DSN" --baseline write
+go run ./cmd/planguard run --tier local --dsn "$COPY_DSN"      # --baseline check is the default
+```
+
+A plan that changes against the baseline fails the check run. When the change is intended, write
+the baseline again and keep it with the copy. `--only` and `--skip` take a regular expression of
+entry ids to narrow a run.
+
+### Prod tier through psql
+
+The server's daily check runs the prod tier itself. To get the same evidence from a database the
+server does not check, for example before turning the check on, emit read-only psql scripts and
+run them yourself. Nothing connects from the tool; you run each script and hand its output back:
+
+```bash
+go run ./cmd/planguard run --tier prod --emit resolvers > resolvers.sql
+docker compose exec -T db psql -X -U beacon -d beacon < resolvers.sql > resolvers.out
+
+go run ./cmd/planguard run --tier prod --emit plans --params resolvers.out > plans.sql
+docker compose exec -T db psql -X -U beacon -d beacon < plans.sql > plans.out
+
+go run ./cmd/planguard run --tier prod --params resolvers.out --plans plans.out
+```
+
+The first script looks up parameter values (20 s statement timeout); the second runs plain
+`EXPLAIN`s with them. Both set `default_transaction_read_only` and a 1 s lock timeout. Each
+script carries a random marker, and the last step rejects output that is truncated or does not
+match the script.
+
+### Before a release
+
+Before tagging a server release, maintainers confirm:
+
+1. CI's fixture tier is clean.
+2. The local tier, against your copy and its baseline, is clean.
+3. On a deployment with the daily check on, `GET /api/v1/admin/db/planguard?fresh=true` returns
+   `"clean": true`, before and after the deploy.
+
+`RETIRED_INDEX` runs are expected while an index drop is pending; each names the index that will
+go.
+
+### Turning on the daily check
+
+The daily check is for large deployments only. Its expectations assume production-sized
+tables, and on a small database the planner rightly picks other plans, which the check reports
+as failures. Before turning it on, run the prod tier through psql once and look at the result.
+Then set:
+
+```yaml
+planguard:
+  daily_check: true
+```
+
+and restart the server. It cannot be combined with `server.read_only`. The first check runs
+about an hour after startup and then once a day; a failed run is retried every hour. Read the
+last report, or run one now (at most one new run per 5 minutes), with the admin key:
+
+```bash
+curl -s https://<your-domain>/api/v1/admin/db/planguard \
+  -H "Authorization: Bearer $BEACON_API_KEY"
+curl -s 'https://<your-domain>/api/v1/admin/db/planguard?fresh=true' \
+  -H "Authorization: Bearer $BEACON_API_KEY"
+```
+
+`clean` must be true. `failures` lists each failing run with the rules it broke and the indexes
+it used. The response is described in the [API contract](api-contract.md#admin).
+
+With [metrics](#metrics) on, add the two plan check alerts from the
+[example rules](#example-alert-rules):
+
+- `BeaconPlanguardFailures` fires when the last check had a failing run.
+  `beacon_planguard_failures` names the entry and mode.
+- `BeaconPlanguardStale` fires when no check has succeeded for 26 hours. The last-run gauge is
+  0 from startup until the first success, so a check that never succeeds fires it too. The
+  `process_start_time_seconds` condition keeps a recent restart from firing it before the first
+  run has had time to happen.
+
+To turn the check off, set `daily_check: false` and restart. Nothing is stored in the database.
+
+### Comparing two builds
+
+`server.read_only: true` (see [Configuration](configuration.md#read-only-mode)) lets two server
+builds serve the same database copy side by side, so a change to a query can be checked against
+real data before it ships. `planguard storediff` then walks the same API pages on both and
+compares the whole JSON of every page.
+
+1. Build the base and the candidate server binaries.
+2. Give each a `config.yaml` with `server.read_only: true` and `ratelimit.enabled: false`, and
+   leave `REDIS_ADDR` unset so neither serves cached responses. Point both `POSTGRES_DSN`s at
+   the same copy, already migrated to the schema both builds expect. Indexes or other objects
+   only the candidate needs can live in a scratch schema on that copy, put first on the
+   candidate's search path with `?search_path=<scratch>,public` in its DSN.
+3. Start them on two ports, for example 8481 and 8482. Each logs a read-only warning at startup
+   and no migration lines.
+4. Compare them:
+
+   ```bash
+   go run ./cmd/planguard storediff --old http://127.0.0.1:8481 --new http://127.0.0.1:8482 \
+     --cases db/planguard/storediff/smoke.yaml --walk 1,2,3,web --out storediff-out
+   ```
+
+`--walk` lists the page sizes to walk; `web` is each case's web page size. Small page sizes catch
+pagination that skips or repeats rows. The tool exits non-zero when any page differs, and with
+`--out` writes `storediff_report.md` there. Never use read-only mode on your live instance: it
+ingests nothing.
 
 ## Rolling back the pool layout
 
