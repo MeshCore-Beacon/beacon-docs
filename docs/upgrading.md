@@ -156,8 +156,8 @@ On a large deployment, pre-build `idx_observations_adverts` off-peak before depl
 Other deployments can skip that: the server builds it at startup.
 
 After the deploy, a background job fills in missing observation payload types; on a large
-deployment it takes about 80 minutes. Until it reports done, observer adverts pages use the
-previous release's statement. See
+deployment it takes about 80 minutes, or under a minute where every observation already has
+its type. Until it reports done, observer adverts pages answer `503` with `Retry-After`. See
 [After upgrading: observation payload types](operations.md#after-upgrading-observation-payload-types),
 which also shows how to mark it done by hand. Five stats and traces statements move to the
 `api_custom` pool; see
@@ -167,7 +167,7 @@ which also shows how to mark it done by hand. Five stats and traces statements m
   `034` is recorded.
 - Don't upgrade to a release that drops `idx_observations_observer_id` until
   `SELECT value FROM background_state WHERE key = 'observation_payload_type'` shows
-  `"done": true`. Before then the previous adverts statement still runs and needs that index.
+  `"done": true`.
 - To roll back, deploy the previous image. See the rollback notes in the two operations
   sections above.
 
@@ -181,12 +181,14 @@ new indexes build at startup in well under a second.
 
 After the deploy, the server fills the table in the background and verifies it once; on a large
 deployment that takes 3 to 5 minutes. Until the log shows
-`cmi trusted: region and scope message pages read channel_message_iatas`, every page is served by
-the previous release's statements, so users see no change. See
+`cmi trusted: region and scope message pages read channel_message_iatas`, channel message pages
+filtered by `iatas` (or by `scope` without `since`) answer `503` with `Retry-After`; see
+[Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model). See
 [Read models: channel messages by site](operations.md#read-models-channel-messages-by-site) for
 what to watch, the metrics and alerts, and how read-only servers decide.
 
-- To turn it off without rolling back, set `readmodels.cmi.enabled: false` and restart; see
+- To turn those pages off without rolling back, set `readmodels.cmi.enabled: false` and
+  restart; they answer `503` until it is `true` again. See
   [Configuration](configuration.md#read-models).
 - To roll back, deploy the previous image. Rolling forward again later repairs the table at
   startup before any page reads it; nothing to do by hand.
@@ -206,8 +208,9 @@ lock on `packets`. No pre-build is needed: the new indexes build on an empty tab
 After the deploy, the server fills the table in the background and verifies it once; on a large
 deployment expect roughly 5 to 20 minutes and a few GB of WAL, then a few minutes of
 `VACUUM (ANALYZE)`. Until the log shows
-`packet_sites trusted: region packet pages read packet_sites`, every region page is served by
-the previous release's statement, so users see no change. See
+`packet_sites trusted: region packet pages read packet_sites`, region pages answer `503` with
+`Retry-After`; see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model).
+See
 [Read models: packets by site](operations.md#read-models-packets-by-site) for what to watch, the
 metrics and alerts, and how read-only servers decide.
 
@@ -216,8 +219,9 @@ metrics and alerts, and how read-only servers decide.
   and watch `beacon_ingest_queue_depth`; see
   [Ingest cost](operations.md#ingest-cost). A growing queue or WAL beyond your budget means
   rolling back.
-- To turn it off without rolling back, set `readmodels.packet_sites.enabled: false` and
-  restart; see [Configuration](configuration.md#read-models).
+- To turn region pages off without rolling back, set `readmodels.packet_sites.enabled: false`
+  and restart; they answer `503` until it is `true` again. See
+  [Configuration](configuration.md#read-models).
 - To roll back, deploy the previous image. Rolling forward again later repairs the table at
   startup before any region page reads it; nothing to do by hand.
 
@@ -257,6 +261,30 @@ and confirm `SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = '
 prints `t` before switching images. The six dropped indexes are optional after a rollback; their rebuild statements are in
 [Lookup-table indexes and the route stamp column](operations.md#lookup-table-indexes-and-the-route-stamp-column),
 which also covers rolling forward again.
+
+## Read-model pages without fallback
+
+The release that removes the read-model fallbacks follows the one above. It keeps the minimum
+web and app versions.
+
+- **Pages that wait.** Region `/packets` pages, channel message pages filtered by `iatas` (or by
+  `scope` without `since`), and observer advert pages are served only from their read model or
+  backfilled data. While that is not ready they answer `503` with `Retry-After: 30`; there is no
+  fallback to the previous statements any more. If the read models fill for the first time in
+  the same upgrade, those pages are unavailable for the whole first fill (minutes for channel
+  messages, roughly 5 to 20 minutes for region packets on a large deployment). The web and app
+  retry for about 90 s and then show an error with a retry, so users retry by hand after that.
+  Upgrade at a quiet hour and watch the `... backfill progress` log lines. See
+  [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model).
+- **Kill switches.** `readmodels.cmi.enabled: false` and `readmodels.packet_sites.enabled: false`
+  now turn those pages off (`503`) instead of serving them from the previous statements.
+- **Pool.** `api_slow` no longer serves untrusted pages, so `slow_pool_size` now defaults to `2`
+  and the default total goes from 26 to 20 connections. An explicit `slow_pool_size` still wins.
+- **Alerts.** Load the two read-model `Untrusted` rules (15 minutes) and `BeaconAdvertsNotReady`
+  from [Example alert rules](operations.md#example-alert-rules).
+- **Getting the fallbacks back.** Revert this release's server change (one commit); that also
+  restores `slow_pool_size`'s default of 8. See
+  [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
 
 ## Changes that need a restart
 

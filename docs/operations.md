@@ -403,11 +403,15 @@ How long it takes depends on the id range, not on how many rows need a type: a d
 ids run to about 830 million needs about 80 minutes. On a database whose observations are all
 typed, each statement reads its span and updates nothing.
 
-Until the job reports `done`, `/observers/{observerId}/adverts` serves the same statement as the
-previous release, on the same index, now on the `api_slow` pool (see
-[Slow region and message statements](#slow-region-and-message-statements)). Once a server process reads `done`, it switches
-to the statement that reads `idx_observations_adverts` and keeps it until restart. The
-responses are the same either way.
+Until a server process reads `done`, `/observers/{observerId}/adverts` answers `503` with
+`Retry-After: 30` (the statement that served those pages before `done` is gone). The job logs
+`observation payload type backfill progress: observer advert pages answer 503 until it is done`
+with `next_id` and `max_id` once a minute while it walks. Once a server process reads `done`,
+it serves the pages from `idx_observations_adverts` and keeps that until restart. On a database
+whose observations already all carry a payload type (every deployment that started on a release
+with the column), the job's first run finds no untyped row and records `done` at once
+(`observation payload types complete ... probe=true`), so the pages are back within a minute of
+boot. There is no switch for this gate.
 
 Check progress, read-only:
 
@@ -445,8 +449,7 @@ per-observer payload breakdown's unknown (`-1`) bucket shrinks into the real typ
 evidence starts to include those rows.
 
 Don't upgrade to a release that drops `idx_observations_observer_id` until the progress query
-shows `"done": true`. Until then the adverts statement of the previous release still runs, and
-it uses that index.
+shows `"done": true`.
 
 Going back to the previous server image needs nothing here. Older servers ignore the
 `observation_payload_type` key, and rows the job typed stay typed, which older servers read the
@@ -564,12 +567,12 @@ While the server process trusts the table, these channel message pages read it:
   with `since` and `iatas`;
 - `/messages` with `iatas`, and with `scope` alone.
 
-Each such page now reads about as many index entries as it returns, where the previous
+Each such page reads about as many index entries as it returns, where the previous
 statement read every observation of the channel. While the process does not trust the table,
-the same pages are served by the previous release's statements, on the `api_slow` pool. Two shapes always use the
-previous statements: `/messages` with `iatas` and `since`, and `/messages` with `iatas` and
-`scope`. Pages without `iatas` or `scope` never read the table. Responses are the same in
-every case.
+those pages answer `503` with `Retry-After: 30`. Two shapes always use the previous all-channel
+statement, trusted or not, on the two-connection `api_slow` pool: `/messages` with `iatas` and
+`since`, and `/messages` with `iatas` and `scope`. Pages without `iatas` or `scope` never read
+the table. Responses are the same as the previous statements' in every case.
 
 ### Installing it
 
@@ -587,10 +590,12 @@ On the first start the server fills the table in the background:
    so later starts skip it.
 4. It logs `cmi trusted: region and scope message pages read channel_message_iatas`.
 
-Until step 4, every page is served by the previous statements, and users see no difference.
-If the verification fails, the server logs
-`cmi verification failed; pages stay on the original statements` and tries again every 5
-minutes.
+Until step 4, the pages above answer `503` with `Retry-After: 30`; the server logs
+`cmi boot repair starting: region and scope message pages answer 503 until it is trusted` when
+it begins. If the verification fails, the server logs
+`cmi verification failed; region and scope message pages answer 503 until a later pass succeeds`
+and tries again every 5 minutes. See [Pages that wait for a read model](#pages-that-wait-for-a-read-model)
+for what users see.
 
 Check progress, read-only:
 
@@ -613,8 +618,8 @@ complete and the one-time verification has passed. It drops trust:
 - at once when ingest leaves a message without its sites: a failed site insert, a message
   stored without its sites, or any message insert error. It logs
   `read model untrusted until the next reconcile` with the reason. Trust returns after the
-  next reconcile that started after the failure, so pages use the previous statements for at
-  most about one interval;
+  next reconcile that started after the failure, so those pages answer `503` for at most about
+  one interval;
 - when the stored state is no longer complete and verified, for example after a rebuild.
 
 A reconcile that repairs rows logs `cmi reconcile repaired N pair(s): a writer bypassed the read model`.
@@ -630,14 +635,15 @@ that the newest 2,000 messages pass the exact check. While all three hold it log
 `cmi trusted on this read-only server: region and scope message pages read channel_message_iatas`
 and serves those pages from the table. Its trust ends on its own 10 minutes after the writer's
 last save, unless a later check finds a newer one. A writer that is rolled back, stopped or keeps
-failing stops saving, so read-only servers go back to the previous statements within 10 minutes
-and log `cmi not trusted on this read-only server: the writer has not saved its state recently`.
+failing stops saving, so on read-only servers those pages answer `503` within 10 minutes, and
+they log `cmi not trusted on this read-only server: the writer has not saved its state recently`.
 
 ### Turning it off
 
 Set `readmodels.cmi.enabled: false` in `config.yaml` and restart; see
-[Configuration](configuration.md#read-models). Every page is then served by the previous
-statements. The table is still maintained, so turning it back on needs only a restart.
+[Configuration](configuration.md#read-models). This turns the pages that read the table off:
+they answer `503` until the key is `true` again. Every other channel message page is
+unaffected. The table is still maintained, so turning it back on needs only a restart.
 
 ### Metrics and alerts
 
@@ -650,8 +656,8 @@ On the [admin listener](#metrics):
   600 s.
 
 Suggested rules are in [Example alert rules](#example-alert-rules): repaired rows in 3
-consecutive 5-minute windows, trusted at 0 for 20 minutes, and a watermark older than 15
-minutes.
+consecutive 5-minute windows, trusted at 0 for more than 15 minutes (those pages are answering
+`503`), and a watermark older than 15 minutes.
 
 ### Rolling back
 
@@ -660,8 +666,8 @@ with their messages, so it does not grow stale rows. Leave the table and its ind
 
 To roll forward again later, deploy the new image. Before it serves any page from the table,
 the boot reconcile adds every site the older image stored, starting from the saved watermarks.
-The previous statements serve meanwhile: about a second after a short rollback, a few minutes
-after days. Nothing to do by hand.
+Those pages answer `503` meanwhile: about a second after a short rollback, a few minutes after
+days. Nothing to do by hand.
 
 Rebuild the table from scratch only if the verification keeps failing:
 
@@ -694,14 +700,13 @@ While the server process trusts the table, `/packets` pages with `iatas`, `iata`
 - payload and route types, up to 8 (payload, route) pairs: one exact range per site and pair;
 - a `since`/`until` window, scopes, or more than 8 type pairs: bounded reads of each site range
   that continue, within the same request, until the page is full. If 8 reads do not fill the
-  page, the previous release's statement answers that request, on the `api_slow` pool with a
-  120 s statement limit (see [Slow region and message statements](#slow-region-and-message-statements)).
+  page, the previous release's statement answers that request, on the two-connection
+  `api_slow` pool with a 120 s statement limit (see [Slow region and message statements](#slow-region-and-message-statements)).
 
 Unknown site codes are dropped by a cheap check first. Requests with `hashPrefix` never read
 the table. A region page served from the table now returns `nextPageCursor`; see
 [Exact page cursors](api-contract.md#exact-page-cursors). While the process does not trust the
-table, region pages are served by the previous release's statement as before, on the `api_slow`
-pool.
+table, region pages answer `503` with `Retry-After: 30`.
 
 Each page is the previous statement's page, except where that statement loses rows: when a
 site's packets are heard by many observers, it can end a page short, end a walk early (an
@@ -752,10 +757,11 @@ On the first start the server fills the table in the background:
    `packet_sites first-time verification passed` and records the time, so later starts skip it.
 4. It logs `packet_sites trusted: region packet pages read packet_sites`.
 
-Until step 4, every region page is served by the previous release's statement, and users see
-no difference. If the verification fails, the server logs
-`packet_sites verification failed; region pages stay on the original statement` and tries again
-every 5 minutes.
+Until step 4, region pages answer `503` with `Retry-After: 30`; the server logs
+`packet_sites boot repair starting: region packet pages answer 503 until it is trusted` when it
+begins. If the verification fails, the server logs
+`packet_sites verification failed; region packet pages answer 503 until a later pass succeeds`
+and tries again every 5 minutes. See [Pages that wait for a read model](#pages-that-wait-for-a-read-model).
 
 Check progress, read-only:
 
@@ -781,8 +787,8 @@ complete and the one-time verification has passed. It drops trust:
   observation: it logs `observation site row failed; storing the observation without it` and
   stores it without its row. Trust drops with
   `read model untrusted until the next reconcile` and the reason, and returns after the next
-  reconcile that started after the failure, so region pages use the previous statement for at
-  most about one interval;
+  reconcile that started after the failure, so region pages answer `503` for at most about one
+  interval;
 - after 3 failed reconciles in a row, until one succeeds;
 - when the saved state is no longer complete and verified, for example after a rebuild.
 
@@ -806,10 +812,9 @@ save, unless a later check finds a newer one. Otherwise it logs one of:
 ### Turning it off
 
 Set `readmodels.packet_sites.enabled: false` in `config.yaml` and restart; see
-[Configuration](configuration.md#read-models). Every region page is then served by the previous
-statement. The table is still maintained and swept, so turning it back on needs only a
-restart. A later release removes the previous statement once the read model has run in
-production.
+[Configuration](configuration.md#read-models). This turns region packet pages off: they answer
+`503` until the key is `true` again. The table is still maintained and swept, so turning it back
+on needs only a restart.
 
 ### Metrics and alerts
 
@@ -832,7 +837,7 @@ On the [admin listener](#metrics):
   a compact index rather than the size the server first saw.
 
 Suggested rules are in [Example alert rules](#example-alert-rules): repaired rows in the last
-10 minutes, trusted at 0 for 40 minutes, a watermark older than 15 minutes, a sweep older than
+10 minutes, trusted at 0 for more than 15 minutes, a watermark older than 15 minutes, a sweep older than
 300 s or a sweep plan at 0, a bloat ratio of the three time-ordered indexes over 2.5 (warn) or
 3, and the table over 2.5 GiB (warn; scale it for your deployment).
 
@@ -844,7 +849,7 @@ Leave the table and its indexes in place.
 
 To roll forward again later, deploy the new image. Before it serves any region page from the
 table, the boot reconcile adds the rows written meanwhile, starting from the saved watermark;
-the previous statement serves until then. Nothing to do by hand.
+region pages answer `503` until then. Nothing to do by hand.
 
 Rebuild the table from scratch only if the verification keeps failing:
 
@@ -855,19 +860,42 @@ TRUNCATE packet_sites;
 
 Then restart the server. It backfills and verifies again as on the first install.
 
+## Pages that wait for a read model
+
+Three page families are served only from data the server prepares, and answer `503` with
+`Retry-After: 30` and code `service_unavailable` while it is not ready:
+
+| Pages | Ready when | Kill switch |
+|---|---|---|
+| `/packets` with `iatas`, `iata`, `region` or `regionId` | this process trusts `packet_sites` | `readmodels.packet_sites.enabled: false` |
+| `/channels/{id}/messages` and `/messages` with `iatas`, or with `scope` and no `since` (not `/messages` with `iatas` and `since` or `scope`) | this process trusts `channel_message_iatas` | `readmodels.cmi.enabled: false` |
+| `/observers/{id}/adverts` | the [payload-type backfill](#after-upgrading-observation-payload-types) is done | none |
+
+A kill switch set to `false` keeps those pages off (`503`) until it is set back. Every other
+page is unaffected. Each such `503` is counted in
+`beacon_api_unavailable_total{reason="not_ready",model}`, `model` being `packet_sites`, `cmi` or
+`observation_payload_types`.
+
+**What users see.** The web app and the mobile app retry a `503` that carries `Retry-After`
+three times, waiting up to 30 s each, so about 90 s in all, and then show an error. A first
+fill or a repair that takes longer than that means users must retry by hand (reload the page,
+or pull to refresh). On the first start of the release that adds a read model, expect those
+pages to be unavailable for the whole fill: minutes for `channel_message_iatas` on a
+200,000-message deployment, roughly 5 to 20 minutes for `packet_sites` on a large one, both
+logged as `... backfill progress` lines. Plan the upgrade for a quiet hour.
+
+**Watching it.** `beacon_readmodel_trusted{model}` is 0 while the pages wait. Alert on it
+staying 0 for more than 15 minutes, per model (the rules are in
+[Example alert rules](#example-alert-rules)); it fires during a long first fill as well, which
+is expected. The adverts gate has no trust gauge; alert on its `503`s instead
+(`BeaconAdvertsNotReady`, two hours, longer than the backfill takes on a large deployment).
+
 ## Slow region and message statements
 
-Some requests still read a large part of the observations in one statement:
-
-- a region `/packets` page whose bounded reads ran out of budget (a sparse filter such as a
-  narrow window or rare payload types over busy sites);
-- `/messages` with `iatas` and `since` or `scope`;
-- while a read model is not trusted (its first fill, a repair, a failed verification, its kill
-  switch), the previous statements that serve its pages: region `/packets`, channel message
-  pages filtered by `iatas` or `scope`, and observer adverts until the payload-type backfill is
-  done.
-
-They run on their own pool, `api_slow`: 8 connections by default, the size `api_legacy` had
+Two kinds of request still read a large part of the observations in one statement: a region
+`/packets` page whose bounded reads ran out of budget (a sparse filter such as a narrow window
+or rare payload types over busy sites), and `/messages` with `iatas` and `since` or `scope`.
+They run on their own pool, `api_slow`: 2 connections by default
 ([`database.slow_pool_size`](configuration.md#database-pools-and-cost-guards)),
 `statement_timeout=120s`, no parallel workers, not gated by the cost guards. When every
 connection is busy a request waits at most 5 s and then answers `503` with `Retry-After: 5`,
@@ -876,13 +904,9 @@ those, and the server logs `api: slow requests refused, every slow connection is
 once a minute. A statement that passes 120 s ends with a `500`; narrowing the request (fewer
 sites, a wider window) avoids it.
 
-During a read model's first fill every region or scope page goes through this pool; the default
-of 8 gives those pages the capacity they had on `api_legacy`. Set `slow_pool_size` only to
-override that.
-
-Before this release these statements ran on `api_legacy` without a time limit, except the
-exact-page-cursor form of the region statement, which ran on `api_custom` (35 s, gated by
-`packets_region`).
+Before this release the region statement ran on `api_legacy` without a time limit for a
+millisecond cursor, and on `api_custom` (35 s, gated by `packets_region`) for an exact page
+cursor; the all-channel message statement ran on `api_legacy` without a limit.
 
 Measured on a copy of a large production database (29.4 million observations, 561 IATAs), with
 the pool's settings:
@@ -897,6 +921,37 @@ the pool's settings:
 Requests naming every IATA are not something the web or app send; the largest region on that
 database has 22 IATAs. `beacon_db_time_seconds{pool="api_slow"}` and
 `beacon_pool_acquire_seconds{pool="api_slow"}` show how busy the pool is.
+
+### Reverting to the read-model fallbacks
+
+If the read-model pages must be served while a model is not trusted, as in earlier releases,
+revert the server change that removed the fallbacks rather than rolling back the image. It is a
+single commit on the server's `dev` branch ("region, scope and advert pages answer 503 until
+their read model is ready, instead of falling back"); reverting it gives back exactly the
+previous release's tree:
+
+```bash
+git revert --no-edit <that commit>
+```
+
+Then build, deploy and restart; no configuration change is needed, because the revert also
+restores `slow_pool_size`'s default of 8 (an explicit `slow_pool_size` in `config.yaml` still
+wins). What to expect:
+
+- Untrusted region `/packets` pages, channel message pages and observer advert pages are served
+  by the previous statements again, with no `503` from a read model.
+- All four previous statements (region, per-channel and all-channel messages, adverts) run on
+  `api_slow`: 8 connections, like the old `api_legacy`, ungated, with the 5 s connection wait and
+  a 120 s statement limit (the old pool had no limit). The total connection count grows by 6.
+- If migration `046` (the drops release) has run, rebuild `idx_observations_observer_id` first,
+  because the restored adverts statement reads it:
+
+  ```sql
+  CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations USING btree (observer_id, id);
+  SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;
+  ```
+
+  The second statement must print `t` before you deploy.
 
 ## Postgres settings
 
@@ -1074,7 +1129,7 @@ connection belongs to:
 | Pool | `application_name` | Size | Session settings |
 |---|---|---:|---|
 | `api_legacy` | `beacon-api_legacy` | 8, `single` only | Server defaults. The rollback layout's only API pool. |
-| `api_slow` | `beacon-api_slow` | 8 (`slow_pool_size`), not under `single` | Server defaults, with `statement_timeout=120s` and `max_parallel_workers_per_gather=0`. Only the [slow region and message statements](#slow-region-and-message-statements). |
+| `api_slow` | `beacon-api_slow` | 2 (`slow_pool_size`), not under `single` | Server defaults, with `statement_timeout=120s` and `max_parallel_workers_per_gather=0`. Only the [slow region and message statements](#slow-region-and-message-statements). |
 | `api_custom` | `beacon-api_custom` | 8 (7 under `split`) | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`, `statement_timeout=35s`, `idle_in_transaction_session_timeout=30s` |
 | `api_cached` | `beacon-api_cached` | 5, `split` only | As `api_custom`, with `plan_cache_mode=force_generic_plan` |
 | `ingest` | `beacon-ingest` | 6, or one per CPU above 6 | `plan_cache_mode=auto`, `jit=off`, no statement timeout: an ingest write waits out a lock rather than drop a packet |
@@ -1083,7 +1138,7 @@ connection belongs to:
 The `single` layout opens only `api_legacy`, `ingest` and `maint`; the other layouts never open
 `api_legacy`.
 
-- **Headroom.** `SHOW max_connections;` must leave room for the total (26 by default on up to
+- **Headroom.** `SHOW max_connections;` must leave room for the total (20 by default on up to
   6 CPUs) plus every other client: `psql` sessions, backups, monitoring. If your deploy starts
   the new server before the old one stops, count both.
 - **Checking.** Parallel workers carry their leader's `application_name`, so count client
@@ -1198,7 +1253,7 @@ scrape_configs:
 | `beacon_pg_xid_age` | gauge | | Age of the oldest transaction ID in the database |
 | `beacon_planguard_failures` | gauge | `entry`, `mode` | 1 for each corpus entry and plan mode that failed the last [plan check](#turning-on-the-daily-check) |
 | `beacon_planguard_last_run_timestamp_seconds` | gauge | | Unix time the last successful plan check finished; 0 until the first one |
-| `beacon_readmodel_trusted` | gauge | `model` | 1 while this process serves pages from the read model ([`cmi`](#read-models-channel-messages-by-site) or [`packet_sites`](#read-models-packets-by-site)), 0 while it serves the previous statements |
+| `beacon_readmodel_trusted` | gauge | `model` | 1 while this process serves pages from the read model ([`cmi`](#read-models-channel-messages-by-site) or [`packet_sites`](#read-models-packets-by-site)), 0 while those pages answer `503` |
 | `beacon_readmodel_repaired_rows_total` | counter | `model` | Rows the read-model reconcile repaired; above zero, a writer bypassed the model |
 | `beacon_readmodel_watermark_age_seconds` | gauge | `model` | Seconds since the last finished reconcile of the read model (on a read-only server, since the writer last saved its state) |
 | `beacon_packet_sites_sweep_age_seconds` | gauge | | Seconds since the last successful `packet_sites` front sweep; absent before the first |
@@ -1206,7 +1261,7 @@ scrape_configs:
 | `beacon_packet_sites_front_live` | gauge | `index` | Index entries written in the last two minutes that the last front sweep visited |
 | `beacon_packet_sites_bytes` | gauge | | Total size of `packet_sites`, heap and indexes, hourly |
 | `beacon_db_sequence_used_ratio` | gauge | `sequence`, `cycle` | Share of a sequence's usable values already handed out, 0 to 1, each minute. The usable range ends at the sequence's own limit or its column's type limit (`integer` 2,147,483,647), whichever is lower. `cycle="true"` marks a `CYCLE` sequence, whose ratio is its position, not used-up headroom. See [Sequence headroom](#sequence-headroom). |
-| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered because `api_slow` had no free connection (`reason="slow_pool_busy"`). `model` is the read model the page reads: `packet_sites`, `cmi` or `observation_payload_types`. |
+| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered: `not_ready` while its read model or backfill is not ready, `slow_pool_busy` when `api_slow` had no free connection. `model` is `packet_sites`, `cmi` or `observation_payload_types`. |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
@@ -1247,9 +1302,9 @@ groups:
       # The read-model rules don't apply with readmodels.cmi.enabled: false, where trusted stays 0.
       - alert: BeaconReadModelRepairing        # reconciles repaired rows in 3 consecutive 5-minute windows
         expr: min_over_time((increase(beacon_readmodel_repaired_rows_total{model="cmi"}[5m]) > bool 0)[15m:5m]) == 1
-      - alert: BeaconReadModelUntrusted        # region and scope message pages on the previous statements
+      - alert: BeaconReadModelUntrusted        # region and scope message pages answering 503
         expr: beacon_readmodel_trusted{model="cmi"} == 0
-        for: 20m
+        for: 15m
       - alert: BeaconReadModelStale            # no finished reconcile (or writer save) for 15 min
         expr: beacon_readmodel_watermark_age_seconds{model="cmi"} > 900
       # The packet_sites trust rules don't apply with readmodels.packet_sites.enabled: false.
@@ -1257,9 +1312,9 @@ groups:
       # read-only server: it never sweeps, so its sweep_plan_ok stays 0 and the plan rule would fire.
       - alert: BeaconPacketSitesRepairing      # a reconcile or audit repaired rows: a writer bypassed the model
         expr: increase(beacon_readmodel_repaired_rows_total{model="packet_sites"}[10m]) > 0
-      - alert: BeaconPacketSitesUntrusted      # region packet pages on the previous statement
+      - alert: BeaconPacketSitesUntrusted      # region packet pages answering 503
         expr: beacon_readmodel_trusted{model="packet_sites"} == 0
-        for: 40m
+        for: 15m
       - alert: BeaconPacketSitesStale          # no finished reconcile (or writer save) for 15 min
         expr: beacon_readmodel_watermark_age_seconds{model="packet_sites"} > 900
       - alert: BeaconPacketSitesSweepStale
@@ -1273,6 +1328,9 @@ groups:
         expr: beacon_index_bloat_ratio{index=~"idx_packet_sites_site(_type|_scope)?"} > 3
       - alert: BeaconPacketSitesSize           # warn; scale 2.5 GiB for your deployment
         expr: beacon_packet_sites_bytes > 2.5 * 1024^3
+      - alert: BeaconAdvertsNotReady           # observer advert pages answering 503 for over 2 h
+        expr: sum(increase(beacon_api_unavailable_total{reason="not_ready",model="observation_payload_types"}[15m])) > 0
+        for: 2h
       - alert: BeaconSlowPoolBusy              # region or message requests refused for want of a slow connection
         expr: sum(increase(beacon_api_unavailable_total{reason="slow_pool_busy"}[15m])) > 10
       # The sequence rules leave out CYCLE sequences, which wrap instead of running out.
@@ -1287,6 +1345,10 @@ groups:
         labels: {severity: critical}
         annotations: {summary: "Sequence {{ $labels.sequence }} runs out within 90 days at its current rate"}
 ```
+
+The two `Untrusted` rules fire while a read model's pages answer `503` for more than 15
+minutes, including during a long first fill after an upgrade; see
+[Pages that wait for a read model](#pages-that-wait-for-a-read-model).
 
 Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
 recheck has no metric yet; at `debug` level it logs a `route reconfirm` line per slice, and

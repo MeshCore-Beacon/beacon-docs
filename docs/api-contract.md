@@ -82,7 +82,26 @@ Each request falls in one family and one class:
 
 "Region set" means a non-empty `iata`, `iatas`, `region` or `regionId`.
 
-A few requests run on a small database pool of their own: `/messages` with `iatas` and `since` or `scope`, region `/packets` pages whose filter is too sparse for the server's site read model, and region and scope pages while the server is still preparing a read model. When that pool is busy they answer `503` `service_unavailable` with `Retry-After: 5`.
+## Pages that wait for server data
+
+Some pages are served only from data the server prepares in the background. While it is not ready they answer `503` with code `service_unavailable` and `Retry-After: 30`, whatever `guards.enforce` says:
+
+| Pages | Ready when |
+|---|---|
+| `/packets` with `iata`, `iatas`, `region` or `regionId`, without `hashPrefix` (region pages) | the server trusts its `packet_sites` read model |
+| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` and neither `since` nor `scope`, or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
+| `/observers/{observerId}/adverts` | every observation carries its payload type |
+
+That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` reads no read model and is always served, on a small pool of its own. The same pool answers trusted region `/packets` pages whose filter is too sparse for the read model's bounded reads. When that pool is busy, those requests answer `503` `service_unavailable` with `Retry-After: 5`.
+
+```
+HTTP/1.1 503 Service Unavailable
+Retry-After: 30
+
+{"error":{"code":"service_unavailable","message":"This page is not available yet. Retry later."}}
+```
+
+Retry after `Retry-After`. A first fill can take minutes, so a client that gives up after a few retries should let the user retry later.
 
 ## Versioning
 
@@ -96,7 +115,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
@@ -126,7 +145,7 @@ on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
 | Endpoint | `pageCursor` | `nextPageCursor` |
 |---|---|---|
 | `/packets` without `iata`, `iatas`, `region`, `regionId` or `hashPrefix` | Wins over `cursor` when both are sent. | When `hasMore` |
-| `/packets` with `iata`, `iatas`, `region` or `regionId` (a region page), without `hashPrefix` | While the server trusts its site read model, wins over `cursor` when both are sent. A region page served without `nextPageCursor` pages by `cursor`: there `cursor` wins, and a `pageCursor` sent alone pages by its millisecond. | When `hasMore`, while the server trusts its site read model |
+| `/packets` with `iata`, `iatas`, `region` or `regionId` (a region page), without `hashPrefix` | Wins over `cursor` when both are sent. | When `hasMore`, except on a page requested by a millisecond `cursor` alone that a sparse filter sent to the server's fallback statement |
 | `/packets` with `hashPrefix` | Checked, then ignored; `cursor` pages. | Not returned |
 | `/nodes`, `/observers` | Wins over `cursor` when both are sent. | When `hasMore` |
 | `/channels` | Can't be combined with a positive `cursor` (`400`). | When `hasMore` |
@@ -138,10 +157,10 @@ on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
   `pageCursor` set to `nextPageCursor` when the page has both, `cursor` alone otherwise. A server
   older than 2.1.0 ignores `pageCursor` and still moves forward by `cursor`. Treat
   `nextPageCursor` as optional on every list. `/channels` takes only one of the two.
-- Region pages of `/packets` return `nextPageCursor` only while the server trusts its
-  `packet_sites` read model, which it checks again after every start and drops on any doubt.
-  Otherwise they page by `cursor` exactly as before, so one walk can mix pages with and without
-  it. Keep sending both whenever a page has both.
+- Region pages of `/packets` are served only while the server trusts its `packet_sites` read
+  model, which it checks again after every start and drops on any doubt; otherwise they answer
+  `503` (see [Pages that wait for server data](#pages-that-wait-for-server-data)). Keep sending
+  both cursors whenever a page has both.
 - A malformed `pageCursor` is a `400` with message `invalid pageCursor` on those three
   endpoints, on every path, including the `/packets` paths that ignore it. Start again from
   the first page without it. An empty `pageCursor` counts as absent.
@@ -179,7 +198,7 @@ With an IATA or region filter and no `hashPrefix` (a region page), the list is o
 - A `pageCursor` page returns the rows in the cursor's millisecond that a millisecond `cursor` skips, as on `/packets` without a region (see [Exact page cursors](#exact-page-cursors)).
 - Where many observers heard a site's packets, the previous statement could end a page short, end a walk early or move `nextCursor` past rows it never returned; the new page returns those rows.
 
-Otherwise region pages page by `cursor` as before.
+While it does not, region pages answer `503` with `Retry-After: 30`; see [Pages that wait for server data](#pages-that-wait-for-server-data).
 
 Without an IATA or region filter or `hashPrefix`, the list is ordered by `lastHeardAt`, newest first, and packets heard in the same instant by `packetHash`, descending. `pageCursor` applies there (see [Exact page cursors](#exact-page-cursors)). Repeated values in the type and scope lists count once, and type values outside the header's range (payload type 0 to 15, route type 0 to 3) are dropped; a type list left with no valid value returns an empty page, not a `400`. When several observations of a packet share the newest time, `latestObserver` comes from the one with the highest observation ID, so the choice is stable.
 
