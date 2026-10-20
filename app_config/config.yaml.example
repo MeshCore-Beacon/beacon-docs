@@ -80,6 +80,13 @@ ratelimit:
 #planguard:
 #  daily_check: false
 
+# Read models. cmi is channel_message_iatas, one row per channel message and site that heard it; region
+# and scope message pages read it once this process trusts it. enabled: false serves every page from the
+# previous statements; the table is still maintained, so turning it back on needs only a restart.
+#readmodels:
+#  cmi:
+#    enabled: true
+
 # MeshMapper integrations (optional, require a regional or grouped-region API key).
 # Your local MeshMapper regional or grouped-region admin can generate the key.
 # A grouped-region key covers multiple regions, including imported group members.

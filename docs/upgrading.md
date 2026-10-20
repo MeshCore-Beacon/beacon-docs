@@ -171,6 +171,28 @@ which also shows how to mark it done by hand. Five stats and traces statements m
 - To roll back, deploy the previous image. See the rollback notes in the two operations
   sections above.
 
+## Channel messages by site
+
+The release that adds migrations `035` to `041` changes no API and keeps the minimum web and app
+versions. It adds `channel_message_iatas`, a read model that channel message pages filtered by
+`iatas` or `scope` read once the server trusts it. Run the
+[pre-deploy check](operations.md#before-deploying-a-release) first. No pre-build is needed: the
+new indexes build at startup in well under a second.
+
+After the deploy, the server fills the table in the background and verifies it once; on a large
+deployment that takes 3 to 5 minutes. Until the log shows
+`cmi trusted: region and scope message pages read channel_message_iatas`, every page is served by
+the previous release's statements, so users see no change. See
+[Read models: channel messages by site](operations.md#read-models-channel-messages-by-site) for
+what to watch, the metrics and alerts, and how read-only servers decide.
+
+- To turn it off without rolling back, set `readmodels.cmi.enabled: false` and restart; see
+  [Configuration](configuration.md#read-models).
+- To roll back, deploy the previous image. Rolling forward again later repairs the table at
+  startup before any page reads it; nothing to do by hand.
+- Run this release for at least a week before upgrading to the release that drops
+  `idx_channel_messages_channel` and `idx_channel_messages_sent_brin`.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run

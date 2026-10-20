@@ -192,6 +192,35 @@ Migration `034_observations_adverts.sql` builds the partial index `idx_observati
 release starts a background job that fills in missing observation payload types; see
 [After upgrading: observation payload types](#after-upgrading-observation-payload-types).
 
+Migrations `035` to `041` add the channel message read model; see
+[Read models: channel messages by site](#read-models-channel-messages-by-site).
+
+- `035` creates the table `channel_message_iatas`.
+- `036` to `040` build its five indexes with `CREATE INDEX CONCURRENTLY` on the empty table,
+  which is instant.
+- `041` builds `idx_channel_messages_channel_id` on `channel_messages` with
+  `CREATE INDEX CONCURRENTLY`. `channel_messages` is small (about 200,000 rows on a large
+  deployment), so it takes well under a second and needs no pre-build.
+
+To pre-build `041` anyway, run the pre-deploy check above, then this text exactly, on its own
+in autocommit mode:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_channel_messages_channel_id ON channel_messages USING btree (channel_id, id DESC);
+SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_channel_messages_channel_id'::regclass;
+```
+
+The second statement must print `t`. The migration then records the existing valid index
+instead of building it again. After the deploy, check every new index:
+
+```sql
+SELECT c.relname, i.indisvalid AND i.indisready FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+WHERE c.relname IN ('channel_message_iatas_pkey', 'idx_cmi_channel_site', 'idx_cmi_site', 'idx_cmi_channel_site_scope',
+                    'idx_cmi_channel_scope', 'idx_cmi_scope', 'idx_channel_messages_channel_id');
+```
+
+It must return 7 rows, all `t`.
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -486,6 +515,130 @@ CREATE INDEX CONCURRENTLY idx_nodes_type_last_seen ON nodes USING btree (node_ty
 
 The baseline's `idx_node_iatas_iata` on `(iata, last_heard DESC)` has been replaced by an index
 of the same name on `(iata)`; leave it in place.
+
+## Read models: channel messages by site
+
+`channel_message_iatas` is a small table with one row for each channel message and each site
+that heard it. Each row also copies the message's channel and its packet's scope. Ingest keeps
+it up to date, and a background reconcile repairs it every 5 minutes. On a large deployment it
+takes about 120-150 MB with its five indexes.
+
+While the server process trusts the table, these channel message pages read it:
+
+- `/channels/{id}/messages` with `iatas`, with `iatas` and `scope`, with `scope` alone, and
+  with `since` and `iatas`;
+- `/messages` with `iatas`, and with `scope` alone.
+
+Each such page now reads about as many index entries as it returns, where the previous
+statement read every observation of the channel. While the process does not trust the table,
+the same pages are served by the previous release's statements. Two shapes always use the
+previous statements: `/messages` with `iatas` and `since`, and `/messages` with `iatas` and
+`scope`. Pages without `iatas` or `scope` never read the table. Responses are the same in
+every case.
+
+### Installing it
+
+The release adds migrations `035` to `041`; see [Before deploying a release](#before-deploying-a-release).
+On the first start the server fills the table in the background:
+
+1. It waits until every transaction that started before boot and holds a transaction id has
+   finished, then runs one full reconcile.
+2. It backfills the table oldest message first, in batches of 10,000 message ids with a 0.1 s
+   pause between them. The log shows `cmi backfill progress` lines, then `cmi backfill complete`.
+   On a deployment with about 200,000 messages this takes 3 to 5 minutes, mostly the pauses.
+3. It runs a one-time verification: an exact check of two ranges of 2,000 messages, and a
+   page-by-page comparison of the previous and the new statements on the busiest recent sites
+   and scopes. On success it logs `cmi first-time verification passed` and records the time,
+   so later starts skip it.
+4. It logs `cmi trusted: region and scope message pages read channel_message_iatas`.
+
+Until step 4, every page is served by the previous statements, and users see no difference.
+If the verification fails, the server logs
+`cmi verification failed; pages stay on the original statements` and tries again every 5
+minutes.
+
+Check progress, read-only:
+
+```sql
+SELECT value, updated_at FROM background_state WHERE key = 'cmi';
+SELECT pg_size_pretty(pg_total_relation_size('channel_message_iatas'));
+```
+
+`complete` turns `true` within minutes, then `first_verified_at` appears. After that,
+`updated_at` advances every 5 minutes.
+
+### When pages use it
+
+Trust is held in memory by each server process; nothing in the database marks the table as
+exact. A process earns it at every start, once the boot reconcile has run, the backfill is
+complete and the one-time verification has passed. It drops trust:
+
+- after 3 reconciles in a row that each repaired at least one row. Two clean reconciles in a
+  row restore it;
+- at once when ingest leaves a message without its sites: a failed site insert, a message
+  stored without its sites, or any message insert error. It logs
+  `read model untrusted until the next reconcile` with the reason. Trust returns after the
+  next reconcile that started after the failure, so pages use the previous statements for at
+  most about one interval;
+- when the stored state is no longer complete and verified, for example after a rebuild.
+
+A reconcile that repairs rows logs `cmi reconcile repaired N pair(s): a writer bypassed the read model`.
+Something stored messages without recording their sites. On a single server running this
+release that should not happen. Running two server versions that both write to one database at
+the same time is not supported; if it happens, the pairs the older one leaves out are repaired
+within one reconcile interval.
+
+A [read-only server](configuration.md#read-only-mode) cannot repair anything. Every 5 minutes it
+checks, read-only, that the writing server's saved state is complete and verified, that the
+writer saved it within the last 10 minutes (two reconcile intervals, on the database clock), and
+that the newest 2,000 messages pass the exact check. While all three hold it logs
+`cmi trusted on this read-only server: region and scope message pages read channel_message_iatas`
+and serves those pages from the table. Its trust ends on its own 10 minutes after the writer's
+last save, unless a later check finds a newer one. A writer that is rolled back, stopped or keeps
+failing stops saving, so read-only servers go back to the previous statements within 10 minutes
+and log `cmi not trusted on this read-only server: the writer has not saved its state recently`.
+
+### Turning it off
+
+Set `readmodels.cmi.enabled: false` in `config.yaml` and restart; see
+[Configuration](configuration.md#read-models). Every page is then served by the previous
+statements. The table is still maintained, so turning it back on needs only a restart.
+
+### Metrics and alerts
+
+On the [admin listener](#metrics):
+
+- `beacon_readmodel_trusted{model="cmi"}` is 1 while this process serves pages from the table.
+- `beacon_readmodel_repaired_rows_total{model="cmi"}` should stay flat.
+- `beacon_readmodel_watermark_age_seconds{model="cmi"}` is the time since the last finished
+  reconcile, or on a read-only server since the writer last saved its state. It stays under
+  600 s.
+
+Suggested rules are in [Example alert rules](#example-alert-rules): repaired rows in 3
+consecutive 5-minute windows, trusted at 0 for 20 minutes, and a watermark older than 15
+minutes.
+
+### Rolling back
+
+Deploy the previous image. It ignores `channel_message_iatas`, and the table's rows are deleted
+with their messages, so it does not grow stale rows. Leave the table and its indexes in place.
+
+To roll forward again later, deploy the new image. Before it serves any page from the table,
+the boot reconcile adds every site the older image stored, starting from the saved watermarks.
+The previous statements serve meanwhile: about a second after a short rollback, a few minutes
+after days. Nothing to do by hand.
+
+Rebuild the table from scratch only if the verification keeps failing:
+
+```sql
+DELETE FROM background_state WHERE key = 'cmi';
+TRUNCATE channel_message_iatas;
+```
+
+Then restart the server. It backfills and verifies again as on the first install.
+
+A later release will drop `idx_channel_messages_channel` and `idx_channel_messages_sent_brin`.
+Run this release for at least a week before upgrading to that one.
 
 ## Postgres settings
 
@@ -785,6 +938,9 @@ scrape_configs:
 | `beacon_pg_xid_age` | gauge | | Age of the oldest transaction ID in the database |
 | `beacon_planguard_failures` | gauge | `entry`, `mode` | 1 for each corpus entry and plan mode that failed the last [plan check](#turning-on-the-daily-check) |
 | `beacon_planguard_last_run_timestamp_seconds` | gauge | | Unix time the last successful plan check finished; 0 until the first one |
+| `beacon_readmodel_trusted` | gauge | `model` | 1 while this process serves pages from the [read model](#read-models-channel-messages-by-site), 0 while it serves the previous statements |
+| `beacon_readmodel_repaired_rows_total` | counter | `model` | Rows the read-model reconcile repaired; above zero, a writer bypassed the model |
+| `beacon_readmodel_watermark_age_seconds` | gauge | `model` | Seconds since the last finished reconcile of the read model (on a read-only server, since the writer last saved its state) |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
@@ -822,6 +978,14 @@ groups:
         expr: sum(beacon_planguard_failures) > 0
       - alert: BeaconPlanguardStale            # no successful plan check for 26 h
         expr: time() - beacon_planguard_last_run_timestamp_seconds > 26*3600 and on() time() - process_start_time_seconds > 26*3600
+      # The read-model rules don't apply with readmodels.cmi.enabled: false, where trusted stays 0.
+      - alert: BeaconReadModelRepairing        # reconciles repaired rows in 3 consecutive 5-minute windows
+        expr: min_over_time((increase(beacon_readmodel_repaired_rows_total{model="cmi"}[5m]) > bool 0)[15m:5m]) == 1
+      - alert: BeaconReadModelUntrusted        # region and scope message pages on the previous statements
+        expr: beacon_readmodel_trusted{model="cmi"} == 0
+        for: 20m
+      - alert: BeaconReadModelStale            # no finished reconcile (or writer save) for 15 min
+        expr: beacon_readmodel_watermark_age_seconds{model="cmi"} > 900
 ```
 
 Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
