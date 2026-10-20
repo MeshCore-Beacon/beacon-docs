@@ -193,6 +193,34 @@ what to watch, the metrics and alerts, and how read-only servers decide.
 - Run this release for at least a week before upgrading to the release that drops
   `idx_channel_messages_channel` and `idx_channel_messages_sent_brin`.
 
+## Packets by site
+
+The release that adds migrations `042` to `045` adds `packet_sites`, a read model that `/packets`
+pages filtered by `iatas`, `iata`, `region` or `regionId` read once the server trusts it. It
+keeps the minimum web and app versions. Those pages gain `nextPageCursor`, which current web and
+app versions already send back as `pageCursor`; see
+[Exact page cursors](api-contract.md#exact-page-cursors). Run the
+[pre-deploy check](operations.md#before-deploying-a-release) first: migration `042` takes a brief
+lock on `packets`. No pre-build is needed: the new indexes build on an empty table in seconds.
+
+After the deploy, the server fills the table in the background and verifies it once; on a large
+deployment expect roughly 5 to 20 minutes and a few GB of WAL, then a few minutes of
+`VACUUM (ANALYZE)`. Until the log shows
+`packet_sites trusted: region packet pages read packet_sites`, every region page is served by
+the previous release's statement, so users see no change. See
+[Read models: packets by site](operations.md#read-models-packets-by-site) for what to watch, the
+metrics and alerts, and how read-only servers decide.
+
+- Each stored observation now costs about 15-21% more insert time and 37-53% more WAL. After
+  the deploy, compare `InsertObservation` in `pg_stat_statements` for the hour before and after
+  and watch `beacon_ingest_queue_depth`; see
+  [Ingest cost](operations.md#ingest-cost). A growing queue or WAL beyond your budget means
+  rolling back.
+- To turn it off without rolling back, set `readmodels.packet_sites.enabled: false` and
+  restart; see [Configuration](configuration.md#read-models).
+- To roll back, deploy the previous image. Rolling forward again later repairs the table at
+  startup before any region page reads it; nothing to do by hand.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
