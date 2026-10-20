@@ -128,8 +128,8 @@ needed, so these are peaks:
 
 | `database.api_plan_layout` | `api_legacy` | `api_slow` | `api_custom` | `api_cached` | `ingest` | `maint` | Total |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `custom_all` (default) | - | 8 (`slow_pool_size`) | 8 | - | 6 | 4 | 26 |
-| `split` | - | 8 (`slow_pool_size`) | 7 | 5 | 6 | 4 | 30 |
+| `custom_all` (default) | - | 2 (`slow_pool_size`) | 8 | - | 6 | 4 | 20 |
+| `split` | - | 2 (`slow_pool_size`) | 7 | 5 | 6 | 4 | 24 |
 | `single` (rollback) | 8 | - | - | - | 6 | 4 | 18 |
 
 `ingest` has one connection per CPU on hosts with more than 6 CPUs, which adds to each total.
@@ -151,23 +151,22 @@ layout sets the sizes.
 
 `api_slow` runs only the statements that may read a large part of the observations in one call:
 the region `/packets` statement that answers when the site read model's bounded reads run out
-of budget, the all-channel message statement for `iatas` combined with `since` or `scope`, and,
-while a read model is not trusted, the previous statements that serve its pages (see
-[Operations](operations.md#slow-region-and-message-statements)).
-Eight connections by default (`database.slow_pool_size`), the size `api_legacy` had, a 120 s `statement_timeout`, no parallel
+of budget, and the all-channel message statement for `iatas` combined with `since` or `scope`.
+Two connections by default (`database.slow_pool_size`), a 120 s `statement_timeout`, no parallel
 workers. A request that finds every connection busy waits at most 5 s and then answers `503`
 with `Retry-After: 5`; it never takes a connection from `api_custom`. A statement that runs past
 120 s ends with a `500`.
 
 ```yaml
 database:
-  slow_pool_size: 8   # api_slow's connections under custom_all and split; at least 1, at most 1000
+  slow_pool_size: 2   # api_slow's connections under custom_all and split; at least 1, at most 1000
 ```
 
 Omit the key to take the default; set it only to override it. Raise it if
 `beacon_api_unavailable_total{reason="slow_pool_busy"}` keeps growing, and count it in
-`max_connections`. While a read model fills for the first time every region or scope page runs
-here, which is why the default matches the old `api_legacy` pool.
+`max_connections`. The default was 8 while untrusted read-model pages also ran here; reverting the
+change that removed those fallbacks restores that default by itself (see
+[Operations](operations.md#reverting-to-the-read-model-fallbacks)).
 
 The layout changes at a restart. What each pool sets is in
 [Operations](operations.md#database-pools-and-connections).
@@ -258,24 +257,30 @@ readmodels:
 ```
 
 `channel_message_iatas` holds one row for each channel message and each site that heard it.
-Channel message pages filtered by `iatas` or `scope` read it instead of every observation, but
-only while the server process trusts the table; see
+Channel message pages filtered by `iatas`, or by `scope` without `since`, are served from it,
+and only while the server process trusts the table. While it does not (the first fill after an
+upgrade, a repair, a failed verification), those pages answer `503` with `Retry-After: 30`; see
 [Operations](operations.md#read-models-channel-messages-by-site).
 
 `readmodels.cmi.enabled: false` is the kill switch, for when you suspect the table serves wrong
-pages. Every channel message page is then served by the statements of the previous release.
-The server still maintains and repairs the table, so setting it back to `true` needs only a
-restart. Omitting the key means `true`. Like every key in this file, a change needs a restart.
+pages. It turns those pages off: they answer `503` until the key is `true` again. Pages that do
+not read the table (no `iatas`, `scope` with `since`, and `iatas` with `since` or `scope`
+across every channel) are not affected. The server still maintains and repairs the table, so
+setting it back to `true` needs only a restart. Omitting the key means `true`. Like every key in
+this file, a change needs a restart.
 
 `packet_sites` holds one row for each packet and each site that heard it. `/packets` pages
-filtered by `iatas`, `iata`, `region` or `regionId` read it instead of every observation, but
-only while the server process trusts the table; see
+filtered by `iatas`, `iata`, `region` or `regionId` are served from it, and only while the
+server process trusts the table; until then they answer `503` with `Retry-After: 30`. See
 [Operations](operations.md#read-models-packets-by-site).
 
-`readmodels.packet_sites.enabled: false` is its kill switch. Every region packet page is then
-served by the statement of the previous release, without `nextPageCursor`. The server still
-maintains and sweeps the table, so setting it back to `true` needs only a restart. Omitting the
-key means `true`.
+`readmodels.packet_sites.enabled: false` is its kill switch: region packet pages answer `503`
+until it is `true` again. The server still maintains and sweeps the table, so setting it back
+to `true` needs only a restart. Omitting the key means `true`.
+
+Observer advert pages (`/observers/{id}/adverts`) have no switch: they answer `503` until the
+[payload-type backfill](operations.md#after-upgrading-observation-payload-types) is done, which
+is at once on a deployment where every observation already carries its payload type.
 
 On a [read-only server](#read-only-mode) both keys work the same way. Such a server never
 writes the tables; it trusts each one only while the writing server keeps it up to date.
