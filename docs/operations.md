@@ -394,19 +394,22 @@ off-peak and expect the following.
 Observations stored by servers older than the observation `payload_type` column have no payload
 type of their own. The release with migration `034` adds a background job, on the `maint` pool,
 that gives each of them its own packet's payload type. It walks `packet_observations` by id in
-spans of one million ids, ten spans a minute, so about 10 million ids a minute. Each statement
+spans of one million ids, up to ten spans a minute, so at most about 10 million ids a minute;
+after each span it pauses as [`readmodels.fill`](#pacing-the-backfills) sets, by default as
+long as the span took, so expect about half that. Each statement
 writes at most 50,000 rows, and the job saves its position after every span, so a restart
 resumes where it stopped. When the walk passes the highest id it read at the start of its run,
 it records `done`. Rows stored later are typed by ingest.
 
 How long it takes depends on the id range, not on how many rows need a type: a database whose
-ids run to about 830 million needs about 80 minutes. On a database whose observations are all
+ids run to about 830 million needed about 80 minutes before the pacing, so expect up to twice
+that at the default `duty: 0.5`. On a database whose observations are all
 typed, each statement reads its span and updates nothing.
 
 Until a server process reads `done`, `/observers/{observerId}/adverts` answers `503` with
 `Retry-After: 30` (the statement that served those pages before `done` is gone). The job logs
 `observation payload type backfill progress: observer advert pages answer 503 until it is done`
-with `next_id` and `max_id` once a minute while it walks. Once a server process reads `done`,
+with `next_id`, `max_id`, `ids_done`, `ids_remaining` and `eta` once a minute while it walks. Once a server process reads `done`,
 it serves the pages from `idx_observations_adverts` and keeps that until restart. On a database
 whose observations already all carry a payload type (every deployment that started on a release
 with the column), the job's first run finds no untyped row and records `done` at once
@@ -581,8 +584,11 @@ On the first start the server fills the table in the background:
 
 1. It waits until every transaction that started before boot and holds a transaction id has
    finished, then runs one full reconcile.
-2. It backfills the table oldest message first, in batches of 10,000 message ids with a 0.1 s
-   pause between them. The log shows `cmi backfill progress` lines, then `cmi backfill complete`.
+2. It backfills the table oldest message first, in batches of 10,000 message ids
+   (`readmodels.fill.cmi_batch`), pausing after each batch as
+   [`readmodels.fill`](#pacing-the-backfills) sets: at least 0.1 s, and by default as long as
+   the batch took. Once a minute the log shows a `cmi backfill progress` line with `ids_done`,
+   `ids_remaining` and `eta`, then `cmi backfill complete`.
    On a deployment with about 200,000 messages this takes 3 to 5 minutes, mostly the pauses.
 3. It runs a one-time verification: an exact check of two ranges of 2,000 messages, and a
    page-by-page comparison of the previous and the new statements on the busiest recent sites
@@ -745,11 +751,14 @@ On the first start the server fills the table in the background:
 1. It waits until every transaction that started before boot and holds a transaction id has
    finished (`packet_sites boot repair waits for transactions from before boot` while it
    waits), then runs one reconcile from the saved watermark.
-2. It backfills the table newest observation first, in slices of 500,000 observation ids with
-   a 0.1 s pause between them. The log shows `packet_sites backfill progress` lines, then
+2. It backfills the table newest observation first, in slices of 500,000 observation ids
+   (`readmodels.fill.packet_sites_slice`), pausing after each slice as
+   [`readmodels.fill`](#pacing-the-backfills) sets: at least 0.1 s, and by default as long as
+   the slice took, so the fill is busy at most half the time. Once a minute the log shows a
+   `packet_sites backfill progress` line with `ids_done`, `ids_remaining` and `eta`, then
    `packet_sites backfill complete`. On a large deployment (about 766 million ids, 29.4 million
-   observations) that is about 1,530 slices: about 3 minutes of pauses plus the fill work, so
-   expect roughly 5 to 20 minutes and a few GB of WAL.
+   observations) that is about 1,530 slices; expect roughly twice the fill work, about 10 to 40
+   minutes, longer on a slow disk or a lower `duty`, and a few GB of WAL.
 3. It runs a one-time verification. It first runs `VACUUM (ANALYZE) packet_sites` (a few
    minutes on a large deployment), then an exact check of two slices of 500,000 observation
    ids, the newest and one random older one, and a page-by-page comparison of region pages of
@@ -881,8 +890,9 @@ three times, waiting up to 30 s each, so about 90 s in all, and then show an err
 fill or a repair that takes longer than that means users must retry by hand (reload the page,
 or pull to refresh). On the first start of the release that adds a read model, expect those
 pages to be unavailable for the whole fill: minutes for `channel_message_iatas` on a
-200,000-message deployment, roughly 5 to 20 minutes for `packet_sites` on a large one, both
-logged as `... backfill progress` lines. Plan the upgrade for a quiet hour.
+200,000-message deployment, roughly 10 to 40 minutes for `packet_sites` on a large one (longer
+with a lower [`readmodels.fill.duty`](#pacing-the-backfills)), both logged once a minute as
+`... backfill progress` lines with an `eta`. Plan the upgrade for a quiet hour.
 
 **Watching it.** `beacon_readmodel_trusted{model}` is 0 while the pages wait. Alert on it
 staying 0 for more than 15 minutes, per model (the rules are in
@@ -890,7 +900,45 @@ staying 0 for more than 15 minutes, per model (the rules are in
 is expected. The adverts gate has no trust gauge; alert on its `503`s instead
 (`BeaconAdvertsNotReady`, two hours, longer than the backfill takes on a large deployment).
 
-## Slow region and message statements
+## Pacing the backfills
+
+The one-off backfills (`packet_sites`, `channel_message_iatas` and observation payload types)
+read and write a lot in a short time. Run flat out on a small server they can take the whole
+disk: on an 8 vCPU, 3.8 GB RAM test server with a rotational disk, the first `packet_sites` fill
+drove I/O pressure to `full avg10=78%` (`/proc/pressure/io`) and the whole machine stalled
+twice, sshd and journald included, until it was rebooted.
+
+Each fill now paces itself by duty cycle. After each slice or batch it sleeps
+`max(min_pause, elapsed × (1 − duty) / duty)`, where `elapsed` is how long that slice took, so
+it is busy at most `duty` of the time. A slow disk makes each slice slower, which stretches the
+pauses on its own. Pacing changes only when the fills run: they write the same rows, the
+verification and trust rules are unchanged, and progress is saved after every slice as before.
+
+Measured on a laptop Postgres with 3 million synthetic observations (`packet_sites`, slices of
+500,000 ids):
+
+| `duty` | Fill time | Busy in fill statements |
+|---|---|---|
+| `1` | 77 s | 99 % |
+| `0.5` (default) | 153 s | 50 % |
+| `0.25` | 316 s | 25 % |
+
+Slices of 100,000 ids cost about 7 % more fill work (85 s at `duty: 1`) but cut the longest
+burst from about 14 s to about 3 s.
+
+Settings, under [`readmodels.fill`](configuration.md#backfill-pacing) in `config.yaml`:
+
+- `duty` (default `0.5`): the share of time a fill may be busy.
+- `min_pause` (default `100ms`): the shortest pause after a slice or batch.
+- `packet_sites_slice` (default `500000`) and `cmi_batch` (default `10000`): the slice and batch
+  sizes. A smaller slice gives shorter bursts at a small cost in total work.
+
+**On a slow disk** (rotational, network or shared storage), set `duty: 0.25`, and consider
+`packet_sites_slice: 100000` for shorter bursts. The startup line `config: loaded` shows the
+values in force. While a fill runs, check `/proc/pressure/io` on the host: `full avg10` should
+stay well below 50 %. Lower `duty` further if it does not. The reconcile and the hourly audit
+are not paced: they cover only the observations since the last run, or one slice an hour.
+
 
 Two kinds of request still read a large part of the observations in one statement: a region
 `/packets` page whose bounded reads ran out of budget (a sparse filter such as a narrow window
