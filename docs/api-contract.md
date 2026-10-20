@@ -124,7 +124,8 @@ on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
 | Endpoint | `pageCursor` | `nextPageCursor` |
 |---|---|---|
 | `/packets` without `iata`, `iatas`, `region`, `regionId` or `hashPrefix` | Wins over `cursor` when both are sent. | When `hasMore` |
-| `/packets` with an IATA or region filter, or `hashPrefix` | Checked, then ignored; `cursor` pages. | Not returned |
+| `/packets` with `iata`, `iatas`, `region` or `regionId` (a region page), without `hashPrefix` | While the server trusts its site read model, wins over `cursor` when both are sent. A region page served without `nextPageCursor` pages by `cursor`: there `cursor` wins, and a `pageCursor` sent alone pages by its millisecond. | When `hasMore`, while the server trusts its site read model |
+| `/packets` with `hashPrefix` | Checked, then ignored; `cursor` pages. | Not returned |
 | `/nodes`, `/observers` | Wins over `cursor` when both are sent. | When `hasMore` |
 | `/channels` | Can't be combined with a positive `cursor` (`400`). | When `hasMore` |
 
@@ -135,6 +136,10 @@ on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
   `pageCursor` set to `nextPageCursor` when the page has both, `cursor` alone otherwise. A server
   older than 2.1.0 ignores `pageCursor` and still moves forward by `cursor`. Treat
   `nextPageCursor` as optional on every list. `/channels` takes only one of the two.
+- Region pages of `/packets` return `nextPageCursor` only while the server trusts its
+  `packet_sites` read model, which it checks again after every start and drops on any doubt.
+  Otherwise they page by `cursor` exactly as before, so one walk can mix pages with and without
+  it. Keep sending both whenever a page has both.
 - A malformed `pageCursor` is a `400` with message `invalid pageCursor` on those three
   endpoints, on every path, including the `/packets` paths that ignore it. Start again from
   the first page without it. An empty `pageCursor` counts as absent.
@@ -165,6 +170,8 @@ Comma-separated list params (`iatas`, `scopes`, `payloadTypes`, `routeTypes`) ta
 | `GET /packets/backfill?afterObservationId=<id>` | Packets with observations after that ID, oldest first, plain array. Default limit 100. For reconnect backfill. |
 
 `/packets` params: `payloadType` or `payloadTypes` (comma-separated integers), `payloadTypeName` (`advert`, `group_text`, `trace`, ...; used when no number is given), `routeType` or `routeTypes`, the location filters, `scope` or `scopes` (comma-separated), `since`, `until`, `hashPrefix` (4 to 16 hex characters of the packet hash), `cursor`, `pageCursor`, `limit`. Filters OR within themselves and AND across each other. The cursor is epoch ms: global `lastHeardAt` order without an IATA filter, and the time heard at the requested sites when one is set, so a filtered list stays bounded to those IATAs. With `hashPrefix` the order and cursor use global `lastHeardAt` even when an IATA filter is set.
+
+With an IATA or region filter and no `hashPrefix` (a region page), the list is ordered by the time the packet was last heard at the requested sites, newest first. While the server trusts its site read model (see [Operations](operations.md#read-models-packets-by-site)), packets heard at the same site time come out by `packetHash`, descending, and `pageCursor` applies (see [Exact page cursors](#exact-page-cursors)). Those pages are the same as before with one difference: where many observers heard a site's packets, the previous statement could end a page short, return an empty page with `hasMore: false` before the end, or move `nextCursor` past rows it never returned; the new page returns those rows. Otherwise region pages page by `cursor` as before.
 
 Without an IATA or region filter or `hashPrefix`, the list is ordered by `lastHeardAt`, newest first, and packets heard in the same instant by `packetHash`, descending. `pageCursor` applies there (see [Exact page cursors](#exact-page-cursors)). Repeated values in the type and scope lists count once, and type values outside the header's range (payload type 0 to 15, route type 0 to 3) are dropped; a type list left with no valid value returns an empty page, not a `400`. When several observations of a packet share the newest time, `latestObserver` comes from the one with the highest observation ID, so the choice is stable.
 

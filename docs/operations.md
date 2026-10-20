@@ -221,6 +221,25 @@ WHERE c.relname IN ('channel_message_iatas_pkey', 'idx_cmi_channel_site', 'idx_c
 
 It must return 7 rows, all `t`.
 
+Migrations `042` to `045` add the region packet read model; see
+[Read models: packets by site](#read-models-packets-by-site).
+
+- `042` creates the table `packet_sites`. Its foreign key to `packets` takes a brief lock on
+  `packets`, so run the pre-deploy check above first.
+- `043` to `045` build `idx_packet_sites_site`, `idx_packet_sites_site_type` and
+  `idx_packet_sites_site_scope` with `CREATE INDEX CONCURRENTLY` on the empty table, which
+  takes seconds. No pre-build is needed.
+
+After the deploy, check the table's four indexes:
+
+```sql
+SELECT c.relname, i.indisvalid AND i.indisready AS ok
+FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+WHERE i.indrelid = 'packet_sites'::regclass ORDER BY 1;
+```
+
+It must return 4 rows, all `ok = t`.
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -640,6 +659,184 @@ Then restart the server. It backfills and verifies again as on the first install
 A later release will drop `idx_channel_messages_channel` and `idx_channel_messages_sent_brin`.
 Run this release for at least a week before upgrading to that one.
 
+## Read models: packets by site
+
+`packet_sites` holds one row for each packet and each site (IATA) that heard it, at that site's
+latest hearing. Each row also copies the packet's payload type, route type, scope and first
+hearing. The observation insert writes the row in the same statement, so a stored observation
+always has its row. A background reconcile repairs the newest rows every 5 minutes, an hourly
+audit refills one random older slice, and a front sweep every 30 seconds keeps the newest
+index entries dense. On a large deployment (about 7.4 million rows) it takes about 1.6 GB:
+heap 484 MB, primary key 285 MB, `idx_packet_sites_site` 419 MB, `idx_packet_sites_site_type`
+353 MB, `idx_packet_sites_site_scope` 53 MB.
+
+While the server process trusts the table, `/packets` pages with `iatas`, `iata`, `region` or
+`regionId` (region pages) read it:
+
+- one site: one range of the site's index;
+- several sites: one range per site;
+- payload and route types, up to 8 (payload, route) pairs: one exact range per site and pair;
+- a `since`/`until` window, scopes, or more than 8 type pairs: bounded reads of each site range
+  that continue, within the same request, until the page is full. If 8 reads do not fill the
+  page, the previous release's statement answers that request.
+
+Unknown site codes are dropped by a cheap check first. Requests with `hashPrefix` never read
+the table. A region page served from the table now returns `nextPageCursor`; see
+[Exact page cursors](api-contract.md#exact-page-cursors). While the process does not trust the
+table, region pages are served by the previous release's statement exactly as before.
+
+Each page is the previous statement's page, except where that statement loses rows: when a
+site's packets are heard by many observers, it can end a page short, end a walk early (an
+empty page with `hasMore: false`) or jump `nextCursor` past rows. The new page is full and
+skips nothing. Packets tied on their site time come out by packet hash, descending.
+
+On a production-size copy, the heaviest region pages went from seconds to under a second: all
+561 sites for the last hour from 19.5 s to 0.3 s, and the 13 busiest sites for the last 75 minutes at
+limit 200 from 4.5 s to 31 ms. A filter of rare types on a very sparse site can read a few
+buffers more than before. An `until` well in the past often runs out of the read budget, so
+the previous statement answers many of those pages, at the previous cost.
+
+### Ingest cost
+
+The site row makes each observation insert about 15-21% slower (mean 104 µs to 119-125 µs)
+and adds about 37-53% WAL per stored observation (1,425-1,470 B to 2,008-2,188 B), measured
+over 100,000 inserts on a scratch database. Re-sends of an observation still write nothing.
+
+After the deploy, compare `InsertObservation` in `pg_stat_statements` (`mean_exec_time`, and
+`wal_bytes / calls`) for the hour before and the hour after, and watch
+`beacon_ingest_queue_depth`. `pg_stat_statements` is cumulative, so take this snapshot an hour
+before the deploy, at the deploy and an hour after, and divide the differences:
+
+```sql
+SELECT now(), sum(calls) AS calls, sum(total_exec_time) AS exec_ms, sum(wal_bytes) AS wal_bytes
+FROM pg_stat_statements WHERE query LIKE '-- name: InsertObservation :one%';
+```
+
+A growing ingest queue, or WAL beyond what you planned for, means rolling back.
+
+### Installing it
+
+The release adds migrations `042` to `045`; see [Before deploying a release](#before-deploying-a-release).
+On the first start the server fills the table in the background:
+
+1. It waits until every transaction that started before boot and holds a transaction id has
+   finished (`packet_sites boot repair waits for transactions from before boot` while it
+   waits), then runs one reconcile from the saved watermark.
+2. It backfills the table newest observation first, in slices of 500,000 observation ids with
+   a 0.1 s pause between them. The log shows `packet_sites backfill progress` lines, then
+   `packet_sites backfill complete`. On a large deployment (about 766 million ids, 29.4 million
+   observations) that is about 1,530 slices: about 3 minutes of pauses plus the fill work, so
+   expect roughly 5 to 20 minutes and a few GB of WAL.
+3. It runs a one-time verification. It first runs `VACUUM (ANALYZE) packet_sites` (a few
+   minutes on a large deployment), then an exact check of two slices of 500,000 observation
+   ids, the newest and one random older one, and a page-by-page comparison of region pages of
+   the busiest recent sites with pages read straight from the observations. On success it logs
+   `packet_sites first-time verification passed` and records the time, so later starts skip it.
+4. It logs `packet_sites trusted: region packet pages read packet_sites`.
+
+Until step 4, every region page is served by the previous release's statement, and users see
+no difference. If the verification fails, the server logs
+`packet_sites verification failed; region pages stay on the original statement` and tries again
+every 5 minutes.
+
+Check progress, read-only:
+
+```sql
+SELECT value, updated_at FROM background_state WHERE key = 'packet_sites';
+SELECT pg_size_pretty(pg_total_relation_size('packet_sites'));
+```
+
+`complete` turns `true`, then `first_verified_at` appears. After that, `updated_at` advances
+every 5 minutes.
+
+### When pages use it
+
+Trust is held in memory by each server process; nothing in the database marks the table as
+exact. A process earns it at every start, once the boot reconcile has run, the backfill is
+complete and the one-time verification has passed. It drops trust:
+
+- at once when a reconcile or the hourly audit repairs any row: something bypassed the
+  writer. Two clean reconciles in a row restore it. A repair logs
+  `packet_sites reconcile repaired N row(s): a writer bypassed the read model` or
+  `packet_sites audit repaired N row(s) below the watermark`;
+- at once when an observation insert with its site row fails. Ingest never loses the
+  observation: it logs `observation site row failed; storing the observation without it` and
+  stores it without its row. Trust drops with
+  `read model untrusted until the next reconcile` and the reason, and returns after the next
+  reconcile that started after the failure, so region pages use the previous statement for at
+  most about one interval;
+- after 3 failed reconciles in a row, until one succeeds;
+- when the saved state is no longer complete and verified, for example after a rebuild.
+
+On a single server running this release, repairs should not happen. Running two server versions
+that both write to one database at the same time is not supported; if it happens, the rows the
+older one leaves out are repaired within one reconcile interval, and trust returns two clean
+reconciles later.
+
+A [read-only server](configuration.md#read-only-mode) cannot repair anything. Every 5 minutes it
+checks, read-only, that the writing server's saved state is complete and verified, that the
+writer saved it within the last 10 minutes (two reconcile intervals), and that the newest
+20,000 observations pass the exact check. While all three hold it logs
+`packet_sites trusted on this read-only server: region packet pages read packet_sites` and
+serves region pages from the table. Its trust ends on its own 10 minutes after the writer's last
+save, unless a later check finds a newer one. Otherwise it logs one of:
+
+- `packet_sites not trusted on this read-only server: backfill or first verification not done`
+- `packet_sites not trusted on this read-only server: the writer has not saved its state recently`
+- `packet_sites not trusted on this read-only server: the newest observations fail the exact check`
+
+### Turning it off
+
+Set `readmodels.packet_sites.enabled: false` in `config.yaml` and restart; see
+[Configuration](configuration.md#read-models). Every region page is then served by the previous
+statement. The table is still maintained and swept, so turning it back on needs only a
+restart. A later release removes the previous statement once the read model has run in
+production.
+
+### Metrics and alerts
+
+On the [admin listener](#metrics):
+
+- `beacon_readmodel_trusted{model="packet_sites"}` is 1 while this process serves region pages
+  from the table.
+- `beacon_readmodel_repaired_rows_total{model="packet_sites"}` should stay flat.
+- `beacon_readmodel_watermark_age_seconds{model="packet_sites"}` is the time since the last
+  finished reconcile, or on a read-only server since the writer last saved its state.
+- `beacon_packet_sites_sweep_age_seconds` is the time since the last successful front sweep,
+  and `beacon_packet_sites_sweep_plan_ok` is 1 while the sweep plans as index scans on the three
+  time-ordered indexes. Without that plan the sweep marks no dead entries and the indexes bloat;
+  the server logs `packet_sites sweep plan sets no dead-entry hints; the indexes will bloat`.
+  Both are written only by the server that runs background jobs.
+- `beacon_packet_sites_front_live{index}` is the entries the last sweep visited, and
+  `beacon_packet_sites_bytes` the table's size with its indexes, hourly.
+- `beacon_index_bloat_ratio` covers the four `packet_sites` indexes. Their baselines are the
+  sizes of a fresh build, applied once the table holds 100,000 rows, so the ratio reads against
+  a compact index rather than the size the server first saw.
+
+Suggested rules are in [Example alert rules](#example-alert-rules): repaired rows in the last
+10 minutes, trusted at 0 for 40 minutes, a watermark older than 15 minutes, a sweep older than
+300 s or a sweep plan at 0, a bloat ratio of the three time-ordered indexes over 2.5 (warn) or
+3, and the table over 2.5 GiB (warn; scale it for your deployment).
+
+### Rolling back
+
+Deploy the previous image. It ignores `packet_sites`, still has the previous release's
+indexes, and the table's rows are deleted with their packets, so it does not grow stale rows.
+Leave the table and its indexes in place.
+
+To roll forward again later, deploy the new image. Before it serves any region page from the
+table, the boot reconcile adds the rows written meanwhile, starting from the saved watermark;
+the previous statement serves until then. Nothing to do by hand.
+
+Rebuild the table from scratch only if the verification keeps failing:
+
+```sql
+DELETE FROM background_state WHERE key = 'packet_sites';
+TRUNCATE packet_sites;
+```
+
+Then restart the server. It backfills and verifies again as on the first install.
+
 ## Postgres settings
 
 The stacks in this repo run stock `postgres:16-alpine` with no tuning. The settings below suit
@@ -938,9 +1135,13 @@ scrape_configs:
 | `beacon_pg_xid_age` | gauge | | Age of the oldest transaction ID in the database |
 | `beacon_planguard_failures` | gauge | `entry`, `mode` | 1 for each corpus entry and plan mode that failed the last [plan check](#turning-on-the-daily-check) |
 | `beacon_planguard_last_run_timestamp_seconds` | gauge | | Unix time the last successful plan check finished; 0 until the first one |
-| `beacon_readmodel_trusted` | gauge | `model` | 1 while this process serves pages from the [read model](#read-models-channel-messages-by-site), 0 while it serves the previous statements |
+| `beacon_readmodel_trusted` | gauge | `model` | 1 while this process serves pages from the read model ([`cmi`](#read-models-channel-messages-by-site) or [`packet_sites`](#read-models-packets-by-site)), 0 while it serves the previous statements |
 | `beacon_readmodel_repaired_rows_total` | counter | `model` | Rows the read-model reconcile repaired; above zero, a writer bypassed the model |
 | `beacon_readmodel_watermark_age_seconds` | gauge | `model` | Seconds since the last finished reconcile of the read model (on a read-only server, since the writer last saved its state) |
+| `beacon_packet_sites_sweep_age_seconds` | gauge | | Seconds since the last successful `packet_sites` front sweep; absent before the first |
+| `beacon_packet_sites_sweep_plan_ok` | gauge | | 1 while the front sweep plans as index scans on its three indexes, 0 otherwise; checked at the first sweep, then hourly |
+| `beacon_packet_sites_front_live` | gauge | `index` | Index entries written in the last two minutes that the last front sweep visited |
+| `beacon_packet_sites_bytes` | gauge | | Total size of `packet_sites`, heap and indexes, hourly |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
@@ -986,6 +1187,26 @@ groups:
         for: 20m
       - alert: BeaconReadModelStale            # no finished reconcile (or writer save) for 15 min
         expr: beacon_readmodel_watermark_age_seconds{model="cmi"} > 900
+      # The packet_sites trust rules don't apply with readmodels.packet_sites.enabled: false, and the
+      # sweep rules only on the server that runs background jobs (not on a read-only server).
+      - alert: BeaconPacketSitesRepairing      # a reconcile or audit repaired rows: a writer bypassed the model
+        expr: increase(beacon_readmodel_repaired_rows_total{model="packet_sites"}[10m]) > 0
+      - alert: BeaconPacketSitesUntrusted      # region packet pages on the previous statement
+        expr: beacon_readmodel_trusted{model="packet_sites"} == 0
+        for: 40m
+      - alert: BeaconPacketSitesStale          # no finished reconcile (or writer save) for 15 min
+        expr: beacon_readmodel_watermark_age_seconds{model="packet_sites"} > 900
+      - alert: BeaconPacketSitesSweepStale
+        expr: beacon_packet_sites_sweep_age_seconds > 300
+      - alert: BeaconPacketSitesSweepPlan      # the sweep sets no dead-entry hints; the indexes will bloat
+        expr: beacon_packet_sites_sweep_plan_ok == 0
+        for: 5m
+      - alert: BeaconPacketSitesBloatWarn
+        expr: beacon_index_bloat_ratio{index=~"idx_packet_sites_site(_type|_scope)?"} > 2.5
+      - alert: BeaconPacketSitesBloat
+        expr: beacon_index_bloat_ratio{index=~"idx_packet_sites_site(_type|_scope)?"} > 3
+      - alert: BeaconPacketSitesSize           # warn; scale 2.5 GiB for your deployment
+        expr: beacon_packet_sites_bytes > 2.5 * 1024^3
 ```
 
 Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
@@ -1050,6 +1271,11 @@ row against a baseline (`beacon_index_bloat_ratio`). The baseline is taken the f
 server sees the index and again whenever it is rebuilt, so the ratio is growth since the last
 rebuild, not absolute bloat: 1 means as compact as then, 4 means four times the bytes per
 row. An index that has never been analyzed has no ratio.
+
+The four `packet_sites` indexes are never built fresh on a full table, so their first-seen size
+would make a poor baseline. They start from the bytes per row of a fresh build instead, once
+the table holds 100,000 rows; below that they have no ratio. A rebuild of one of them
+re-baselines it from its measured size, as for any index.
 
 The first run, and then one run a week, also logs `indexes with no scans since the last
 statistics reset` with each unused non-unique index and its size. An index that stays on that
