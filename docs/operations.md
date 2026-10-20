@@ -240,6 +240,21 @@ WHERE i.indrelid = 'packet_sites'::regclass ORDER BY 1;
 
 It must return 4 rows, all `ok = t`.
 
+Migrations `047` to `053` finish the cleanup; see
+[Lookup-table indexes and the route stamp column](#lookup-table-indexes-and-the-route-stamp-column).
+
+- `047` to `052` drop six cold indexes on small lookup tables with
+  `DROP INDEX CONCURRENTLY IF EXISTS`: milliseconds each, plus any wait for a lock.
+- `053` drops the column `known_routes.last_reconfirmed_at` in a transaction. It is a catalog
+  change, not a rewrite (179 ms on a 10.5-million-row copy), but it takes an `ACCESS EXCLUSIVE`
+  lock on `known_routes`, so run the pre-deploy check above, and make sure no `pg_dump` is
+  running: the drop waits for it. While it waits (up to 30 s, three attempts), every other
+  session's reads of `known_routes`, read-only servers' included, queue behind it. The
+  column's space (about 8 bytes a route, some 80 MB on 10.5 million routes) is reclaimed only
+  when the table is next rewritten (`VACUUM FULL` or `pg_repack`); new and updated rows no longer
+  carry it. **It is a one-way door for older images**; see
+  [Upgrading](upgrading.md).
+
 ### Pre-building the route hop index
 
 Migration `006_known_routes_hop_iata.sql` builds `idx_known_routes_hop_iata`, which `/routes`
@@ -389,7 +404,8 @@ ids run to about 830 million needs about 80 minutes. On a database whose observa
 typed, each statement reads its span and updates nothing.
 
 Until the job reports `done`, `/observers/{observerId}/adverts` serves the same statement as the
-previous release, on the same index and pool. Once a server process reads `done`, it switches
+previous release, on the same index, now on the `api_slow` pool (see
+[Slow region and message statements](#slow-region-and-message-statements)). Once a server process reads `done`, it switches
 to the statement that reads `idx_observations_adverts` and keeps it until restart. The
 responses are the same either way.
 
@@ -550,7 +566,7 @@ While the server process trusts the table, these channel message pages read it:
 
 Each such page now reads about as many index entries as it returns, where the previous
 statement read every observation of the channel. While the process does not trust the table,
-the same pages are served by the previous release's statements. Two shapes always use the
+the same pages are served by the previous release's statements, on the `api_slow` pool. Two shapes always use the
 previous statements: `/messages` with `iatas` and `since`, and `/messages` with `iatas` and
 `scope`. Pages without `iatas` or `scope` never read the table. Responses are the same in
 every case.
@@ -678,12 +694,14 @@ While the server process trusts the table, `/packets` pages with `iatas`, `iata`
 - payload and route types, up to 8 (payload, route) pairs: one exact range per site and pair;
 - a `since`/`until` window, scopes, or more than 8 type pairs: bounded reads of each site range
   that continue, within the same request, until the page is full. If 8 reads do not fill the
-  page, the previous release's statement answers that request.
+  page, the previous release's statement answers that request, on the `api_slow` pool with a
+  120 s statement limit (see [Slow region and message statements](#slow-region-and-message-statements)).
 
 Unknown site codes are dropped by a cheap check first. Requests with `hashPrefix` never read
 the table. A region page served from the table now returns `nextPageCursor`; see
 [Exact page cursors](api-contract.md#exact-page-cursors). While the process does not trust the
-table, region pages are served by the previous release's statement exactly as before.
+table, region pages are served by the previous release's statement as before, on the `api_slow`
+pool.
 
 Each page is the previous statement's page, except where that statement loses rows: when a
 site's packets are heard by many observers, it can end a page short, end a walk early (an
@@ -836,6 +854,49 @@ TRUNCATE packet_sites;
 ```
 
 Then restart the server. It backfills and verifies again as on the first install.
+
+## Slow region and message statements
+
+Some requests still read a large part of the observations in one statement:
+
+- a region `/packets` page whose bounded reads ran out of budget (a sparse filter such as a
+  narrow window or rare payload types over busy sites);
+- `/messages` with `iatas` and `since` or `scope`;
+- while a read model is not trusted (its first fill, a repair, a failed verification, its kill
+  switch), the previous statements that serve its pages: region `/packets`, channel message
+  pages filtered by `iatas` or `scope`, and observer adverts until the payload-type backfill is
+  done.
+
+They run on their own pool, `api_slow`: 2 connections by default
+([`database.slow_pool_size`](configuration.md#database-pools-and-cost-guards)),
+`statement_timeout=120s`, no parallel workers, not gated by the cost guards. When every
+connection is busy a request waits at most 5 s and then answers `503` with `Retry-After: 5`,
+without touching the other pools; `beacon_api_unavailable_total{reason="slow_pool_busy"}` counts
+those, and the server logs `api: slow requests refused, every slow connection is busy` at most
+once a minute. A statement that passes 120 s ends with a `500`; narrowing the request (fewer
+sites, a wider window) avoids it.
+
+During a read model's first fill every region or scope page goes through this pool, so set
+`slow_pool_size: 8` (the old `api_legacy` size) for the upgrade, and lower it again once
+`beacon_readmodel_trusted` is 1 for both models.
+
+Before this release these statements ran on `api_legacy` without a time limit, except the
+exact-page-cursor form of the region statement, which ran on `api_custom` (35 s, gated by
+`packets_region`).
+
+Measured on a copy of a large production database (29.4 million observations, 561 IATAs), with
+the pool's settings:
+
+| Request | Warm | Cold cache |
+|---|---:|---:|
+| The busiest region (13 IATAs), three rare payload types | 3.1-3.3 s | 22.9 s |
+| The 13 busiest IATAs, a one-hour window 60 hours back | 5.5 s | 23.3 s (first run) |
+| Every IATA (561), a one-minute window | 50 s | 34 s |
+| Every IATA (561), a one-hour window 120 hours back | 115 s | not measured |
+
+Requests naming every IATA are not something the web or app send; the largest region on that
+database has 22 IATAs. `beacon_db_time_seconds{pool="api_slow"}` and
+`beacon_pool_acquire_seconds{pool="api_slow"}` show how busy the pool is.
 
 ## Postgres settings
 
@@ -1012,15 +1073,17 @@ connection belongs to:
 
 | Pool | `application_name` | Size | Session settings |
 |---|---|---:|---|
-| `api_legacy` | `beacon-api_legacy` | 8 | Server defaults. Runs the few API statements that keep the previous plan behaviour. |
+| `api_legacy` | `beacon-api_legacy` | 8, `single` only | Server defaults. The rollback layout's only API pool. |
+| `api_slow` | `beacon-api_slow` | 2, not under `single` | Server defaults, with `statement_timeout=120s` and `max_parallel_workers_per_gather=0`. Only the [slow region and message statements](#slow-region-and-message-statements). |
 | `api_custom` | `beacon-api_custom` | 8 (7 under `split`) | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`, `statement_timeout=35s`, `idle_in_transaction_session_timeout=30s` |
 | `api_cached` | `beacon-api_cached` | 5, `split` only | As `api_custom`, with `plan_cache_mode=force_generic_plan` |
 | `ingest` | `beacon-ingest` | 6, or one per CPU above 6 | `plan_cache_mode=auto`, `jit=off`, no statement timeout: an ingest write waits out a lock rather than drop a packet |
 | `maint` | `beacon-maint` | 4 | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`. Background jobs, importers, backups and admin queries. |
 
-The `single` layout opens only `api_legacy`, `ingest` and `maint`.
+The `single` layout opens only `api_legacy`, `ingest` and `maint`; the other layouts never open
+`api_legacy`.
 
-- **Headroom.** `SHOW max_connections;` must leave room for the total (26 by default on up to
+- **Headroom.** `SHOW max_connections;` must leave room for the total (20 by default on up to
   6 CPUs) plus every other client: `psql` sessions, backups, monitoring. If your deploy starts
   the new server before the old one stops, count both.
 - **Checking.** Parallel workers carry their leader's `application_name`, so count client
@@ -1031,8 +1094,8 @@ The `single` layout opens only `api_legacy`, `ingest` and `maint`.
   WHERE application_name LIKE 'beacon-%' AND backend_type = 'client backend' GROUP BY 1;
   ```
 
-  No pool should go above its size, and `beacon-api_cached` should be absent under
-  `custom_all`.
+  No pool should go above its size, `beacon-api_cached` should be absent under `custom_all`,
+  and `beacon-api_legacy` absent except under `single`.
 - **`pool_max_conns`.** A `pool_max_conns` in `POSTGRES_DSN` is overridden by the pool sizes;
   the server logs that at startup.
 - **PgBouncer.** The session settings are sent as startup parameters. Behind PgBouncer,
@@ -1142,6 +1205,8 @@ scrape_configs:
 | `beacon_packet_sites_sweep_plan_ok` | gauge | | 1 while the front sweep plans as index scans on its three indexes, 0 otherwise; checked at the first sweep, then hourly |
 | `beacon_packet_sites_front_live` | gauge | `index` | Index entries written in the last two minutes that the last front sweep visited |
 | `beacon_packet_sites_bytes` | gauge | | Total size of `packet_sites`, heap and indexes, hourly |
+| `beacon_db_sequence_used_ratio` | gauge | `sequence`, `cycle` | Share of a sequence's usable values already handed out, 0 to 1, each minute. The usable range ends at the sequence's own limit or its column's type limit (`integer` 2,147,483,647), whichever is lower. `cycle="true"` marks a `CYCLE` sequence, whose ratio is its position, not used-up headroom. See [Sequence headroom](#sequence-headroom). |
+| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered because `api_slow` had no free connection (`reason="slow_pool_busy"`). `model` is the read model the page reads: `packet_sites`, `cmi` or `observation_payload_types`. |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
@@ -1208,6 +1273,19 @@ groups:
         expr: beacon_index_bloat_ratio{index=~"idx_packet_sites_site(_type|_scope)?"} > 3
       - alert: BeaconPacketSitesSize           # warn; scale 2.5 GiB for your deployment
         expr: beacon_packet_sites_bytes > 2.5 * 1024^3
+      - alert: BeaconSlowPoolBusy              # region or message requests refused for want of a slow connection
+        expr: sum(increase(beacon_api_unavailable_total{reason="slow_pool_busy"}[15m])) > 10
+      # The sequence rules leave out CYCLE sequences, which wrap instead of running out.
+      - alert: BeaconSequenceHalfUsed
+        expr: beacon_db_sequence_used_ratio{cycle="false"} > 0.5
+        for: 1h
+        labels: {severity: warning}
+        annotations: {summary: "Sequence {{ $labels.sequence }} has used over half of its values"}
+      - alert: BeaconSequenceRunsOutIn90Days
+        expr: predict_linear(beacon_db_sequence_used_ratio{cycle="false"}[7d], 90 * 86400) >= 1
+        for: 6h
+        labels: {severity: critical}
+        annotations: {summary: "Sequence {{ $labels.sequence }} runs out within 90 days at its current rate"}
 ```
 
 Replace `<baseline bytes/s>` with your normal WAL rate before loading the rules. The route
@@ -1285,6 +1363,62 @@ list for weeks is a candidate to drop; check that no rare job reads it first.
 When `BeaconKeysetBloat` fires, rebuild that index as in
 [Rebuilding the route keyset indexes](#rebuilding-the-route-keyset-indexes). The rebuild resets
 its baseline, and the ratio drops back to about 1 on the next hourly run.
+
+## Lookup-table indexes and the route stamp column
+
+Migrations `047` to `052` drop six indexes that no statement's plan reads; every lookup they
+served goes through a primary key or a table of a few hundred rows:
+
+| Index | Table | Why it goes | Rebuild (seconds) |
+|---|---|---|---|
+| `idx_channel_iatas_iata` | `channel_iatas` | nothing looks up channel sites by IATA | `CREATE INDEX CONCURRENTLY idx_channel_iatas_iata ON channel_iatas USING btree (iata);` |
+| `idx_node_neighbors_node` | `node_neighbors` | the primary key `(node_id, neighbor_id, iata)` serves every lookup by node | `CREATE INDEX CONCURRENTLY idx_node_neighbors_node ON node_neighbors USING btree (node_id, iata);` |
+| `idx_transport_scopes_fingerprint` | `transport_scopes` | scopes are loaded whole | `CREATE INDEX CONCURRENTLY idx_transport_scopes_fingerprint ON transport_scopes USING btree (key_fingerprint);` |
+| `idx_meshmapper_channel_members_fingerprint` | `meshmapper_channel_members` | channel pages read members by IATA through the primary key | `CREATE INDEX CONCURRENTLY idx_meshmapper_channel_members_fingerprint ON meshmapper_channel_members USING btree (key_fingerprint);` |
+| `idx_region_iatas_iata` | `region_iatas` | regions are read by id; the IATA lookup reads a tiny table | `CREATE INDEX CONCURRENTLY idx_region_iatas_iata ON region_iatas USING btree (iata);` |
+| `idx_trace_tags_first_heard` | `trace_tags` | trace pages walk the keyset index | `CREATE INDEX CONCURRENTLY idx_trace_tags_first_heard ON trace_tags USING btree (first_heard_at);` |
+
+`idx_analytics_scope_sets_scope` stays: `/scopes/{name}` reads it twice, and without it a rare
+scope's lookup becomes two full scans of the scope rollup table.
+
+No older image needs the six indexes for its plans; rebuilding them after a rollback is
+optional.
+
+Migration `053` drops `known_routes.last_reconfirmed_at`. No statement of this release reads
+it: route reconfirm stopped stamping it and its index went in earlier releases. The old values
+are gone for good (no client ever saw them). Every older image needs the column back before it
+starts, because its route evidence statement lists it and 2.0.7's reconfirm writes it:
+
+```sql
+ALTER TABLE known_routes ADD COLUMN last_reconfirmed_at timestamp with time zone DEFAULT now() NOT NULL;
+```
+
+This is a catalog change, not a rewrite (8 ms on a 10.5-million-row copy), and takes an
+`ACCESS EXCLUSIVE` lock on `known_routes` for that long. Every route reads the time of the
+`ALTER`; 2.0.7 then walks routes in arbitrary order on its first reconfirm cycle, which changes
+nothing it deletes. To roll forward again, the new image's migration `053` is already recorded,
+so drop the column by hand with `ALTER TABLE known_routes DROP COLUMN last_reconfirmed_at;`, or
+delete the `053_drop_known_routes_last_reconfirmed_at.sql` row from `schema_migrations` so the
+migration runs again.
+
+## Sequence headroom
+
+`beacon_db_sequence_used_ratio{sequence}` is, for every sequence in Beacon's schema, the share
+of its usable values already handed out: 0 when unused, 1 when exhausted. The usable range ends
+at the sequence's own maximum or at its column's type limit, whichever is lower, so an
+`integer` column on a `bigint` sequence counts against 2,147,483,647. A descending sequence
+counts from its top. A `CYCLE` sequence wraps to its start instead of running out, so it is
+reported by position with `cycle="true"`, and the example rules leave it out; Beacon creates
+none.
+
+On a large deployment `channels_id_seq` read about 0.02 and every `bigint` sequence about 0.
+`channels_id_seq` used to burn about 2,000 values a minute through upsert conflicts (fixed by
+the channel write-through); the `BeaconSequenceRunsOutIn90Days` rule in
+[Example alert rules](#example-alert-rules) would have caught that. An `integer` sequence
+nearing 1 needs its column changed to `bigint`, a table rewrite to plan off-peak.
+
+After deploying, check that `channels_id_seq` stays flat over an hour:
+`delta(beacon_db_sequence_used_ratio{sequence="channels_id_seq"}[1h])` near 0.
 
 ## Plan checks (planguard)
 
@@ -1461,8 +1595,9 @@ database:
   api_plan_layout: single
 ```
 
-It puts every API statement on one pool with the previous session settings and makes every
-guard family observe, whatever `guards.enforce` says. The alternative is the previous server
+It puts every API statement, the slow ones included, on one pool (`api_legacy`, 8 connections,
+the server's own settings, no statement limit) and makes every guard family observe, whatever
+`guards.enforce` says. The alternative is the previous server
 image. It ignores migration 010; the `pg_stat_statements` extension stays installed and
 harmless.
 
