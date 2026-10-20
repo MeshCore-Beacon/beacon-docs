@@ -71,7 +71,7 @@ which ones to read.
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 600 requests a minute. | You get 429s you did not expect. |
 | `database` | `api_plan_layout`: how API statements are spread over database connection pools. | You check `max_connections`, or need the rollback layout. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `planguard` | `daily_check`: a daily read-only check that the database still plans Beacon's queries the way they were designed. Off by default. | You run a large deployment. See [Daily plan check](#daily-plan-check). |
-| `readmodels` | `cmi.enabled`: whether region and scope channel message pages may read the `channel_message_iatas` read model. `packet_sites.enabled`: whether region packet pages may read the `packet_sites` read model. Both default to `true`. | You suspect a read model serves wrong pages. See [Read models](#read-models). |
+| `readmodels` | `cmi.enabled`: whether region and scope channel message pages may read the `channel_message_iatas` read model. `packet_sites.enabled`: whether region packet pages may read the `packet_sites` read model. Both default to `true`. `fill`: how hard the one-off backfills may work the disk. | You suspect a read model serves wrong pages, or a backfill starves a small server's disk. See [Read models](#read-models). |
 | `guards` | Which request families the cost guards may refuse. All of them only observe by default. | After a week of observing. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
@@ -254,6 +254,11 @@ readmodels:
     enabled: true
   packet_sites:
     enabled: true
+  fill:
+    duty: 0.5
+    min_pause: 100ms
+    packet_sites_slice: 500000
+    cmi_batch: 10000
 ```
 
 `channel_message_iatas` holds one row for each channel message and each site that heard it.
@@ -284,6 +289,27 @@ is at once on a deployment where every observation already carries its payload t
 
 On a [read-only server](#read-only-mode) both keys work the same way. Such a server never
 writes the tables; it trusts each one only while the writing server keeps it up to date.
+
+### Backfill pacing
+
+`readmodels.fill` paces the one-off backfills: the `packet_sites` and `channel_message_iatas`
+fills after an upgrade or a rebuild, and the
+[payload-type backfill](operations.md#after-upgrading-observation-payload-types). After each
+slice or batch a fill sleeps `max(min_pause, elapsed × (1 − duty) / duty)`, where `elapsed` is
+how long that slice took. A slow disk makes each slice take longer, so it stretches the pauses
+on its own. Pacing changes only when the fills run, never what they write.
+
+| Key | Default | Range | What it does |
+|---|---|---|---|
+| `duty` | `0.5` | 0.01 to 1 | The share of time a fill may be busy. `0.5` waits as long as each slice took; `0.25` waits three times as long; `1` waits only `min_pause`. No single pause is longer than 10 minutes. |
+| `min_pause` | `100ms` | `0s` to `1m` | The shortest pause after a slice or batch. |
+| `packet_sites_slice` | `500000` | 1 to 10,000,000 | Observation ids one `packet_sites` backfill slice covers. |
+| `cmi_batch` | `10000` | 1 to 1,000,000 | Message ids one `channel_message_iatas` backfill batch covers. |
+
+The defaults suit a small server. On a slow (rotational or shared) disk, set `duty: 0.25`. A
+value out of range stops the server at startup with an error naming the key. The startup log
+line `config: loaded` shows the values in force (`fillDuty`, `fillMinPause`,
+`fillPacketSitesSlice`, `fillCmiBatch`). See [Pacing the backfills](operations.md#pacing-the-backfills).
 
 ## MeshMapper API key
 
