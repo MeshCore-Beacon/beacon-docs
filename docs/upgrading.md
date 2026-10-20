@@ -225,13 +225,13 @@ metrics and alerts, and how read-only servers decide.
 
 The release that adds migrations `047` to `053` keeps the minimum web and app versions.
 
-- **Pools.** `api_legacy` opens only under the `single` layout. A new `api_slow` pool (2
+- **Pools.** `api_legacy` opens only under the `single` layout. A new `api_slow` pool (8
   connections by default, `database.slow_pool_size`; 120 s statement limit; ungated) runs the
   statements that may read whole site histories: the region statement for pages whose bounded
   reads run out of budget, `/messages` with `iatas` and `since` or `scope`, and the previous
   statements that serve region and scope pages while a read model is not trusted. The default
-  total goes from 26 to 20 connections. If the read models fill for the first time in the same
-  upgrade, set `slow_pool_size: 8` until both are trusted. See
+  total stays at 26 connections (api_slow's 8 replace api_legacy's 8); set `slow_pool_size` only
+  to override that. See
   [Slow region and message statements](operations.md#slow-region-and-message-statements).
 - **Alerts.** Load `BeaconSlowPoolBusy` and the two sequence rules from
   [Example alert rules](operations.md#example-alert-rules).

@@ -867,7 +867,7 @@ Some requests still read a large part of the observations in one statement:
   pages filtered by `iatas` or `scope`, and observer adverts until the payload-type backfill is
   done.
 
-They run on their own pool, `api_slow`: 2 connections by default
+They run on their own pool, `api_slow`: 8 connections by default, the size `api_legacy` had
 ([`database.slow_pool_size`](configuration.md#database-pools-and-cost-guards)),
 `statement_timeout=120s`, no parallel workers, not gated by the cost guards. When every
 connection is busy a request waits at most 5 s and then answers `503` with `Retry-After: 5`,
@@ -876,9 +876,9 @@ those, and the server logs `api: slow requests refused, every slow connection is
 once a minute. A statement that passes 120 s ends with a `500`; narrowing the request (fewer
 sites, a wider window) avoids it.
 
-During a read model's first fill every region or scope page goes through this pool, so set
-`slow_pool_size: 8` (the old `api_legacy` size) for the upgrade, and lower it again once
-`beacon_readmodel_trusted` is 1 for both models.
+During a read model's first fill every region or scope page goes through this pool; the default
+of 8 gives those pages the capacity they had on `api_legacy`. Set `slow_pool_size` only to
+override that.
 
 Before this release these statements ran on `api_legacy` without a time limit, except the
 exact-page-cursor form of the region statement, which ran on `api_custom` (35 s, gated by
@@ -1074,7 +1074,7 @@ connection belongs to:
 | Pool | `application_name` | Size | Session settings |
 |---|---|---:|---|
 | `api_legacy` | `beacon-api_legacy` | 8, `single` only | Server defaults. The rollback layout's only API pool. |
-| `api_slow` | `beacon-api_slow` | 2, not under `single` | Server defaults, with `statement_timeout=120s` and `max_parallel_workers_per_gather=0`. Only the [slow region and message statements](#slow-region-and-message-statements). |
+| `api_slow` | `beacon-api_slow` | 8 (`slow_pool_size`), not under `single` | Server defaults, with `statement_timeout=120s` and `max_parallel_workers_per_gather=0`. Only the [slow region and message statements](#slow-region-and-message-statements). |
 | `api_custom` | `beacon-api_custom` | 8 (7 under `split`) | `plan_cache_mode=force_custom_plan`, `jit=off`, `max_parallel_workers_per_gather=0`, `statement_timeout=35s`, `idle_in_transaction_session_timeout=30s` |
 | `api_cached` | `beacon-api_cached` | 5, `split` only | As `api_custom`, with `plan_cache_mode=force_generic_plan` |
 | `ingest` | `beacon-ingest` | 6, or one per CPU above 6 | `plan_cache_mode=auto`, `jit=off`, no statement timeout: an ingest write waits out a lock rather than drop a packet |
@@ -1083,7 +1083,7 @@ connection belongs to:
 The `single` layout opens only `api_legacy`, `ingest` and `maint`; the other layouts never open
 `api_legacy`.
 
-- **Headroom.** `SHOW max_connections;` must leave room for the total (20 by default on up to
+- **Headroom.** `SHOW max_connections;` must leave room for the total (26 by default on up to
   6 CPUs) plus every other client: `psql` sessions, backups, monitoring. If your deploy starts
   the new server before the old one stops, count both.
 - **Checking.** Parallel workers carry their leader's `application_name`, so count client

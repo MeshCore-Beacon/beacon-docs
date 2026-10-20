@@ -128,8 +128,8 @@ needed, so these are peaks:
 
 | `database.api_plan_layout` | `api_legacy` | `api_slow` | `api_custom` | `api_cached` | `ingest` | `maint` | Total |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `custom_all` (default) | - | 2 (`slow_pool_size`) | 8 | - | 6 | 4 | 20 |
-| `split` | - | 2 (`slow_pool_size`) | 7 | 5 | 6 | 4 | 24 |
+| `custom_all` (default) | - | 8 (`slow_pool_size`) | 8 | - | 6 | 4 | 26 |
+| `split` | - | 8 (`slow_pool_size`) | 7 | 5 | 6 | 4 | 30 |
 | `single` (rollback) | 8 | - | - | - | 6 | 4 | 18 |
 
 `ingest` has one connection per CPU on hosts with more than 6 CPUs, which adds to each total.
@@ -154,19 +154,20 @@ the region `/packets` statement that answers when the site read model's bounded 
 of budget, the all-channel message statement for `iatas` combined with `since` or `scope`, and,
 while a read model is not trusted, the previous statements that serve its pages (see
 [Operations](operations.md#slow-region-and-message-statements)).
-Two connections by default (`database.slow_pool_size`), a 120 s `statement_timeout`, no parallel
+Eight connections by default (`database.slow_pool_size`), the size `api_legacy` had, a 120 s `statement_timeout`, no parallel
 workers. A request that finds every connection busy waits at most 5 s and then answers `503`
 with `Retry-After: 5`; it never takes a connection from `api_custom`. A statement that runs past
 120 s ends with a `500`.
 
 ```yaml
 database:
-  slow_pool_size: 2   # api_slow's connections under custom_all and split; at least 1, at most 1000
+  slow_pool_size: 8   # api_slow's connections under custom_all and split; at least 1, at most 1000
 ```
 
-Raise it if `beacon_api_unavailable_total{reason="slow_pool_busy"}` keeps growing, and count it in
+Omit the key to take the default; set it only to override it. Raise it if
+`beacon_api_unavailable_total{reason="slow_pool_busy"}` keeps growing, and count it in
 `max_connections`. While a read model fills for the first time every region or scope page runs
-here, so use `8` (the old `api_legacy` size) for that upgrade.
+here, which is why the default matches the old `api_legacy` pool.
 
 The layout changes at a restart. What each pool sets is in
 [Operations](operations.md#database-pools-and-connections).
