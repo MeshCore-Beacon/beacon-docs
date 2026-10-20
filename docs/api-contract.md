@@ -82,6 +82,8 @@ Each request falls in one family and one class:
 
 "Region set" means a non-empty `iata`, `iatas`, `region` or `regionId`.
 
+A few requests run on a small database pool of their own: `/messages` with `iatas` and `since` or `scope`, region `/packets` pages whose filter is too sparse for the server's site read model, and region and scope pages while the server is still preparing a read model. When that pool is busy they answer `503` `service_unavailable` with `Retry-After: 5`.
+
 ## Versioning
 
 Path is the contract: `/api/v1/`. Breaking changes get `/api/v2/`. Backward-compatible additions just expand the existing payloads. WebSocket messages include a `type` discriminator and a top-level `v: 1` field so we can evolve in place.

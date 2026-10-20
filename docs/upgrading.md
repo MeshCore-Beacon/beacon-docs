@@ -221,6 +221,43 @@ metrics and alerts, and how read-only servers decide.
 - To roll back, deploy the previous image. Rolling forward again later repairs the table at
   startup before any region page reads it; nothing to do by hand.
 
+## The slow pool, lookup-table indexes and a dropped column
+
+The release that adds migrations `047` to `053` keeps the minimum web and app versions.
+
+- **Pools.** `api_legacy` opens only under the `single` layout. A new `api_slow` pool (8
+  connections by default, `database.slow_pool_size`; 120 s statement limit; ungated) runs the
+  statements that may read whole site histories: the region statement for pages whose bounded
+  reads run out of budget, `/messages` with `iatas` and `since` or `scope`, and the previous
+  statements that serve region and scope pages while a read model is not trusted. The default
+  total stays at 26 connections (api_slow's 8 replace api_legacy's 8); set `slow_pool_size` only
+  to override that. See
+  [Slow region and message statements](operations.md#slow-region-and-message-statements).
+- **Alerts.** Load `BeaconSlowPoolBusy` and the two sequence rules from
+  [Example alert rules](operations.md#example-alert-rules).
+- **Migrations.** `047` to `052` drop six cold lookup-table indexes; `053` drops
+  `known_routes.last_reconfirmed_at`. Run the [pre-deploy check](operations.md#before-deploying-a-release)
+  first and make sure no `pg_dump` is running.
+
+**Rolling back is a one-way door.** Migration `053` removes a column that every older image
+(2.0.7 and every build before this release) reads or writes. Before starting an older image,
+put the column back:
+
+```sql
+ALTER TABLE known_routes ADD COLUMN last_reconfirmed_at timestamp with time zone DEFAULT now() NOT NULL;
+```
+
+It is a catalog change, not a rewrite: 8 ms on a 10.5-million-row copy of a large database,
+under a brief `ACCESS EXCLUSIVE` lock on `known_routes`. This covers this release only; the
+rollback steps of the earlier releases you are going back past still apply. In particular, once
+the drops release (migration `046`) has run, 2.0.7 needs `idx_observations_observer_id` again:
+rebuild it with
+`CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations USING btree (observer_id, id);`
+and confirm `SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;`
+prints `t` before switching images. The six dropped indexes are optional after a rollback; their rebuild statements are in
+[Lookup-table indexes and the route stamp column](operations.md#lookup-table-indexes-and-the-route-stamp-column),
+which also covers rolling forward again.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
