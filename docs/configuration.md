@@ -71,6 +71,7 @@ which ones to read.
 | `ratelimit` | Per-client REST limits for `/api/v1/*`. On by default at 600 requests a minute. | You get 429s you did not expect. |
 | `database` | `api_plan_layout`: how API statements are spread over database connection pools. | You check `max_connections`, or need the rollback layout. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `planguard` | `daily_check`: a daily read-only check that the database still plans Beacon's queries the way they were designed. Off by default. | You run a large deployment. See [Daily plan check](#daily-plan-check). |
+| `readmodels` | `cmi.enabled`: whether region and scope channel message pages may read the `channel_message_iatas` read model (default `true`). | You suspect the read model serves wrong pages. See [Read models](#read-models). |
 | `guards` | Which request families the cost guards may refuse. All of them only observe by default. | After a week of observing. See [Database pools and cost guards](#database-pools-and-cost-guards). |
 | `meshmapper` | Import transport scopes, IATA borders, region groups and public channels from MeshMapper instead of listing them by hand, and add repeater site details to node detail. Requires a [MeshMapper API key](#meshmapper-api-key). | You are in a region MeshMapper covers. |
 | `iatas` | Display names, coordinates and optional border files for airport codes. IATAs are created automatically when traffic arrives; this block only decorates them. A `borderFile` path is relative to `config.yaml`; in Docker the compose file mounts only `config.yaml`, so add a mount for the folder too (`- ./data/app/borders:/app/borders:ro` under the `app` service). | You want names on the map or a border drawn. |
@@ -195,7 +196,8 @@ messages, MQTT ingest, the presence writer, the rollup catch-up, every backgroun
 MeshMapper imports. Every database session it opens is read-only
 (`default_transaction_read_only`), so anything that would still write, such as
 `POST /api/v1/admin/accounts`, fails with SQLSTATE `25006` instead of changing data. The server
-logs a warning at startup saying so.
+logs a warning at startup saying so. The one thing it still runs is a read-only check of the
+channel message read model every 5 minutes; see [Read models](#read-models).
 
 The REST API and `/ws` still serve what is in the database, but nothing new arrives. Because no
 migrations run, the database must already be at the schema the build expects. Its use is
@@ -224,6 +226,27 @@ are not real. Turn it on for a large deployment; see
 metrics.
 
 It cannot be combined with `server.read_only: true`; the server refuses to start with both.
+
+## Read models
+
+```yaml
+readmodels:
+  cmi:
+    enabled: true
+```
+
+`channel_message_iatas` holds one row for each channel message and each site that heard it.
+Channel message pages filtered by `iatas` or `scope` read it instead of every observation, but
+only while the server process trusts the table; see
+[Operations](operations.md#read-models-channel-messages-by-site).
+
+`readmodels.cmi.enabled: false` is the kill switch, for when you suspect the table serves wrong
+pages. Every channel message page is then served by the statements of the previous release.
+The server still maintains and repairs the table, so setting it back to `true` needs only a
+restart. Omitting the key means `true`. Like every key in this file, a change needs a restart.
+
+On a [read-only server](#read-only-mode) this key works the same way. Such a server never
+writes the table; it trusts it only while the writing server keeps it up to date.
 
 ## MeshMapper API key
 
