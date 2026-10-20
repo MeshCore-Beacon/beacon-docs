@@ -1187,8 +1187,9 @@ groups:
         for: 20m
       - alert: BeaconReadModelStale            # no finished reconcile (or writer save) for 15 min
         expr: beacon_readmodel_watermark_age_seconds{model="cmi"} > 900
-      # The packet_sites trust rules don't apply with readmodels.packet_sites.enabled: false, and the
-      # sweep rules only on the server that runs background jobs (not on a read-only server).
+      # The packet_sites trust rules don't apply with readmodels.packet_sites.enabled: false.
+      # Install the two sweep rules only for the server that runs background jobs, never for a
+      # read-only server: it never sweeps, so its sweep_plan_ok stays 0 and the plan rule would fire.
       - alert: BeaconPacketSitesRepairing      # a reconcile or audit repaired rows: a writer bypassed the model
         expr: increase(beacon_readmodel_repaired_rows_total{model="packet_sites"}[10m]) > 0
       - alert: BeaconPacketSitesUntrusted      # region packet pages on the previous statement
