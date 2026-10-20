@@ -914,6 +914,13 @@ it is busy at most `duty` of the time. A slow disk makes each slice slower, whic
 pauses on its own. Pacing changes only when the fills run: they write the same rows, the
 verification and trust rules are unchanged, and progress is saved after every slice as before.
 
+The fill sessions also plan their statements with `plan_cache_mode = force_custom_plan` and,
+when a read-model table has never been analyzed, run `ANALYZE` on it (at the session start if it
+already holds rows, otherwise after the first slice). A generic plan built on a new table with no
+statistics can turn a 14 s slice into one that runs for many minutes. A failed `ANALYZE` is
+logged (`read-model ANALYZE failed; the fill goes on`) and the fill continues; a table that
+already has statistics is left to autovacuum.
+
 Measured on a laptop Postgres with 3 million synthetic observations (`packet_sites`, slices of
 500,000 ids):
 
@@ -928,7 +935,8 @@ burst from about 14 s to about 3 s.
 
 Settings, under [`readmodels.fill`](configuration.md#backfill-pacing) in `config.yaml`:
 
-- `duty` (default `0.5`): the share of time a fill may be busy.
+- `duty` (default `0.5`, at least `0.01`): the share of time a fill may be busy. No single pause
+  is longer than 10 minutes.
 - `min_pause` (default `100ms`): the shortest pause after a slice or batch.
 - `packet_sites_slice` (default `500000`) and `cmi_batch` (default `10000`): the slice and batch
   sizes. A smaller slice gives shorter bursts at a small cost in total work.
@@ -939,6 +947,7 @@ values in force. While a fill runs, check `/proc/pressure/io` on the host: `full
 stay well below 50 %. Lower `duty` further if it does not. The reconcile and the hourly audit
 are not paced: they cover only the observations since the last run, or one slice an hour.
 
+## Slow region and message statements
 
 Two kinds of request still read a large part of the observations in one statement: a region
 `/packets` page whose bounded reads ran out of budget (a sparse filter such as a narrow window

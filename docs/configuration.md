@@ -301,7 +301,7 @@ on its own. Pacing changes only when the fills run, never what they write.
 
 | Key | Default | Range | What it does |
 |---|---|---|---|
-| `duty` | `0.5` | above 0, up to 1 | The share of time a fill may be busy. `0.5` waits as long as each slice took; `0.25` waits three times as long; `1` waits only `min_pause`. |
+| `duty` | `0.5` | 0.01 to 1 | The share of time a fill may be busy. `0.5` waits as long as each slice took; `0.25` waits three times as long; `1` waits only `min_pause`. No single pause is longer than 10 minutes. |
 | `min_pause` | `100ms` | `0s` to `1m` | The shortest pause after a slice or batch. |
 | `packet_sites_slice` | `500000` | 1 to 10,000,000 | Observation ids one `packet_sites` backfill slice covers. |
 | `cmi_batch` | `10000` | 1 to 1,000,000 | Message ids one `channel_message_iatas` backfill batch covers. |
