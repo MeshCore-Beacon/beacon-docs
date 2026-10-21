@@ -11,6 +11,8 @@ This repo is where you deploy and operate it. The code lives in
 The proposed paired backend, basic Atlas and Topology release is described in
 [Core performance candidate](docs/performance-release-candidate.md), including
 validation, operational budgets and remaining release gates.
+The separate [optional collection guide](docs/telemetry-collection.md) covers
+mobile/headless clients, intake, sensor cards and their qualification gates.
 
 > **Coming from 1.x?** 2.0.0 needs a fresh database and a few config changes. Read
 > [Upgrading](docs/upgrading.md) before you pull new images.
