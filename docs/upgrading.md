@@ -137,9 +137,11 @@ the flood jail's `maxretry` of 900 still sits above the new limit.
 ## Upgrading to 2.1
 
 Server 2.1.0 adds exact page cursors (`nextPageCursor` and `pageCursor`) to `/packets`, `/nodes`
-and `/observers`; see [Exact page cursors](api-contract.md#exact-page-cursors). The change is
-additive and the minimum web and app versions stay where they were, so older clients keep
-working. Pull Beacon Web 2.1 with the server.
+and `/observers`; see [Exact page cursors](api-contract.md#exact-page-cursors). The API change is
+additive, but server 2.1 requires Beacon Web 2.1 (`minWebVersion` 2.1.0): older web versions do not
+wait out the 503s that region, scope and advert pages answer while a read model is not ready, and
+they skip rows tied on a page boundary. Deploy Beacon Web 2.1 together with the server; an open
+tab on an older web version shows the reload screen. The minimum app version stays 2.0.0.
 
 Migrations `025` to `033` add two checks, four indexes and a statistics object to `packets`.
 Before deploying, run the [pre-deploy check](operations.md#before-deploying-a-release) and the
