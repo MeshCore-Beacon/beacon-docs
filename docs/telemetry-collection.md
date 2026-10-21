@@ -31,7 +31,7 @@ Point the optional server setting at the intake over the private service network
 
 ```yaml
 node_telemetry:
-  gateway_url: http://collector:8081
+  gateway_url: http://collector:8081/api/v1/node-telemetry
 ```
 
 Replace `collector` with that deployment's actual private service hostname. The
