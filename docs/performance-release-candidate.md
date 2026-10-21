@@ -5,6 +5,9 @@ Review this as a paired server/web candidate before promoting it from `dev` or
 Atlas sensor cards are a separate dependent change. Basic Atlas and Topology do
 not require that optional service.
 
+See the [21 October qualification record](release-qualification-20261021.md)
+for the paired drafts, exact preview build, measurements and remaining gates.
+
 ## What the core changes
 
 | Area | Result |
