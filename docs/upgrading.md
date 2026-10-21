@@ -136,157 +136,174 @@ the flood jail's `maxretry` of 900 still sits above the new limit.
 
 ## Upgrading to 2.1
 
-Server 2.1.0 adds exact page cursors (`nextPageCursor` and `pageCursor`) to `/packets`, `/nodes`
-and `/observers`; see [Exact page cursors](api-contract.md#exact-page-cursors). The API change is
-additive, but server 2.1 requires Beacon Web 2.1 (`minWebVersion` 2.1.0): older web versions do not
-wait out the 503s that region, scope and advert pages answer while a read model is not ready, and
-they skip rows tied on a page boundary. Deploy Beacon Web 2.1 together with the server; an open
-tab on an older web version shows the reload screen. The minimum app version stays 2.0.0.
+Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `053` at startup,
+adds two read models that region and scope pages are served from, and drops indexes and one
+column nothing reads any more. No config change is required. Beacon Web must move to 2.1 at the
+same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). The minimum app
+version stays 2.0.0, so installed apps keep working.
 
-Migrations `025` to `033` add two checks, four indexes and a statistics object to `packets`.
-Before deploying, run the [pre-deploy check](operations.md#before-deploying-a-release) and the
-type check in the same section. A large deployment can pre-build the four indexes off-peak; see
-[Pre-building the packets indexes](operations.md#pre-building-the-packets-indexes). Other
-deployments can skip that: the server builds them at startup and serves the API once they are
-done.
+The upgrade has two phases. First the server runs its migrations while the API and ingest are
+down. Then it serves the API again and fills the read models in the background; until each one
+is ready, the pages it serves answer `503` with `Retry-After`. Web and app retry for about 90 s,
+then show an error with a retry button.
 
-## Observer adverts index and payload-type backfill
+### Before you upgrade
 
-The release that adds migration `034` changes no API and keeps the minimum web and app versions.
-On a large deployment, pre-build `idx_observations_adverts` off-peak before deploying; see
-[Pre-building the observer adverts index](operations.md#pre-building-the-observer-adverts-index).
-Other deployments can skip that: the server builds it at startup.
+1. **Back up** the database; see [Backing up](operations.md#backing-up). The
+   [rollback](#rolling-back-from-21) does not need the backup, but it is the only way back from
+   anything unexpected.
+2. **Disk.** On a large deployment the release adds about 1 GB net (the new `packet_sites` table
+   is about 2.3 GB; dropped indexes free the rest), and the first fill writes about 8 GB of WAL
+   within minutes. Keep that much free on the volume under `data/postgres/`, with room to spare.
+3. **Slow disk or small VM** (rotational, network or shared storage, or a few GB of RAM): set
+   `readmodels.fill.duty: 0.25` and `readmodels.fill.packet_sites_slice: 100000` in `config.yaml`
+   before upgrading. At full speed the first fill can stall such a machine; paced, it takes
+   longer but the server stays responsive. See [Pacing the backfills](operations.md#pacing-the-backfills).
+4. **Connections.** The server now opens one pool per workload: 20 connections by default, plus
+   one for each CPU above 6. Check that Postgres `max_connections` leaves room for that and your
+   own sessions; see [Database pools and connections](operations.md#database-pools-and-connections).
+5. **Large deployments only** (tens of millions of routes, hundreds of millions of observations):
+   pre-build the new indexes off-peak, while the old version keeps running, to shorten the
+   startup pause:
+   - [the route hop index](operations.md#pre-building-the-route-hop-index) (10 to 25 minutes
+     at startup otherwise),
+   - [the four packets indexes](operations.md#pre-building-the-packets-indexes),
+   - [the observer adverts index](operations.md#pre-building-the-observer-adverts-index).
 
-After the deploy, a background job fills in missing observation payload types; on a large
-deployment it takes about 80 minutes, or under a minute where every observation already has
-its type. Until it reports done, observer adverts pages answer `503` with `Retry-After`. See
+   Everyone else can skip this: the server builds them at startup.
+6. Run the [pre-deploy check](operations.md#before-deploying-a-release) (no long transactions,
+   no anti-wraparound vacuum, no `pg_dump` running), and pick a quiet hour.
+
+### Upgrade
+
+Pull and start the server and web images together, as in [Routine upgrades](#routine-upgrades):
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### What happens, and how long
+
+| Phase | Pages affected | Small deployment | Large deployment |
+|---|---|---|---|
+| Startup migrations | Whole API and ingest down; packets arriving meanwhile are not stored | Seconds | Under a minute with the indexes pre-built; add 10 to 25 minutes for the route hop index and a few more for the others if not. Two checks on `packets` (`026`, `028`) always run here |
+| Channel messages by site | Channel message pages filtered by `iatas`, `region` or `scope` answer `503` | Seconds | About 1 to 5 minutes |
+| Packets by site | `/packets` filtered by `iatas`, `iata`, `region` or `regionId` answer `503` | Seconds to minutes | Roughly 5 to 20 minutes at `duty: 1`; about twice that at the default `0.5`, four times at `0.25` |
+| Observation payload types | Observer advert pages answer `503` | About a minute when every observation already has its type | Up to about 80 minutes when many observations have none |
+
+A slow disk stretches every phase: on a test server with a rotational disk and about 6 million
+observations, the migrations took 8 minutes and the fills at `duty: 0.25` about an hour.
+
+Watch the log for these lines; each one ends a phase:
+
+- `Beacon listening on :8080`: migrations done, API up.
+- `cmi trusted: region and scope message pages read channel_message_iatas`
+- `packet_sites trusted: region packet pages read packet_sites`
+- `... backfill progress` lines show a fill moving.
+
+After that the server keeps both read models up to date as it ingests, and earns their trust
+again within a second or two of every later restart. If trust ever drops, the log says
+`read model untrusted ...` and later `read model trusted again: its pages are served from it`;
+see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model).
+
+### After upgrading
+
+- **Ingest cost.** Each stored observation now costs about 15 to 21 % more insert time and 37 to
+  53 % more WAL. Watch `beacon_ingest_queue_depth` for the first hours; see
+  [Ingest cost](operations.md#ingest-cost).
+- **Alerts.** Load the read-model `Untrusted` rules, `BeaconAdvertsNotReady`,
+  `BeaconSlowPoolBusy` and the sequence rules from
+  [Example alert rules](operations.md#example-alert-rules).
+- **Route maintenance.** The first route retention run after the upgrade is a full pass; on a
+  large deployment it takes 12 to 14 minutes in short statements. See
+  [After upgrading: route maintenance](operations.md#after-upgrading-route-maintenance).
+- **Optional, large deployments, once, off-peak:**
+  [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
+  and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
+- **Plan checks.** Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only
+  after the upgrade, if you want it.
+
+### Rolling back from 2.1
+
+Lighter steps first, without changing images:
+
+- Region or scope pages misbehave: set `readmodels.cmi.enabled: false` or
+  `readmodels.packet_sites.enabled: false` and restart. Those pages answer `503` until it is
+  `true` again; see [Configuration](configuration.md#read-models).
+- Pool or plan trouble: `database.api_plan_layout: single` and restart; see
+  [Rolling back the pool layout](operations.md#rolling-back-the-pool-layout).
+
+To go back to 2.0.7, two objects it needs must come back first, because migrations `046` and
+`053` removed them:
+
+```sql
+ALTER TABLE known_routes ADD COLUMN last_reconfirmed_at timestamp with time zone DEFAULT now() NOT NULL;
+CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations USING btree (observer_id, id);
+SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;
+```
+
+The `ALTER` is a catalog change (milliseconds, brief lock on `known_routes`). Run the `CREATE` on
+its own in autocommit mode; on a large deployment it takes about a minute or two, and the
+`SELECT` must print `t`. Then deploy the 2.0.7 server and a matching 2.0 web build. The other
+dropped indexes are optional; their statements are in
+[Lookup-table indexes and the route stamp column](operations.md#lookup-table-indexes-and-the-route-stamp-column).
+Upgrading again later needs nothing by hand: the server repairs both read models at startup
+before any page reads them.
+
+### What changed, by area
+
+Reference for operators who want the detail behind each phase above.
+
+#### Packets: checks, indexes and exact cursors (`025` to `033`)
+
+Exact page cursors (`nextPageCursor` and `pageCursor`) on `/packets`, `/nodes` and `/observers`;
+see [Exact page cursors](api-contract.md#exact-page-cursors). Two checks, four indexes and a
+statistics object on `packets`. The checks (`026`, `028`) scan `packets` at startup and cannot be
+pre-built. Pre-build only the four indexes; don't create the checks or the statistics object
+yourself, or startup stops on an object that already exists.
+
+#### Observer adverts index and payload-type backfill (`034`)
+
+A partial index for `/observers/{observerId}/adverts`, read once a background job has filled in
+missing observation payload types. Until it reports done, advert pages answer `503`. See
 [After upgrading: observation payload types](operations.md#after-upgrading-observation-payload-types),
 which also shows how to mark it done by hand. Five stats and traces statements move to the
 `api_custom` pool; see
 [After upgrading: stats and traces on the custom pool](operations.md#after-upgrading-stats-and-traces-on-the-custom-pool).
 
-- Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only after migration
-  `034` is recorded.
-- Don't upgrade to a release that drops `idx_observations_observer_id` until
-  `SELECT value FROM background_state WHERE key = 'observation_payload_type'` shows
-  `"done": true`.
-- To roll back, deploy the previous image. See the rollback notes in the two operations
-  sections above.
+#### Channel messages by site (`035` to `041`)
 
-## Channel messages by site
-
-The release that adds migrations `035` to `041` changes no API and keeps the minimum web and app
-versions. It adds `channel_message_iatas`, a read model that channel message pages filtered by
-`iatas` or `scope` read once the server trusts it. Run the
-[pre-deploy check](operations.md#before-deploying-a-release) first. No pre-build is needed: the
-new indexes build at startup in well under a second.
-
-After the deploy, the server fills the table in the background and verifies it once; on a large
-deployment that takes 3 to 5 minutes. Until the log shows
-`cmi trusted: region and scope message pages read channel_message_iatas`, channel message pages
-filtered by `iatas` (or by `scope` without `since`) answer `503` with `Retry-After`; see
-[Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model). See
+`channel_message_iatas`, the read model behind channel message pages filtered by `iatas` or
+`scope`. Its indexes build on an empty table in under a second. See
 [Read models: channel messages by site](operations.md#read-models-channel-messages-by-site) for
 what to watch, the metrics and alerts, and how read-only servers decide.
 
-- To turn those pages off without rolling back, set `readmodels.cmi.enabled: false` and
-  restart; they answer `503` until it is `true` again. See
-  [Configuration](configuration.md#read-models).
-- To roll back, deploy the previous image. Rolling forward again later repairs the table at
-  startup before any page reads it; nothing to do by hand.
-- Run this release for at least a week before upgrading to the release that drops
-  `idx_channel_messages_channel` and `idx_channel_messages_sent_brin`.
+#### Packets by site (`042` to `045`)
 
-## Packets by site
+`packet_sites`, the read model behind `/packets` filtered by `iatas`, `iata`, `region` or
+`regionId`. Those pages gain `nextPageCursor`. Migration `042` takes a brief lock on `packets`.
+See [Read models: packets by site](operations.md#read-models-packets-by-site).
 
-The release that adds migrations `042` to `045` adds `packet_sites`, a read model that `/packets`
-pages filtered by `iatas`, `iata`, `region` or `regionId` read once the server trusts it. It
-keeps the minimum web and app versions. Those pages gain `nextPageCursor`, which current web and
-app versions already send back as `pageCursor`; see
-[Exact page cursors](api-contract.md#exact-page-cursors). Run the
-[pre-deploy check](operations.md#before-deploying-a-release) first: migration `042` takes a brief
-lock on `packets`. No pre-build is needed: the new indexes build on an empty table in seconds.
+#### Pools, dropped indexes and a dropped column (`046` to `053`)
 
-After the deploy, the server fills the table in the background and verifies it once; on a large
-deployment expect roughly 5 to 20 minutes and a few GB of WAL, then a few minutes of
-`VACUUM (ANALYZE)`. Until the log shows
-`packet_sites trusted: region packet pages read packet_sites`, region pages answer `503` with
-`Retry-After`; see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model).
-See
-[Read models: packets by site](operations.md#read-models-packets-by-site) for what to watch, the
-metrics and alerts, and how read-only servers decide.
-
-- Each stored observation now costs about 15-21% more insert time and 37-53% more WAL. After
-  the deploy, compare `InsertObservation` in `pg_stat_statements` for the hour before and after
-  and watch `beacon_ingest_queue_depth`; see
-  [Ingest cost](operations.md#ingest-cost). A growing queue or WAL beyond your budget means
-  rolling back.
-- To turn region pages off without rolling back, set `readmodels.packet_sites.enabled: false`
-  and restart; they answer `503` until it is `true` again. See
-  [Configuration](configuration.md#read-models).
-- To roll back, deploy the previous image. Rolling forward again later repairs the table at
-  startup before any region page reads it; nothing to do by hand.
-
-## The slow pool, lookup-table indexes and a dropped column
-
-The release that adds migrations `047` to `053` keeps the minimum web and app versions.
-
-- **Pools.** `api_legacy` opens only under the `single` layout. A new `api_slow` pool (8
-  connections by default, `database.slow_pool_size`; 120 s statement limit; ungated) runs the
-  statements that may read whole site histories: the region statement for pages whose bounded
-  reads run out of budget, `/messages` with `iatas` and `since` or `scope`, and the previous
-  statements that serve region and scope pages while a read model is not trusted. The default
-  total stays at 26 connections (api_slow's 8 replace api_legacy's 8); set `slow_pool_size` only
-  to override that. See
+- `api_legacy` opens only under the `single` layout. `api_slow` (2 connections by default,
+  `database.slow_pool_size`, 120 s statement limit) runs the few statements that may read whole
+  site histories; see
   [Slow region and message statements](operations.md#slow-region-and-message-statements).
-- **Alerts.** Load `BeaconSlowPoolBusy` and the two sequence rules from
-  [Example alert rules](operations.md#example-alert-rules).
-- **Migrations.** `047` to `052` drop six cold lookup-table indexes; `053` drops
-  `known_routes.last_reconfirmed_at`. Run the [pre-deploy check](operations.md#before-deploying-a-release)
-  first and make sure no `pg_dump` is running.
+- `046` drops `idx_observations_observer_id`, `047` to `052` drop six cold lookup-table indexes,
+  and `053` drops `known_routes.last_reconfirmed_at`. Every 2.0.x image reads or writes that
+  column, hence the rollback steps above.
 
-**Rolling back is a one-way door.** Migration `053` removes a column that every older image
-(2.0.7 and every build before this release) reads or writes. Before starting an older image,
-put the column back:
+#### Read-model pages without fallback
 
-```sql
-ALTER TABLE known_routes ADD COLUMN last_reconfirmed_at timestamp with time zone DEFAULT now() NOT NULL;
-```
-
-It is a catalog change, not a rewrite: 8 ms on a 10.5-million-row copy of a large database,
-under a brief `ACCESS EXCLUSIVE` lock on `known_routes`. This covers this release only; the
-rollback steps of the earlier releases you are going back past still apply. In particular, once
-the drops release (migration `046`) has run, 2.0.7 needs `idx_observations_observer_id` again:
-rebuild it with
-`CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations USING btree (observer_id, id);`
-and confirm `SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;`
-prints `t` before switching images. The six dropped indexes are optional after a rollback; their rebuild statements are in
-[Lookup-table indexes and the route stamp column](operations.md#lookup-table-indexes-and-the-route-stamp-column),
-which also covers rolling forward again.
-
-## Read-model pages without fallback
-
-The release that removes the read-model fallbacks follows the one above. It keeps the minimum
-web and app versions.
-
-- **Pages that wait.** Region `/packets` pages, channel message pages filtered by `iatas` (or by
-  `scope` without `since`), and observer advert pages are served only from their read model or
-  backfilled data. While that is not ready they answer `503` with `Retry-After: 30`; there is no
-  fallback to the previous statements any more. If the read models fill for the first time in
-  the same upgrade, those pages are unavailable for the whole first fill (minutes for channel
-  messages, roughly 5 to 20 minutes for region packets on a large deployment). The web and app
-  retry for about 90 s and then show an error with a retry, so users retry by hand after that.
-  Upgrade at a quiet hour and watch the `... backfill progress` log lines. See
-  [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-model).
-- **Kill switches.** `readmodels.cmi.enabled: false` and `readmodels.packet_sites.enabled: false`
-  now turn those pages off (`503`) instead of serving them from the previous statements.
-- **Pool.** `api_slow` no longer serves untrusted pages, so `slow_pool_size` now defaults to `2`
-  and the default total goes from 26 to 20 connections. An explicit `slow_pool_size` still wins.
-- **Alerts.** Load the two read-model `Untrusted` rules (15 minutes) and `BeaconAdvertsNotReady`
-  from [Example alert rules](operations.md#example-alert-rules).
-- **Getting the fallbacks back.** Revert this release's server change (one commit); that also
-  restores `slow_pool_size`'s default of 8. See
-  [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
+Region `/packets` pages, channel message pages filtered by `iatas` (or by `scope` without
+`since`), and observer advert pages are served only from their read model or backfilled data.
+While that is not ready they answer `503` with `Retry-After: 30`; there is no fallback to the
+previous statements. The kill switches above turn those pages off instead of serving them from
+the previous statements. A page whose statement runs past its pool's limit answers `503` with
+`Retry-After: 10`. To get the fallbacks back, revert their one server commit; see
+[Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
 
 ## Changes that need a restart
 
