@@ -619,7 +619,8 @@ Trust is held in memory by each server process; nothing in the database marks th
 exact. A process earns it at every start, once the boot reconcile has run, the backfill is
 complete and the one-time verification has passed. It drops trust:
 
-- after 3 reconciles in a row that each repaired at least one row. Two clean reconciles in a
+- after 3 reconciles in a row that each repaired at least one row. It logs
+  `read model untrusted: repair runs fixed rows the writers missed`. Two clean reconciles in a
   row restore it;
 - at once when ingest leaves a message without its sites: a failed site insert, a message
   stored without its sites, or any message insert error. It logs
@@ -627,6 +628,8 @@ complete and the one-time verification has passed. It drops trust:
   next reconcile that started after the failure, so those pages answer `503` for at most about
   one interval;
 - when the stored state is no longer complete and verified, for example after a rebuild.
+
+Each restore after a drop logs `read model trusted again: its pages are served from it`.
 
 A reconcile that repairs rows logs `cmi reconcile repaired N pair(s): a writer bypassed the read model`.
 Something stored messages without recording their sites. On a single server running this
@@ -791,7 +794,8 @@ complete and the one-time verification has passed. It drops trust:
 - at once when a reconcile or the hourly audit repairs any row: something bypassed the
   writer. Two clean reconciles in a row restore it. A repair logs
   `packet_sites reconcile repaired N row(s): a writer bypassed the read model` or
-  `packet_sites audit repaired N row(s) below the watermark`;
+  `packet_sites audit repaired N row(s) below the watermark`, and the drop logs
+  `read model untrusted: repair runs fixed rows the writers missed`;
 - at once when an observation insert with its site row fails. Ingest never loses the
   observation: it logs `observation site row failed; storing the observation without it` and
   stores it without its row. Trust drops with
@@ -800,6 +804,8 @@ complete and the one-time verification has passed. It drops trust:
   interval;
 - after 3 failed reconciles in a row, until one succeeds;
 - when the saved state is no longer complete and verified, for example after a rebuild.
+
+Each restore after a drop logs `read model trusted again: its pages are served from it`.
 
 On a single server running this release, repairs should not happen. Running two server versions
 that both write to one database at the same time is not supported; if it happens, the rows the
@@ -1318,7 +1324,7 @@ scrape_configs:
 | `beacon_packet_sites_front_live` | gauge | `index` | Index entries written in the last two minutes that the last front sweep visited |
 | `beacon_packet_sites_bytes` | gauge | | Total size of `packet_sites`, heap and indexes, hourly |
 | `beacon_db_sequence_used_ratio` | gauge | `sequence`, `cycle` | Share of a sequence's usable values already handed out, 0 to 1, each minute. The usable range ends at the sequence's own limit or its column's type limit (`integer` 2,147,483,647), whichever is lower. `cycle="true"` marks a `CYCLE` sequence, whose ratio is its position, not used-up headroom. See [Sequence headroom](#sequence-headroom). |
-| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered: `not_ready` while its read model or backfill is not ready, `slow_pool_busy` when `api_slow` had no free connection. `model` is `packet_sites`, `cmi` or `observation_payload_types`. |
+| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered: `not_ready` while its read model or backfill is not ready, `slow_pool_busy` when `api_slow` had no free connection, `timeout` when its statement ran past its pool's statement limit or an enforced guard's deadline. `model` is `packet_sites`, `cmi` or `observation_payload_types`. |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`

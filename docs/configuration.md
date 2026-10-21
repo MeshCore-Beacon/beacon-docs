@@ -217,6 +217,10 @@ MeshMapper imports. Every database session it opens is read-only
 `POST /api/v1/admin/accounts`, fails with SQLSTATE `25006` instead of changing data. The server
 logs a warning at startup saying so. The one thing it still runs is a read-only check of each
 read model (channel messages and packets by site) every 5 minutes; see [Read models](#read-models).
+When `meshmapper.scopes.enabled` is on, it also loads the writer's saved MeshMapper scope
+catalogues once at boot, reading only, so region and IATA scope lists (`/scopes?region=`,
+`/stats/scopes?region=`) match the writer's as of that boot. They don't refresh until the next
+restart.
 
 The REST API and `/ws` still serve what is in the database, but nothing new arrives. Because no
 migrations run, the database must already be at the schema the build expects. Its use is
