@@ -8,6 +8,10 @@ This repo is where you deploy and operate it. The code lives in
 [beacon-server](https://github.com/MeshCore-Beacon/beacon-server) (the API and ingest) and
 [beacon-web](https://github.com/MeshCore-Beacon/beacon-web) (the frontend).
 
+The proposed paired backend, basic Atlas and Topology release is described in
+[Core performance candidate](docs/performance-release-candidate.md), including
+validation, operational budgets and remaining release gates.
+
 > **Coming from 1.x?** 2.0.0 needs a fresh database and a few config changes. Read
 > [Upgrading](docs/upgrading.md) before you pull new images.
 
