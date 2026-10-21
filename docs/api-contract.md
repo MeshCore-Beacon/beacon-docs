@@ -60,6 +60,8 @@ Retry-After: 5
 
 The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
 
+Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers route evidence (`/routes/{iata}/{pathKey}/observations`) and the [background-data pages](#pages-that-wait-for-server-data) (region packets, region and scope messages, observer adverts). Other endpoints still answer `500` in that case.
+
 Each request falls in one family and one class:
 
 | Path | Condition | Family | Class |
@@ -582,7 +584,7 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 | `GET /routes` | Plain array, newest `lastSeen` first. Params: `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50). |
 | `GET /routes/search?from=&to=[&iatas=]` | Routes within one IATA between two node hash prefixes. `from`, `to` required (hex, 1–4 bytes; widths may differ). `iatas` optional: comma list, at most 100, omitted = every IATA; the single `iata` is still accepted. At most 500 results, shortest first. `hops` is trimmed to source…destination and `hopCount` = `hops.length`. |
 | `GET /routes/cross?fromHash=&toHash=[&iatas=]` | Routes that cross from one IATA into another. `fromHash`, `toHash` required. `iatas` optional: 2–100 codes, omitted = every IATA. The legacy `fromIata`+`toIata` pair is still accepted, but not together with `iatas`. At most 500 results, sorted by `totalHops`, then `crossHop.lastSeen` newest first. |
-| `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. |
+| `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. A lookup past the statement limit answers `503` + `Retry-After` ([Cost guards](#cost-guards)). |
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
