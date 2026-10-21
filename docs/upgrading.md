@@ -195,6 +195,23 @@ docker compose up -d
 A slow disk stretches every phase: on a test server with a rotational disk and about 6 million
 observations, the migrations took 8 minutes and the fills at `duty: 0.25` about an hour.
 
+**Measured on a large deployment** (8 vCPU, 8 GB RAM, NVMe; 91 GB database with 35 million
+routes, 30 million observations and 3 million packets; default pacing):
+
+| Step | Time |
+|---|---|
+| Pre-building the eight indexes, old version still serving | 1 min 50 s (route hop index 72 s, adverts index 16 s, the rest under 8 s each) |
+| Migrations `004` to `053` at startup | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
+| API and ingest down | about 15 s |
+| Channel message pages by site back | 8 min after startup |
+| Observer advert pages | at once (no untyped observations) |
+| Region packet pages back | 50 min after startup |
+| Database size | 91 GB before, 71 GB after |
+
+The region packet fill walks the whole observation id range, newest to oldest, so a database that
+still holds a few very old observations fills for longer than its row count suggests, and the
+`eta` in its progress lines overstates the time left.
+
 Watch the log for these lines; each one ends a phase:
 
 - `Beacon listening on :8080`: migrations done, API up.
