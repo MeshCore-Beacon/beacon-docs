@@ -5,6 +5,37 @@ Torchlight and the Canadaverse preview work should use going forward. It records
 the operator-supplied planning discussion and MrAlderson's follow-up. It supersedes
 the older parity roadmap's release priorities, not its historical evidence.
 
+## Current status overlay — 22 October 2026
+
+The [organisation-wide reconciliation](docs/org-status-20261022.md) checks all four
+publicly visible Beacon repositories, including the now-public Flutter app. It records
+exact main/dev/dev1 refs, stable/prerelease distinctions, draft heads and acceptance
+gaps. Private/unlisted repository contents are not certified by the public inventory.
+
+- **🟢 Stable tags:** server 2.0.7 and web 2.0.5. The current 2.1 development/candidate
+  work and experimental preview labels are not stable 2.1 or roadmap-2.5 completion.
+- **🟡 Core candidate:** basic node/observer Atlas, animated Topology and backend
+  reliability/performance are consolidated in server #266/#267, web #182/#183 and
+  docs #43. Review this stack rather than duplicating its older focused changes.
+- **🟡 Optional collection candidate:** server #268/#269, web #184/#185, docs #44 and
+  Flutter #11 are separate, dependent work. Android background collection exists in
+  the draft; iOS remains foreground-only. The validating intake stays separate from
+  core and from the polling clients. Basic Atlas/Topology do not require intake.
+- **🟡 Milestone reconciliation:** foundations and collection are in progress, not
+  wholly unstarted or complete. Existing historical Basic Atlas delivery remains
+  credited. Agent/setup responsibility, receipt evidence, paired schema/client
+  acceptance and physical/background qualification still need explicit closure.
+- **🟡 Release gates:** core before optional; cold 24-hour Topology optimization,
+  shared-client RF coordination, physical BLE/Wi-Fi/screen-off testing, migration/
+  rollback and realistic workload/role/pool qualification. See the report for sources.
+- **🔴 Verification blocker:** the guarded preview check reports “Runtime image
+  changed; owner requalification required.” Current public changelog evidence is
+  available, but this task does not claim a new successful runtime verification.
+
+The version allocations below remain planning targets. This overlay updates their
+implementation/acceptance state; it does not silently renumber releases, approve
+production, replace safety requirements or declare every feature finished.
+
 The [owner-delegated version allocation](https://discord.com/channels/1507764602253869197/1507788454774182030/1556399330699640893)
 was added by **[Torchlight]** at the
 [owner's request](https://discord.com/channels/1507764602253869197/1507788454774182030/1556400784885809313).
