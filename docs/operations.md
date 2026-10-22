@@ -19,15 +19,22 @@ Beacon has no health endpoint yet. Use these instead:
 
 ## Logs
 
-Logs go to stderr and Docker collects them. Docker's default `json-file` driver does not
-rotate, so on a long-running host set a cap, either in `/etc/docker/daemon.json` for every
-container or per service in `docker-compose.yml`:
+Logs go to stderr and Docker collects them. The supplied all-in-one and split deployment
+templates cap each service's Docker logs at three files of about 10 MB each. Their shared
+`bounded-logging` block applies to every service. Adjust that policy for your retention needs:
 
 ```yaml
     logging:
       driver: json-file
-      options: { max-size: "50m", max-file: "5" }
+      options: { max-size: "10m", max-file: "3" }
 ```
+
+Docker's default `json-file` driver is unbounded when no rotation options are configured.
+Existing containers do not adopt a changed logging policy on restart: recreate the affected
+services during a planned maintenance window, preserving their data volumes. Inspect the
+effective policy with `docker inspect --format '{{json .HostConfig.LogConfig}}' <container>`.
+Do not remove database volumes to apply a logging change. This policy is separate from
+Caddy's rotated access-log files.
 
 Set `log.level` (`debug`, `info`,
 `warn`, `error`; default `info`) and `log.format` (`text` or `json`) in `config.yaml`, or

@@ -1,3 +1,9 @@
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   app:
     image: ghcr.io/meshcore-beacon/beacon-server:latest
@@ -12,6 +18,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    logging: *bounded-logging
 
   db:
     image: postgres:16-alpine
@@ -29,6 +36,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *bounded-logging
 
   redis:
     image: redis:7-alpine
@@ -42,6 +50,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *bounded-logging
 
   caddy:
     image: caddy:2-alpine
@@ -62,6 +71,7 @@ services:
       app:
         condition: service_started
     restart: unless-stopped
+    logging: *bounded-logging
 
 # Fixed subnet so data/app/config.yaml can trust Caddy in server.trusted_proxies.
 # Pick another private /24 if this one is already in use on the host.
