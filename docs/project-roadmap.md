@@ -87,6 +87,16 @@ The 22/23 October Topology work changed the route query to stream paired adjacen
 
 The web now applies its frame budget to camera input as well as animation, skips unchanged idle paints, releases inactive canvas buffers while restoring the camera, indexes observer lookup for chatter, and animates repeated hearings of one exact packet/path once. Every raw report and trail and every distinct path is retained; unique packet effects, glows and Public chatter remain. Extra Path2D caching was tried and removed because its timing benefit was inconsistent.
 
+The maximum-scene CPU raster fixture still shows expensive camera motion. With 5,000 nodes, 10,200 links and a 512-flow cap, the 20-frame sample medians were:
+
+| CPU raster phase | Before | Current candidate |
+| --- | --- | --- |
+| Steady flow | 11.92 ms | 10.60 ms |
+| Trail update | 128.08 ms | 106.38 ms |
+| Orbit | 382.58 ms | 380.34 ms |
+
+These are synthetic CPU/Skia draw timings, not browser frame rates; run-to-run noise prevents attributing these small differences to the patch. They do show that throttling redraw frequency does not make a maximum-scene redraw cheap. R2 should profile curve projection, rasterization and labels during real Mac/phone camera motion, then qualify any further detail/pixel-ratio or rendering changes against the same visible-node/path and animation requirements. The current work does not establish smooth maximum-cap camera motion.
+
 The native frontend run exposed the same asynchronous fixture failure as Vite #186: all assertions passed, but a delayed TanStack Virtual scroll callback ran after jsdom destroyed window. Test-only commit `c2c3ecb` controls/drains that timer while the environment exists and asserts no timers remain after cleanup. It does not suppress unhandled errors, change production scrolling or remediate dependency advisories. The updated complete preview suite subsequently passed 1,560 tests.
 
 The Pi is not presently a clean performance reference. The fresh audit saw load around 4.6 on four CPUs and, in a later sample, I/O PSI `some avg60=62.61` and `full avg60=35.22`; these are stall-pressure measures, not disk bandwidth/utilization. CoreScope was at about 1.499 GiB of a 1.5 GiB limit and using about 115% CPU. Beacon app and its database were each using only a few percent CPU. This identifies a suspect co-located contributor, not isolated proof of a sole cause. No unrelated workload was stopped.
