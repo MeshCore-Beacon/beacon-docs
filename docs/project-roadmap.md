@@ -166,10 +166,10 @@ New coordination issue [beacon-docs #45](https://github.com/MeshCore-Beacon/beac
 
 ## Every pre-existing open PR
 
-| PR | Target / current head | Disposition |
+| PR | Target / code head (docs via PR) | Disposition |
 | --- | --- | --- |
-| [MeshCore-Beacon/beacon-docs #44](https://github.com/MeshCore-Beacon/beacon-docs/pull/44) | dev / `0d70bf73729f` | OPTIONAL collection guide, refresh after core docs acceptance. |
-| [MeshCore-Beacon/beacon-docs #43](https://github.com/MeshCore-Beacon/beacon-docs/pull/43) | dev / `b221d58a31e4` | PRIMARY project roadmap/core qualification/operator docs; includes bounded log templates. |
+| [MeshCore-Beacon/beacon-docs #44](https://github.com/MeshCore-Beacon/beacon-docs/pull/44) | dev / `see PR` | OPTIONAL collection guide, refresh after core docs acceptance. |
+| [MeshCore-Beacon/beacon-docs #43](https://github.com/MeshCore-Beacon/beacon-docs/pull/43) | dev / `see PR` | PRIMARY project roadmap/core qualification/operator docs; includes bounded log templates. |
 | [MeshCore-Beacon/beacon-docs #7](https://github.com/MeshCore-Beacon/beacon-docs/pull/7) | main / `93e096f12bb7` | Historical experimental docs targeting main; policy check fails. Port needed content through dev, no bypass. |
 | [MeshCore-Beacon/beacon-flutter-app-archive #22](https://github.com/MeshCore-Beacon/beacon-flutter-app-archive/pull/22) | dev / `8392a679f026` | Legacy repository duplicate of canonical action maintenance. Decide archive policy; do not create another release lane. |
 | [MeshCore-Beacon/beacon-flutter-app #11](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/11) | dev / `1f704187a94e` | OPTIONAL mobile collection; native CI passed, physical BLE/Wi-Fi/background gate open. |
