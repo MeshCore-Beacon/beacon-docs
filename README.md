@@ -9,6 +9,9 @@ This repo is where you deploy and operate it. The code lives in
 [beacon-web](https://github.com/MeshCore-Beacon/beacon-web) (the frontend).
 
 The proposed paired backend, basic Atlas and Topology release is described in
+[Project roadmap and maintainer handoff](docs/project-roadmap.md) maps current
+repositories, issues, PRs and the staged route to live.
+
 [Core performance candidate](docs/performance-release-candidate.md), including
 validation, operational budgets and remaining release gates.
 The separate [optional collection guide](docs/telemetry-collection.md) covers
