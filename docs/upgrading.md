@@ -318,9 +318,20 @@ Region `/packets` pages, channel message pages filtered by `iatas` (or by `scope
 `since`), and observer advert pages are served only from their read model or backfilled data.
 While that is not ready they answer `503` with `Retry-After: 30`; there is no fallback to the
 previous statements. The kill switches above turn those pages off instead of serving them from
-the previous statements. A page whose statement runs past its pool's limit answers `503` with
-`Retry-After: 10`. To get the fallbacks back, revert their one server commit; see
+the previous statements. To get the fallbacks back, revert their one server commit; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
+
+#### Statement timeouts answer 503
+
+Every `/api/v1` read whose statement runs past its pool's limit (35 s; 120 s on `api_slow`)
+now answers `503` `deadline_exceeded` with `Retry-After: 10` instead of a `500`. The heavy
+stats endpoints and route searches already answered `503` when their own time limit ran out;
+that `503` now carries `Retry-After: 10` and code `deadline_exceeded` (was
+`service_unavailable`), and also covers a statement timeout. Web and app retry it like the other
+`503`s. In the server log a timeout is one `request complete` line at `WARN` with `status=503`
+instead of an `ERROR` pair; a real `500` still logs `api: error 500: <message>` at `ERROR`, now
+with the database error in `error`. Only pages that read a read model count timeouts in
+`beacon_api_unavailable_total{reason="timeout"}`.
 
 #### Runtime image on Alpine 3.24
 

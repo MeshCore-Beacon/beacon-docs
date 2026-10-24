@@ -76,6 +76,15 @@ minutes after it closes, and packet cleanup holds back up to 24 hours of raw row
 hours are rolled, so raw data lives a little longer than `packets.retention` says. An hour
 whose raw rows were deleted first is reported as partial, with no values.
 
+`packets.retention` counts from the last time any observer heard a packet, and a packet goes
+together with all its observations and its channel message. A packet that is still being heard
+keeps its older observations, so `packet_observations` always holds a small tail of rows older
+than the retention, with ids far below the current range. Most of it is byte-identical packets
+that nodes send again and again, such as adverts from nodes whose clock was never set (their
+advert timestamp stays the same, so every advert has the same hash). A later hearing by an
+observer that already reported the packet stores no new observation, but it still counts as
+heard. On a 72 h retention this tail was about 0.5 % of observations.
+
 ## Backing up
 
 Two options.
@@ -964,8 +973,8 @@ They run on their own pool, `api_slow`: 2 connections by default
 connection is busy a request waits at most 5 s and then answers `503` with `Retry-After: 5`,
 without touching the other pools; `beacon_api_unavailable_total{reason="slow_pool_busy"}` counts
 those, and the server logs `api: slow requests refused, every slow connection is busy` at most
-once a minute. A statement that passes 120 s ends with a `500`; narrowing the request (fewer
-sites, a wider window) avoids it.
+once a minute. A statement that passes 120 s answers `503` `deadline_exceeded` with
+`Retry-After: 10`; narrowing the request (fewer sites, a wider window) avoids it.
 
 Before this release the region statement ran on `api_legacy` without a time limit for a
 millisecond cursor, and on `api_custom` (35 s, gated by `packets_region`) for an exact page
