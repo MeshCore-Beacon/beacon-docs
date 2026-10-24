@@ -191,6 +191,10 @@ four tables during the upgrade; a blocked drop stops startup after about two min
 described below, and the next start resumes where it stopped. Afterwards, compact the two
 tables once; see [Compacting observers and channels](#after-upgrading-compacting-observers-and-channels).
 
+Migration `058` sets `fillfactor = 50` on `nodes`. It only changes the table's settings (no
+rewrite, a lock that does not block reads or writes), and applies to pages written from then on;
+the same compaction section covers `nodes`.
+
 Migrations `025` to `033` (2.1.0) change `packets`:
 
 - `025` and `027` add the checks `packets_payload_type_domain` (`payload_type` 0 to 15) and
