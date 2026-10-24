@@ -136,7 +136,7 @@ the flood jail's `maxretry` of 900 still sits above the new limit.
 
 ## Upgrading to 2.1
 
-Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `053` at startup,
+Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `060` at startup,
 adds two read models that region and scope pages are served from, and drops indexes and one
 column nothing reads any more. No config change is required. Beacon Web must move to 2.1 at the
 same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). The minimum app
@@ -206,16 +206,18 @@ routes, 30 million observations and 3 million packets; default pacing):
 | Step | Time |
 |---|---|
 | Pre-building the eight indexes, old version still serving | 1 min 50 s (route hop index 72 s, adverts index 16 s, the rest under 8 s each) |
-| Migrations `004` to `053` at startup | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
+| Migrations `004` to `053` at startup (a 2.1 development build; the release adds `054` to `060`, a few seconds more) | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
 | API and ingest down | about 15 s |
 | Channel message pages by site back | 8 min after startup |
 | Observer advert pages | at once (no untyped observations) |
 | Region packet pages back | 50 min after startup |
 | Database size | 91 GB before, 71 GB after |
 
-The region packet fill walks the whole observation id range, newest to oldest, so a database that
-still holds a few very old observations fills for longer than its row count suggests, and the
-`eta` in its progress lines overstates the time left.
+That development build walked the whole observation id range in fixed id slices, so the few very
+old observations the database still held stretched its fill and its `eta`. The release slices the
+fill by observations instead and reports progress and `eta` in rows (see
+[Pacing the backfills](operations.md#pacing-the-backfills)); on a copy of the same data it needs
+about 60 slices instead of 1,533.
 
 Watch the log for these lines; each one ends a phase:
 
@@ -348,6 +350,16 @@ so is `beacon_api_unavailable_total{reason="slow_pool_busy"}` (and the `BeaconSl
 alert in the examples). A `database.slow_pool_size` left in `config.yaml` is ignored, with a
 `WARN` at startup; remove it. The default connection total drops from 20 to 18 (22 under
 `split`).
+
+#### Nodes table (`058`, `060`)
+
+`058` sets `fillfactor = 50` on `nodes` so the `last_seen` update of every advert can stay on its
+page (fewer index writes, about half the WAL); it changes settings only and applies to pages
+written from then on. `060` widens `nodes.device_clock_drift_seconds` to `bigint`, so device
+clocks more than about 68 years off are stored as they are instead of wrapping; it rewrites
+`nodes` once at startup (about 0.1 s for 70,000 nodes). See
+[How startup migrations wait for locks](operations.md#how-startup-migrations-wait-for-locks) and,
+before going back to 2.0.x, the extra step in [Rolling back from 2.1](#rolling-back-from-21).
 
 #### Read-model pages without fallback
 
