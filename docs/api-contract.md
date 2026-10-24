@@ -94,7 +94,7 @@ Some pages are served only from data the server prepares in the background. Whil
 | `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` (with or without `since` or `scope`), or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
 | `/observers/{observerId}/adverts` | every observation carries its payload type |
 
-That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)).
+That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` is in the table since 2.1: development builds of 2.1 served it from the observations whatever the read model's state, and answered `503` with `Retry-After: 5` when that pool was busy; that `503` is gone.
 
 ```
 HTTP/1.1 503 Service Unavailable

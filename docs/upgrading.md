@@ -170,12 +170,12 @@ then show an error with a retry button.
    - [the four packets indexes](operations.md#pre-building-the-packets-indexes),
    - [the observer adverts index](operations.md#pre-building-the-observer-adverts-index).
 
-   Everyone else can skip this: the server builds them at startup. The four indexes of
-   [`054` to `057`](operations.md#indexes-for-deep-region-and-message-pages-054-to-057) need no pre-build: three build on
-   tables the same startup creates, and `idx_channel_messages_sent` reads `channel_messages` in
-   well under a second. A server already on a 2.1 development build builds all four on full
-   tables in a few seconds; pre-build them there only if you want, with the text in that
-   section.
+   Everyone else can skip this: the server builds them at startup. The five indexes of
+   [`054` to `057` and `059`](operations.md#indexes-for-deep-region-and-message-pages-054-to-057-059)
+   need no pre-build: four build on tables the same startup creates, and
+   `idx_channel_messages_sent` reads `channel_messages` in well under a second. A server already
+   on a 2.1 development build builds all five on full tables in a few seconds; pre-build them
+   there only if you want, with the text in that section.
 6. Run the [pre-deploy check](operations.md#before-deploying-a-release) (no long transactions,
    no anti-wraparound vacuum, no `pg_dump` running), and pick a quiet hour.
 
@@ -319,13 +319,14 @@ See [Read models: packets by site](operations.md#read-models-packets-by-site).
   and `053` drops `known_routes.last_reconfirmed_at`. Every 2.0.x image reads or writes that
   column, hence the rollback steps above.
 
-#### Deep region and message pages (`054` to `057`)
+#### Deep region and message pages (`054` to `057`, `059`)
 
 Region `/packets` pages with a `since`/`until` window or scopes seek from the window instead of
 reading each site from its newest row, and `/messages` with `iatas` and `since` or `scope` read
 `channel_message_iatas`; no page reads a whole site history in one statement any more. Two
-partial indexes on `packet_sites` (`054`, `055`), one on `channel_message_iatas` (`056`) and one
-on `channel_messages` (`057`), all small. Pages are full until the last; rows, order and cursors
+partial indexes on `packet_sites` (`054`, `055`), one on `channel_message_iatas` (`056`), one on
+`channel_messages` (`057`), and one on the scoped rows of `packet_sites` for a scope with a type
+filter (`059`, 61 MB on a large deployment). Pages are full until the last; rows, order and cursors
 are unchanged. On production the busiest region with `until` 24 hours back took 48-51 s before;
 on a production-size copy it went from 131,591 buffers to 2,442. See
 [Deep region and message pages](operations.md#deep-region-and-message-pages).

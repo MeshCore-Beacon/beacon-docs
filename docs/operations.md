@@ -260,8 +260,8 @@ Migrations `042` to `045` add the region packet read model; see
   `idx_packet_sites_site_scope` with `CREATE INDEX CONCURRENTLY` on the empty table, which
   takes seconds. No pre-build is needed.
 
-After the deploy, check the table's six indexes (four from `042` to `045`, two from `054` and
-`055` below):
+After the deploy, check the table's seven indexes (four from `042` to `045`, three from `054`,
+`055` and `059` below):
 
 ```sql
 SELECT c.relname, i.indisvalid AND i.indisready AS ok
@@ -269,7 +269,7 @@ FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
 WHERE i.indrelid = 'packet_sites'::regclass ORDER BY 1;
 ```
 
-It must return 6 rows, all `ok = t`.
+It must return 7 rows, all `ok = t`.
 
 Migrations `047` to `053` finish the cleanup; see
 [Lookup-table indexes and the route stamp column](#lookup-table-indexes-and-the-route-stamp-column).
@@ -286,11 +286,11 @@ Migrations `047` to `053` finish the cleanup; see
   carry it. **It is a one-way door for older images**; see
   [Upgrading](upgrading.md).
 
-### Indexes for deep region and message pages (`054` to `057`)
+### Indexes for deep region and message pages (`054` to `057`, `059`)
 
-Migrations `054` to `057` add four small indexes for region and message pages that reach far
-back; see [Deep region and message pages](#deep-region-and-message-pages). Each is one
-`CREATE INDEX CONCURRENTLY`:
+Migrations `054` to `057` and `059` add five indexes for region and message pages that reach far
+back or filter sparsely; see [Deep region and message pages](#deep-region-and-message-pages).
+Each is one `CREATE INDEX CONCURRENTLY`:
 
 - `054` `idx_packet_sites_late` and `055` `idx_packet_sites_early` on `packet_sites`: partial
   indexes on the rows heard at a site more than 30 minutes after, or before, their packet's
@@ -298,22 +298,27 @@ back; see [Deep region and message pages](#deep-region-and-message-pages). Each 
   empty).
 - `056` `idx_cmi_site_scope` on `channel_message_iatas` (6 MB on a large deployment).
 - `057` `idx_channel_messages_sent` on `channel_messages` (4 MB on a large deployment).
+- `059` `idx_packet_sites_site_scope_type` on `packet_sites`: one range per site, scope and type
+  pair, on the scoped rows (61 MB on a large deployment).
 
-Upgrading from 2.0.x, `054` to `056` build on tables the same startup created and filled
-nothing into yet, so they are instant, and `057` reads `channel_messages` (about 200,000 rows on
-a large deployment) in well under a second. On a server that already runs a 2.1 development
-build, the tables are full: on a production-size copy `054` took 2.0 s, `055` 0.5 s, `056`
-0.3 s and `057` 0.2 s. No pre-build is needed. To pre-build them anyway, run the pre-deploy check
-above, then each statement on its own in autocommit mode, exactly as written (`054` and `055`
-only where `packet_sites` exists, `056` only where `channel_message_iatas` exists):
+Upgrading from 2.0.x, `054` to `056` and `059` build on tables the same startup created and
+filled nothing into yet, so they are instant, and `057` reads `channel_messages` (about 200,000
+rows on a large deployment) in well under a second. On a server that already runs a 2.1
+development build, the tables are full: on a production-size copy `054` took 2.0 s, `055` 0.5 s,
+`056` 0.3 s, `057` 0.2 s and `059` 1.9 s. No pre-build is needed. To pre-build them anyway, run
+the pre-deploy check above, then each statement on its own in autocommit mode, exactly as written
+(`054`, `055` and `059` only where `packet_sites` exists, `056` only where
+`channel_message_iatas` exists):
 
 ```sql
 CREATE INDEX CONCURRENTLY idx_packet_sites_late ON packet_sites USING btree (iata, site_heard_at DESC, packet_hash DESC) INCLUDE (first_heard_at, payload_type, route_type, scope_id) WHERE ((site_heard_at - first_heard_at) > '00:30:00'::interval);
 CREATE INDEX CONCURRENTLY idx_packet_sites_early ON packet_sites USING btree (iata, first_heard_at) INCLUDE (site_heard_at, packet_hash, payload_type, route_type, scope_id) WHERE ((first_heard_at - site_heard_at) > '00:30:00'::interval);
 CREATE INDEX CONCURRENTLY idx_cmi_site_scope ON channel_message_iatas USING btree (iata, scope_id, message_id DESC) WHERE (scope_id IS NOT NULL);
 CREATE INDEX CONCURRENTLY idx_channel_messages_sent ON channel_messages USING btree (sent_at);
+CREATE INDEX CONCURRENTLY idx_packet_sites_site_scope_type ON packet_sites USING btree (iata, scope_id, payload_type, route_type, site_heard_at DESC, packet_hash DESC) INCLUDE (first_heard_at) WHERE (scope_id IS NOT NULL);
 SELECT c.relname, i.indisvalid AND i.indisready FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
-WHERE c.relname IN ('idx_packet_sites_late', 'idx_packet_sites_early', 'idx_cmi_site_scope', 'idx_channel_messages_sent');
+WHERE c.relname IN ('idx_packet_sites_late', 'idx_packet_sites_early', 'idx_cmi_site_scope', 'idx_channel_messages_sent',
+                    'idx_packet_sites_site_scope_type');
 ```
 
 Every row of the last statement must read `t`. When the server finds a valid index with one of
@@ -689,8 +694,9 @@ Each such page reads about as many index entries as it returns, where the previo
 statement read every observation of the channel. `/messages` with `iatas` and `scope` reads one
 range per site and scope (`idx_cmi_site_scope`). `/messages` with `iatas` and `since` first
 counts the messages sent since then, up to 5,001 (`idx_channel_messages_sent`): up to 5,000, it
-reads exactly those and keeps the ones heard at a requested site; more, and it walks the newest
-messages down until the page is full, which meets enough of them quickly. Sender clocks put
+reads exactly those and keeps the ones heard at a requested site. More, and it reads the newest
+5,000 messages first, which fills the page for sites heard often; a page that leaves short is read
+from all the messages sent since then, which is what it asked for. Sender clocks put
 `sentAt` anywhere, so neither the message order nor a site's range bounds `since` by itself.
 While the process does not trust the table, those pages answer `503` with `Retry-After: 30`;
 until this release `/messages` with `iatas` and `since` or `scope` ran the previous statement
@@ -827,7 +833,7 @@ observation is as likely to be audited however sparse the old ids are), and a fr
 index entries dense. On a large deployment (about 7.4 million rows) it takes about 1.6 GB:
 heap 484 MB, primary key 285 MB, `idx_packet_sites_site` 419 MB, `idx_packet_sites_site_type`
 353 MB, `idx_packet_sites_site_scope` 53 MB, `idx_packet_sites_late` 4 MB and
-`idx_packet_sites_early` (about empty) 8 kB.
+`idx_packet_sites_early` (about empty) 8 kB and `idx_packet_sites_site_scope_type` 61 MB.
 
 While the server process trusts the table, `/packets` pages with `iatas`, `iata`, `region` or
 `regionId` (region pages) read it:
@@ -835,8 +841,8 @@ While the server process trusts the table, `/packets` pages with `iatas`, `iata`
 - one site: one range of the site's index;
 - several sites: one range per site;
 - payload and route types, up to 8 (payload, route) pairs: one exact range per site and pair;
-- a `since`/`until` window, or scopes: each site's range (each site and scope's, with scopes)
-  from the page start down to the window; see
+- a `since`/`until` window, or scopes: each site's range (each site and scope's, with scopes;
+  with a type filter, each type pair's range in it) from the page start down to the window; see
   [Deep region and message pages](#deep-region-and-message-pages);
 - more than 8 type pairs without a window: bounded reads of each site range that continue,
   within the same request, until the page is full; if 8 reads do not fill it, one exact range
@@ -865,6 +871,8 @@ over 100,000 inserts on a scratch database. Re-sends of an observation still wri
 The two partial indexes from `054` and `055` add about 1-6 % to the insert time and no
 measurable WAL (three runs of 150,000 inserts with 1 % of the hearings arriving hours late:
 within 0.4 %): only a row heard more than 30 minutes away from its first hearing enters them.
+`059` adds no measurable insert time (-1.2 to +1.4 %) and 0.5-0.9 % WAL, with one packet in
+eight scoped: only scoped rows enter it.
 
 After the deploy, compare `InsertObservation` in `pg_stat_statements` (`mean_exec_time`, and
 `wal_bytes / calls`) for the hour before and the hour after, and watch
@@ -1093,11 +1101,11 @@ are not paced: they cover only the observations since the last run, or one slice
 
 ## Deep region and message pages
 
-Region `/packets` pages with a window and `/messages` pages with `iatas` and `since` or `scope`
-read about their own rows and their window, not the observations. A very sparse filter can still
-read a whole site's range in the read model (a rare type in a scope with no window, or a quiet
-site with `since` when more than 5,000 messages were sent since then), index-only and far
-cheaper than the previous statement. Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
+Region `/packets` pages with a window, scopes or types, and `/messages` pages with `iatas` and
+`since` or `scope`, read at most their page per index range (site, scope, type pair) or, for
+`/messages` with `since`, at most the messages sent since then. The worst case is a quiet site
+with `since` near the oldest retained message: it reads every message sent since then. On a
+production-size copy (196,000 messages) that took 2,907 buffers and 148 ms. Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
 a narrow window, an `until` well in the past, or rare payload types over busy sites), and
 `/messages` with `iatas` and `since` or `scope`, ran the previous release's statements on a
 two-connection `api_slow` pool with a 120 s statement limit. That pool and its
@@ -1113,7 +1121,10 @@ first heard (a re-hearing hours or days later; about 0.8 % of the rows), and
 `idx_packet_sites_early`, the rows heard more than 30 minutes before it (ingest clamps hearing
 times to 30 minutes of its own clock, so it stays about empty). A page reads about its own rows,
 the 30 minutes above `until` and the late rows above that; a sparse filter reads at most its
-window. Scoped pages do the same per site and scope. Pages are full until the last, and the
+window. Scoped pages do the same per site and scope. With a type filter, each site's (or site and
+scope's) range is read per (payload type, route type) pair instead, on `idx_packet_sites_site_type`
+or `idx_packet_sites_site_scope_type`, so a rare type reads at most a page per pair: a page costs
+at most the pairs times its size, however sparse the filter. Pages are full until the last, and the
 rows, their order and `nextPageCursor` are those of the observations; where the previous
 statement had ended a page short at its scan floor, the new page is full and the walk returns
 the same rows in the same order.
