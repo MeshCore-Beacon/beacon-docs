@@ -88,10 +88,11 @@ accepted is lost:
    connections close.
 
 A normal stop takes a few seconds; the worst case is about 60 s. Docker sends `SIGKILL` after the
-service's `stop_grace_period`, 10 s by default, which can cut steps 2 and 3 short. The example
-compose files set `stop_grace_period: 75s` on the `app` service; set the same on your own. A
-`SIGKILL`ed server loses at most the last presence interval (`last_seen` freshness), never
-packets or observations, and a background job resumes where it stopped.
+service's `stop_grace_period`, 10 s by default, which can cut any step short. The example compose
+files set `stop_grace_period: 75s` on the `app` service; set the same on your own. A server killed
+before step 1 ends loses the MQTT messages still queued for storage (the broker does not resend
+them). One killed later loses at most the last presence interval (`last_seen` freshness). Either
+way, a background job resumes where it stopped.
 
 ## Retention
 
