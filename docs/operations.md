@@ -198,6 +198,9 @@ the same compaction section covers `nodes`.
 Migration `060` widens `nodes.device_clock_drift_seconds` to `bigint`. Before it, a device clock
 more than about 68 years ahead wrapped to a large negative drift. It rewrites `nodes` once under
 an `ACCESS EXCLUSIVE` lock at startup: about 0.1 s for 70,000 nodes, so no pre-build is needed.
+A read-only server already connected to the same database may log one error per cached statement
+that reads `nodes` while the column changes type; it recovers by itself. Rolling back past `060`
+needs one `UPDATE` first; see [Rolling back from 2.1](upgrading.md#rolling-back-from-21).
 
 Migrations `025` to `033` (2.1.0) change `packets`:
 

@@ -264,6 +264,15 @@ CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations US
 SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;
 ```
 
+Also clear clock drifts an older server cannot read: `060` lets drifts exceed the 32-bit range, and
+2.0.7 fails node detail and the clock-drift stats on such a row. It is a few rows at most, and
+each node measures its drift again on its next advert:
+
+```sql
+UPDATE nodes SET device_clock_drift_seconds = NULL
+WHERE device_clock_drift_seconds NOT BETWEEN -2147483648 AND 2147483647;
+```
+
 The `ALTER` is a catalog change (milliseconds, brief lock on `known_routes`). Run the `CREATE` on
 its own in autocommit mode; on a large deployment it takes about a minute or two, and the
 `SELECT` must print `t`. Then deploy the 2.0.7 server and a matching 2.0 web build. The other
