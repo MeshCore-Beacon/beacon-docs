@@ -435,7 +435,10 @@ typed, each statement reads its span and updates nothing.
 Until a server process reads `done`, `/observers/{observerId}/adverts` answers `503` with
 `Retry-After: 30` (the statement that served those pages before `done` is gone). The job logs
 `observation payload type backfill progress: observer advert pages answer 503 until it is done`
-with `next_id`, `max_id`, `ids_done`, `ids_remaining` and `eta` once a minute while it walks. Once a server process reads `done`,
+with `next_id`, `max_id`, `ids_done`, `ids_remaining`, `observations_done`,
+`observations_remaining` and `eta` once a minute while it walks. The observation counts are the
+planner's estimates from the table statistics, and `eta` follows them, so a long, nearly empty
+old id range does not count as work. Once a server process reads `done`,
 it serves the pages from `idx_observations_adverts` and keeps that until restart. On a database
 whose observations already all carry a payload type (every deployment that started on a release
 with the column), the job's first run finds no untyped row and records `done` at once
@@ -759,7 +762,8 @@ Run this release for at least a week before upgrading to that one.
 latest hearing. Each row also copies the packet's payload type, route type, scope and first
 hearing. The observation insert writes the row in the same statement, so a stored observation
 always has its row. A background reconcile repairs the newest rows every 5 minutes, an hourly
-audit refills one random older slice, and a front sweep every 30 seconds keeps the newest
+audit refills a random older slice of 500,000 observations (picked by row, so every
+observation is as likely to be audited however sparse the old ids are), and a front sweep every 30 seconds keeps the newest
 index entries dense. On a large deployment (about 7.4 million rows) it takes about 1.6 GB:
 heap 484 MB, primary key 285 MB, `idx_packet_sites_site` 419 MB, `idx_packet_sites_site_type`
 353 MB, `idx_packet_sites_site_scope` 53 MB.
@@ -831,8 +835,9 @@ On the first start the server fills the table in the background:
    60 slices; expect roughly twice the fill work, about 10 to 40 minutes, longer on a slow disk
    or a lower `duty`, and a few GB of WAL.
 3. It runs a one-time verification. It first runs `VACUUM (ANALYZE) packet_sites` (a few
-   minutes on a large deployment), then an exact check of two slices of 500,000 observation
-   ids, the newest and one random older one, and a page-by-page comparison of region pages of
+   minutes on a large deployment), then an exact check of the newest 500,000 observation ids
+   and of a random 500,000 older observations (picked by row, like the audit), and a page-by-page
+   comparison of region pages of
    the busiest recent sites with pages read straight from the observations. On success it logs
    `packet_sites first-time verification passed` and records the time, so later starts skip it.
 4. It logs `packet_sites trusted: region packet pages read packet_sites`.
