@@ -325,6 +325,14 @@ previous statements. The kill switches above turn those pages off instead of ser
 the previous statements. To get the fallbacks back, revert their one server commit; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
 
+#### Packet sites fill counts observations
+
+The `packet_sites` first fill slices by observations instead of observation ids, so the few
+old observations far below the live ids no longer cost a paced slice per 500,000 ids, and its
+progress line adds `observations_done` and `observations_remaining` (planner estimates) and
+bases `eta` on them. `readmodels.fill.packet_sites_slice` keeps its default and range but now
+counts observations.
+
 #### Statement timeouts answer 503
 
 Every `/api/v1` read whose statement runs past its pool's limit (35 s; 120 s on `api_slow`)
