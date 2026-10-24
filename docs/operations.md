@@ -1392,7 +1392,7 @@ scrape_configs:
 | `beacon_packet_sites_front_live` | gauge | `index` | Index entries written in the last two minutes that the last front sweep visited |
 | `beacon_packet_sites_bytes` | gauge | | Total size of `packet_sites`, heap and indexes, hourly |
 | `beacon_db_sequence_used_ratio` | gauge | `sequence`, `cycle` | Share of a sequence's usable values already handed out, 0 to 1, each minute. The usable range ends at the sequence's own limit or its column's type limit (`integer` 2,147,483,647), whichever is lower. `cycle="true"` marks a `CYCLE` sequence, whose ratio is its position, not used-up headroom. See [Sequence headroom](#sequence-headroom). |
-| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered: `not_ready` while its read model or backfill is not ready, `slow_pool_busy` when `api_slow` had no free connection, `timeout` when its statement ran past its pool's statement limit or an enforced guard's deadline. `model` is `packet_sites`, `cmi` or `observation_payload_types`. |
+| `beacon_api_unavailable_total` | counter | `reason`, `model` | `503`s a page answered: `not_ready` while its read model or backfill is not ready, `slow_pool_busy` when `api_slow` had no free connection, `timeout` when its statement ran past its pool's statement limit, an enforced guard's deadline or the endpoint's own time limit. `model` is the read model the page reads (`packet_sites`, `cmi` or `observation_payload_types`), or `none` for every other `/api/v1` page. A request an enforced guard deadline stops is also counted in `beacon_guard_refused_total{guard="deadline"}`; admission and cap refusals happen before the page runs and are not counted here. |
 
 `guard` is `deadline`, `cap`, `admission` or `budget`. The Postgres counters are read once a
 minute; the index gauges first appear an hour after startup. The two `beacon_planguard_*`
@@ -1464,6 +1464,10 @@ groups:
         for: 2h
       - alert: BeaconSlowPoolBusy              # region or message requests refused for want of a slow connection
         expr: sum(increase(beacon_api_unavailable_total{reason="slow_pool_busy"}[15m])) > 10
+      - alert: BeaconQueryTimeouts             # pages answering 503 because their statement ran out of time
+        # One client retrying a slow page adds a few dozen in 15 minutes; tune the floor to your traffic.
+        expr: sum by (model) (increase(beacon_api_unavailable_total{reason="timeout"}[15m])) > 100
+        for: 30m
       # The sequence rules leave out CYCLE sequences, which wrap instead of running out.
       - alert: BeaconSequenceHalfUsed
         expr: beacon_db_sequence_used_ratio{cycle="false"} > 0.5
