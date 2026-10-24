@@ -89,9 +89,9 @@ advertised. This fills in on its own as the mesh is observed.
 ## Channel messages show a hash but no text
 
 The channel's key is not configured, or it was added without a restart. Add it under
-`channel_keys:` in `config.yaml` and run `docker compose restart app`. On start, Beacon decrypts
-the stored messages for the new key and logs
-`config: backfilled N previously-undecrypted channel message(s)`.
+`channel_keys:` in `config.yaml` and run `docker compose restart app`. Once it listens, Beacon
+decrypts the stored messages for the new key in the background and logs
+`channel message backfill done: N previously-undecrypted channel message(s)`.
 
 ## MeshMapper imports are unconfigured or stale
 
