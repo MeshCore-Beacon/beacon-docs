@@ -241,7 +241,7 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
   large deployment it takes 12 to 14 minutes in short statements. See
   [After upgrading: route maintenance](operations.md#after-upgrading-route-maintenance).
 - **Optional, large deployments, once, off-peak:**
-  [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
+  [compact `observers`, `channels` and `nodes`](operations.md#after-upgrading-compacting-observers-and-channels)
   and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
 - **Stats pages.** Top nodes, top advertisers and paths for a region get faster as hours rolled
   before the upgrade leave the window: fully within 7 days for the default view. See
@@ -344,6 +344,14 @@ While that is not ready they answer `503` with `Retry-After: 30`; there is no fa
 previous statements. The kill switches above turn those pages off instead of serving them from
 the previous statements. To get the fallbacks back, revert their two server commits; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
+
+#### Packet sites fill counts observations
+
+The `packet_sites` first fill slices by observations instead of observation ids, so the few
+old observations far below the live ids no longer cost a paced slice per 500,000 ids, and its
+progress line adds `observations_done` and `observations_remaining` (planner estimates) and
+bases `eta` on them. `readmodels.fill.packet_sites_slice` keeps its default and range but now
+counts observations.
 
 #### Statement timeouts answer 503
 

@@ -191,6 +191,10 @@ four tables during the upgrade; a blocked drop stops startup after about two min
 described below, and the next start resumes where it stopped. Afterwards, compact the two
 tables once; see [Compacting observers and channels](#after-upgrading-compacting-observers-and-channels).
 
+Migration `058` sets `fillfactor = 50` on `nodes`. It only changes the table's settings (no
+rewrite, a lock that does not block reads or writes), and applies to pages written from then on;
+the same compaction section covers `nodes`.
+
 Migrations `025` to `033` (2.1.0) change `packets`:
 
 - `025` and `027` add the checks `packets_payload_type_domain` (`payload_type` 0 to 15) and
@@ -581,23 +585,32 @@ only applies to pages written from then on. A table that bloated before the upgr
 size until it is rewritten once: on a large deployment `observers` held about 4,000 rows in
 52 MB, and about 6 MB after the rewrite.
 
-**When.** Once, off-peak, after the release is live and its last migration is recorded. This
-must return `1`:
+2.1 also sets `fillfactor = 50` on `nodes` (migration `058`). Every node advert rewrites its
+node's `last_seen` (about 1.1 million updates a day on a large deployment), and with packed pages
+almost none of those updates could stay on their page. In a benchmark of 343,000 `last_seen`
+updates over 68,700 nodes, fillfactor 50 made 60 % of them HOT instead of 0.5 %, with 47 % less
+WAL and 37 % less time. Node page times did not change: the table is about twice its packed size
+(about 23 MB instead of 11 MB for 68,700 nodes), a few more cached pages per read. Like the others,
+the setting only applies to pages written from then on; the rewrite below compacts `nodes` too.
+
+**When.** Once, off-peak, after the release is live and its last migration is recorded:
 
 ```sql
 SELECT count(*) FROM schema_migrations WHERE filename LIKE '024_%';
+SELECT count(*) FROM schema_migrations WHERE filename LIKE '058_%';
 ```
 
-Not before: without the fillfactor and the dropped indexes, the tables bloat again.
+Both must return `1`. Not before: without the fillfactor and the dropped indexes, the tables
+bloat again.
 
 **Is it worth it?** Check the sizes in `psql` as above:
 
 ```sql
 SELECT relname, relpages, pg_size_pretty(pg_relation_size(oid)) AS heap, reltuples::bigint AS rows
-FROM pg_class WHERE relname IN ('observers', 'channels');
+FROM pg_class WHERE relname IN ('observers', 'channels', 'nodes');
 ```
 
-If both are already a few MB, skip it.
+If they are already a few MB (`nodes` about twice its packed size), skip it.
 
 **Run** as the table owner (the `beacon` user) or a superuser, each statement on its own in
 autocommit mode, not inside a transaction block:
@@ -606,12 +619,13 @@ autocommit mode, not inside a transaction block:
 SET lock_timeout = '3s';
 VACUUM FULL observers;
 VACUUM FULL channels;
+VACUUM FULL nodes;
 ```
 
 - Each `VACUUM FULL` rewrites the table and its indexes under an `ACCESS EXCLUSIVE` lock, which
   blocks reads and writes on that table while it runs. On tables of this size that is a few
-  seconds, so ingest's observer and channel updates and the observer and channel API pages
-  wait that long.
+  seconds, so ingest's observer, channel and node updates and the observer, channel and node
+  API pages wait that long.
 - If it reports `canceling statement due to lock timeout`, another session held the table;
   run the same statement again.
 - It needs free disk equal to the table's new size plus its indexes, a few MB here. The old
@@ -625,7 +639,7 @@ apart and compare the change:
 ```sql
 SELECT relname, n_tup_upd, n_tup_hot_upd,
        round(100.0 * n_tup_hot_upd / nullif(n_tup_upd, 0), 1) AS hot_pct
-FROM pg_stat_user_tables WHERE relname IN ('observers', 'channels');
+FROM pg_stat_user_tables WHERE relname IN ('observers', 'channels', 'nodes');
 ```
 
 Between the two samples, nearly all new updates (`n_tup_hot_upd` growth over `n_tup_upd`
@@ -868,14 +882,19 @@ On the first start the server fills the table in the background:
 1. It waits until every transaction that started before boot and holds a transaction id has
    finished (`packet_sites boot repair waits for transactions from before boot` while it
    waits), then runs one reconcile from the saved watermark.
-2. It backfills the table newest observation first, in slices of 500,000 observation ids
+2. It backfills the table newest observation first, in slices of 500,000 observations
    (`readmodels.fill.packet_sites_slice`), pausing after each slice as
    [`readmodels.fill`](#pacing-the-backfills) sets: at least 0.1 s, and by default as long as
-   the slice took, so the fill is busy at most half the time. Once a minute the log shows a
-   `packet_sites backfill progress` line with `ids_done`, `ids_remaining` and `eta`, then
-   `packet_sites backfill complete`. On a large deployment (about 766 million ids, 29.4 million
-   observations) that is about 1,530 slices; expect roughly twice the fill work, about 10 to 40
-   minutes, longer on a slow disk or a lower `duty`, and a few GB of WAL.
+   the slice took, so the fill is busy at most half the time. A slice counts observations, not
+   ids: the few old observations [retention keeps](#retention) spread over a long id range cost
+   a few slices, not one per 500,000 ids. Once a minute the log shows a
+   `packet_sites backfill progress` line with `ids_done`, `ids_remaining`,
+   `observations_done`, `observations_remaining` and `eta`, then
+   `packet_sites backfill complete`. The observation counts are the planner's estimates from
+   the table statistics, and `eta` follows them, so it no longer counts empty ids as work.
+   On a large deployment (29.4 million observations over about 766 million ids) that is about
+   60 slices; expect roughly twice the fill work, about 10 to 40 minutes, longer on a slow disk
+   or a lower `duty`, and a few GB of WAL.
 3. It runs a one-time verification. It first runs `VACUUM (ANALYZE) packet_sites` (a few
    minutes on a large deployment), then an exact check of two slices of 500,000 observation
    ids, the newest and one random older one, and a page-by-page comparison of region pages of
@@ -1042,7 +1061,7 @@ logged (`read-model ANALYZE failed; the fill goes on`) and the fill continues; a
 already has statistics is left to autovacuum.
 
 Measured on a laptop Postgres with 3 million synthetic observations (`packet_sites`, slices of
-500,000 ids):
+500,000 observations, dense ids):
 
 | `duty` | Fill time | Busy in fill statements |
 |---|---|---|
@@ -1050,7 +1069,7 @@ Measured on a laptop Postgres with 3 million synthetic observations (`packet_sit
 | `0.5` (default) | 153 s | 50 % |
 | `0.25` | 316 s | 25 % |
 
-Slices of 100,000 ids cost about 7 % more fill work (85 s at `duty: 1`) but cut the longest
+Slices of 100,000 observations cost about 7 % more fill work (85 s at `duty: 1`) but cut the longest
 burst from about 14 s to about 3 s.
 
 Settings, under [`readmodels.fill`](configuration.md#backfill-pacing) in `config.yaml`:
