@@ -60,7 +60,7 @@ Retry-After: 5
 
 The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
 
-Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account, backup and plan-check admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
+Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account, backup and plan-check admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
 
 Each request falls in one family and one class:
 
@@ -91,10 +91,10 @@ Some pages are served only from data the server prepares in the background. Whil
 | Pages | Ready when |
 |---|---|
 | `/packets` with `iata`, `iatas`, `region` or `regionId`, without `hashPrefix` (region pages) | the server trusts its `packet_sites` read model |
-| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` and neither `since` nor `scope`, or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
+| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` (with or without `since` or `scope`), or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
 | `/observers/{observerId}/adverts` | every observation carries its payload type |
 
-That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` reads no read model and is always served, on a small pool of its own. The same pool answers trusted region `/packets` pages whose filter is too sparse for the read model's bounded reads. When that pool is busy, those requests answer `503` `service_unavailable` with `Retry-After: 5`.
+That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` is in the table since 2.1: development builds of 2.1 served it from the observations whatever the read model's state, and answered `503` with `Retry-After: 5` when that pool was busy; that `503` is gone.
 
 ```
 HTTP/1.1 503 Service Unavailable
@@ -707,6 +707,9 @@ clamped to the oldest hour the rollups still hold. An empty region returns zeros
   `{ observerA, observerB, since, until, totalPackets, onlyA, onlyB, both }`.
 - `clock-drift` lists repeaters and room servers whose last advert clock is off by more than
   `nodes.clock_drift_threshold`, worst first. It is current state, not windowed.
+  `clockDriftSeconds` (here and on node detail) is the advert's clock minus the server's, in seconds.
+  A device clock decades off gives values from about -1.8 × 10⁹ to +2.5 × 10⁹ (the negative bound
+  grows over time); every value fits a JSON number exactly.
 - `radio-presets` is `[{ preset, iata, sourceType, count }]`, where `preset` is `freqMhz,bwKhz,sf` and
   `sourceType` is `observer` or `node`; it is rebuilt every `background.view_refresh` (default `1h`).
   `node-types` is `[{ nodeType, nodeTypeName, count }]` over all known nodes.
