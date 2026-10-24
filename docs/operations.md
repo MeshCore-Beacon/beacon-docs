@@ -964,8 +964,8 @@ They run on their own pool, `api_slow`: 2 connections by default
 connection is busy a request waits at most 5 s and then answers `503` with `Retry-After: 5`,
 without touching the other pools; `beacon_api_unavailable_total{reason="slow_pool_busy"}` counts
 those, and the server logs `api: slow requests refused, every slow connection is busy` at most
-once a minute. A statement that passes 120 s ends with a `500`; narrowing the request (fewer
-sites, a wider window) avoids it.
+once a minute. A statement that passes 120 s answers `503` `deadline_exceeded` with
+`Retry-After: 10`; narrowing the request (fewer sites, a wider window) avoids it.
 
 Before this release the region statement ran on `api_legacy` without a time limit for a
 millisecond cursor, and on `api_custom` (35 s, gated by `packets_region`) for an exact page
