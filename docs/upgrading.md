@@ -322,6 +322,13 @@ the previous statements. A page whose statement runs past its pool's limit answe
 `Retry-After: 10`. To get the fallbacks back, revert their one server commit; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
 
+#### Runtime image on Alpine 3.24
+
+The server image moved from Alpine 3.19, which is out of support, to Alpine 3.24 with the
+PostgreSQL 16 client tools. Nothing to change for a PostgreSQL 16 database. A self-built image
+with `POSTGRES_CLIENT_MAJOR=17` or `18` now works too; see
+[Backup export](backup-export.md).
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
