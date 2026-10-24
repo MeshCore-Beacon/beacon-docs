@@ -242,6 +242,9 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
   before the upgrade leave the window: fully within 7 days for the default view. See
   [After upgrading: stats rollup row order](operations.md#after-upgrading-stats-rollup-row-order)
   for an optional one-off `CLUSTER` that heals it at once.
+- **Stop grace period.** If you run your own compose file, give the `app` service
+  `stop_grace_period: 75s` (Docker's default is 10 s), so a stop finishes storing what ingest has
+  queued; see [Stopping the server](operations.md#stopping-the-server).
 - **Plan checks.** Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only
   after the upgrade, if you want it.
 

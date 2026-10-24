@@ -74,6 +74,26 @@ historical stats. A packet heard live before the backfill reaches it is decrypte
 instead: its message is stored once either way, its hours are re-rolled too, and, as a live
 message, it is broadcast over the WebSocket with its original `sentAt`.
 
+## Stopping the server
+
+On `SIGTERM` (`docker compose stop`, a redeploy) the server stops in order, so nothing it has
+accepted is lost:
+
+1. It stops taking HTTP requests and lets the ones in flight finish (up to 30 s). At the same
+   time, ingest stops reading MQTT and stores what it has queued (up to 20 s).
+2. Background jobs (rollups, retention, read-model upkeep, the channel message backfill, imports)
+   stop on their next check; a statement in flight finishes or is cancelled. Shutdown waits up
+   to 15 s for them, then logs `shutdown: background jobs still running` and goes on.
+3. Observer and packet presence held in memory is written out (up to 15 s), then the database
+   connections close.
+
+A normal stop takes a few seconds; the worst case is about 60 s. Docker sends `SIGKILL` after the
+service's `stop_grace_period`, 10 s by default, which can cut any step short. The example compose
+files set `stop_grace_period: 75s` on the `app` service; set the same on your own. A server killed
+before step 1 ends loses the MQTT messages still queued for storage (the broker does not resend
+them). One killed later loses at most the last presence interval (`last_seen` freshness). Either
+way, a background job resumes where it stopped.
+
 ## Retention
 
 Everything below is a duration in `config.yaml`. Shorten them if disk is tight, lengthen them
