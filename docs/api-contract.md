@@ -60,7 +60,7 @@ Retry-After: 5
 
 The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
 
-Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers route evidence (`/routes/{iata}/{pathKey}/observations`) and the [background-data pages](#pages-that-wait-for-server-data) (region packets, region and scope messages, observer adverts). Other endpoints still answer `500` in that case.
+Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account, backup and plan-check admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
 
 Each request falls in one family and one class:
 
@@ -117,7 +117,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
