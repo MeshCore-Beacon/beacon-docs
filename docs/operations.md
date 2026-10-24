@@ -495,6 +495,32 @@ still run the previous statements, without parallel workers. Measured over all 6
 Responses are unchanged. Under `split`, `ListObserverAdverts` and `GetObserverTelemetrySince`
 run on cached generic plans; see [Configuration](configuration.md#database-pools-and-cost-guards).
 
+### After upgrading: stats rollup row order
+
+2.1 writes each hourly rollup in its primary-key order, so one hour's rows for an IATA sit on a
+few adjacent pages. Older servers wrote them in hash order: one page per row. The per-(hour, IATA)
+reads (top nodes, top advertisers and paths with up to 32 IATAs) read about a tenth of the pages
+on the new layout: for a 13-IATA region over 7 days, about 11,000 buffers instead of about 116,000.
+
+Rows written before the upgrade keep the old layout, so these pages get faster as old hours leave
+the requested window: fully within 7 days for the default 7-day view, and within 30 days for a
+30-day one. Nothing needs to be done.
+
+**Optional: heal at once.** Rewrite the two tables those reads use, off-peak:
+
+```sql
+CLUSTER analytics_hourly_advert_hearings USING analytics_hourly_advert_hearings_pkey;
+CLUSTER analytics_hourly_paths USING analytics_hourly_paths_pkey;
+```
+
+- Each `CLUSTER` holds an `ACCESS EXCLUSIVE` lock for its whole run. Stats pages that read the
+  table and the hourly rollup wait for it.
+- It needs free disk for a full copy of the table and its indexes until it finishes.
+- Measured: 9.6 s for 2.0 million rows (226 MB heap) on a fast workstation. Rollups are kept for
+  90 days, so these tables grow by about 0.3 million rows a day on a large deployment. At about
+  35 days, expect around 10 million rows (1.3 GB heap) for `analytics_hourly_advert_hearings` and
+  1 to 3 minutes per table on a busy server.
+
 ### After upgrading: compacting observers and channels
 
 The small-table release (migrations `011` to `024`) drops the indexes that made every observer
