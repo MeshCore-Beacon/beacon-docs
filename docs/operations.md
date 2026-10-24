@@ -1111,8 +1111,9 @@ are not paced: they cover only the observations since the last run, or one slice
 Region `/packets` pages with a window, scopes or types, and `/messages` pages with `iatas` and
 `since` or `scope`, read at most their page per index range (site, scope, type pair) or, for
 `/messages` with `since`, at most the messages sent since then. The worst case is a quiet site
-with `since` near the oldest retained message: it reads every message sent since then. On a
-production-size copy (196,000 messages) that took 2,907 buffers and 148 ms. Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
+with `since` near the oldest retained message: it reads every message sent since then, which for an
+old `since` is effectively the whole message history. On a production-size copy (196,000
+messages) that took 2,907 buffers and 148 ms. Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
 a narrow window, an `until` well in the past, or rare payload types over busy sites), and
 `/messages` with `iatas` and `since` or `scope`, ran the previous release's statements on a
 two-connection `api_slow` pool with a 120 s statement limit. That pool and its
@@ -1131,7 +1132,15 @@ the 30 minutes above `until` and the late rows above that; a sparse filter reads
 window. Scoped pages do the same per site and scope. With a type filter, each site's (or site and
 scope's) range is read per (payload type, route type) pair instead, on `idx_packet_sites_site_type`
 or `idx_packet_sites_site_scope_type`, so a rare type reads at most a page per pair: a page costs
-at most the pairs times its size, however sparse the filter. Pages are full until the last, and the
+at most the pairs times its size, however sparse the filter. That holds up to 4,096 ranges (sites
+times scopes times type pairs; a region page with up to 8 pairs is always under it). Above it the
+page reads each site or site-and-scope range with the types as a filter, as an untyped page does:
+cheap while the filter is dense, but a sparse filter then reads each range down to the window.
+Only requests naming thousands of combinations get there; the worst measured, every known site
+(562) with every scope (1,491) and one rare payload type, took 2.5 million buffers and 2.1 s
+without a window and 5.0 million buffers and 3.0 s with `until` a day back, on a warm
+production-size copy, nearly all of it probing the 838,000 mostly empty site-and-scope ranges.
+Pages are full until the last, and the
 rows, their order and `nextPageCursor` are those of the observations; where the previous
 statement had ended a page short at its scan floor, the new page is full and the walk returns
 the same rows in the same order.
