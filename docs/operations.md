@@ -478,9 +478,13 @@ They are also guarded, but a guard's deadline applies only if its family is list
 
 For top nodes, top advertisers and paths, requests with at most 32 distinct IATAs and
 whole-hour bounds use new statements that read the hourly rollups one hour and IATA at a time.
-Only wider lists, such as every IATA at once, still run the previous statements, now without
-parallel workers. Measured over all 625 IATAs for 7 days on a copy of a large production
-database, they stay far inside the timeout:
+Top nodes with no IATA filter run their own statement over the whole window: the only API
+statement allowed parallel workers. The server raises `max_parallel_workers_per_gather` to 2 for
+that statement alone, inside its own transaction (with 2 workers it took 300-400 ms instead of
+620-850 ms over 7 days on the same copy; it is cached for an hour). If the server has no free
+worker, the statement runs without one, at the speed shown below. Lists of more than 32 IATAs
+still run the previous statements, without parallel workers. Measured over all 625 IATAs for
+7 days on a copy of a large production database, they stay far inside the timeout:
 
 | Statement | With parallel workers | Without |
 |---|---:|---:|
@@ -552,6 +556,13 @@ growth) should be HOT; before this release only a few percent were. Sessions hol
 snapshots lower it somewhat.
 
 **Rollback.** None needed for the rewrite; it changes no data.
+
+Type-filtered node pages (`/nodes` with a node type) are slower in this release on purpose.
+They now read the whole `nodes` table like the unfiltered page: about 5-12 ms on a large
+deployment's 68,000 nodes, against 1.4 ms with the dropped `(node_type, last_seen)` index. That
+index held `last_seen`, which every node advert rewrites (about 1.1 million times a day on that
+deployment). In a benchmark of 100,000 `last_seen` updates it added 31 % WAL and 22 % time, more
+than doubled the table's index size, and stopped every one of those updates from being HOT.
 
 To go back to the previous server image, just deploy it: it works without the dropped
 indexes, but type-filtered node pages (`/nodes` with a node type) are slower until the indexes
