@@ -126,11 +126,11 @@ cannot honour. These are the ones people hit:
 Beacon opens one PostgreSQL connection pool per workload. Pools open connections only when
 needed, so these are peaks:
 
-| `database.api_plan_layout` | `api_legacy` | `api_slow` | `api_custom` | `api_cached` | `ingest` | `maint` | Total |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `custom_all` (default) | - | 2 (`slow_pool_size`) | 8 | - | 6 | 4 | 20 |
-| `split` | - | 2 (`slow_pool_size`) | 7 | 5 | 6 | 4 | 24 |
-| `single` (rollback) | 8 | - | - | - | 6 | 4 | 18 |
+| `database.api_plan_layout` | `api_legacy` | `api_custom` | `api_cached` | `ingest` | `maint` | Total |
+|---|---:|---:|---:|---:|---:|---:|
+| `custom_all` (default) | - | 8 | - | 6 | 4 | 18 |
+| `split` | - | 7 | 5 | 6 | 4 | 22 |
+| `single` (rollback) | 8 | - | - | 6 | 4 | 18 |
 
 `ingest` has one connection per CPU on hosts with more than 6 CPUs, which adds to each total.
 The startup log line `database pools open` shows the real figure. Postgres `max_connections`
@@ -149,24 +149,13 @@ layout sets the sizes.
 - **`single`** is the rollback: one API pool (`api_legacy`) on the server's own settings, and
   every guard family only observes, whatever `guards.enforce` says.
 
-`api_slow` runs only the statements that may read a large part of the observations in one call:
-the region `/packets` statement that answers when the site read model's bounded reads run out
-of budget, and the all-channel message statement for `iatas` combined with `since` or `scope`.
-Two connections by default (`database.slow_pool_size`), a 120 s `statement_timeout`, no parallel
-workers. A request that finds every connection busy waits at most 5 s and then answers `503`
-with `Retry-After: 5`; it never takes a connection from `api_custom`. A statement that runs past
-120 s answers `503` `deadline_exceeded` with `Retry-After: 10`.
-
-```yaml
-database:
-  slow_pool_size: 2   # api_slow's connections under custom_all and split; at least 1, at most 1000
-```
-
-Omit the key to take the default; set it only to override it. Raise it if
-`beacon_api_unavailable_total{reason="slow_pool_busy"}` keeps growing, and count it in
-`max_connections`. The default was 8 while untrusted read-model pages also ran here; reverting the
-change that removed those fallbacks restores that default by itself (see
-[Operations](operations.md#reverting-to-the-read-model-fallbacks)).
+`database.slow_pool_size` is no longer read. It sized the `api_slow` pool of the 2.1 development
+builds, which ran region and message statements that could read whole site histories; those
+pages now seek from their window (see
+[Deep region and message pages](operations.md#deep-region-and-message-pages)) and run on the
+pools above. A config that still sets the key loads as before, and the server logs
+`config: database.slow_pool_size is no longer used and is ignored; remove it` at `WARN` at
+startup. Remove the key.
 
 The layout changes at a restart. What each pool sets is in
 [Operations](operations.md#database-pools-and-connections).
