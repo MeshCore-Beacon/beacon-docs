@@ -238,6 +238,10 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
 - **Optional, large deployments, once, off-peak:**
   [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
   and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
+- **Stats pages.** Top nodes, top advertisers and paths for a region get faster as hours rolled
+  before the upgrade leave the window: fully within 7 days for the default view. See
+  [After upgrading: stats rollup row order](operations.md#after-upgrading-stats-rollup-row-order)
+  for an optional one-off `CLUSTER` that heals it at once.
 - **Plan checks.** Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only
   after the upgrade, if you want it.
 
