@@ -333,6 +333,13 @@ instead of an `ERROR` pair; a real `500` still logs `api: error 500: <message>` 
 with the database error in `error`. Only pages that read a read model count timeouts in
 `beacon_api_unavailable_total{reason="timeout"}`.
 
+#### Runtime image on Alpine 3.24
+
+The server image moved from Alpine 3.19, which is out of support, to Alpine 3.24 with the
+PostgreSQL 16 client tools. Nothing to change for a PostgreSQL 16 database. A self-built image
+with `POSTGRES_CLIENT_MAJOR=17` or `18` now works too; see
+[Backup export](backup-export.md).
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
