@@ -707,6 +707,9 @@ clamped to the oldest hour the rollups still hold. An empty region returns zeros
   `{ observerA, observerB, since, until, totalPackets, onlyA, onlyB, both }`.
 - `clock-drift` lists repeaters and room servers whose last advert clock is off by more than
   `nodes.clock_drift_threshold`, worst first. It is current state, not windowed.
+  `clockDriftSeconds` (here and on node detail) is the advert's clock minus the server's, in seconds.
+  A device clock decades off gives values from about -1.8 × 10⁹ to +2.5 × 10⁹ (the negative bound
+  grows over time); every value fits a JSON number exactly.
 - `radio-presets` is `[{ preset, iata, sourceType, count }]`, where `preset` is `freqMhz,bwKhz,sf` and
   `sourceType` is `observer` or `node`; it is rebuilt every `background.view_refresh` (default `1h`).
   `node-types` is `[{ nodeType, nodeTypeName, count }]` over all known nodes.
