@@ -351,7 +351,10 @@ The `packet_sites` first fill slices by observations instead of observation ids,
 old observations far below the live ids no longer cost a paced slice per 500,000 ids, and its
 progress line adds `observations_done` and `observations_remaining` (planner estimates) and
 bases `eta` on them. `readmodels.fill.packet_sites_slice` keeps its default and range but now
-counts observations.
+counts observations. The hourly audit and the first-time verification pick their random older
+slice by observations too, so on a database with a long, sparse old id range they check real
+rows. The observation payload-type backfill's progress line gains the same `observations_*`
+estimates and bases its `eta` on them.
 
 #### Statement timeouts answer 503
 
