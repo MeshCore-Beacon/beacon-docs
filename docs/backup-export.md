@@ -29,8 +29,10 @@ changes, PostgreSQL roles and cluster settings, Redis and deployment files are n
 - `pg_dump` must be in the **same runtime** as the exporter (the CLI's environment, or the
   server's PATH for the download), with a major version at least as new as the database's. A client on
   the Docker host or in another container doesn't count.
-- The Docker image ships the PostgreSQL 16 client. Its Alpine 3.19 base has no 17/18
-  packages, so a newer database needs a different runtime, not just `POSTGRES_CLIENT_MAJOR`.
+- The published Docker image ships the PostgreSQL 16 client on an Alpine 3.24 base. For a
+  PostgreSQL 17 or 18 database, build your own image from a beacon-server checkout, e.g.
+  `docker build -f .build/Dockerfile --build-arg POSTGRES_CLIENT_MAJOR=17 -t beacon:pg17 .`,
+  and point the stack's `image:` at that tag.
 - The temp directory (`TMPDIR`) needs about twice the SQL limit free. A small tmpfs won't do.
 - The output filesystem must support hard links (used to publish atomically). Existing
   destinations, symlinks included, are never replaced. Files are 0600 and staging dirs 0700;
