@@ -1069,8 +1069,11 @@ are not paced: they cover only the observations since the last run, or one slice
 
 ## Deep region and message pages
 
-No region `/packets` page and no `/messages` page reads a whole site history in one statement.
-Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
+Region `/packets` pages with a window and `/messages` pages with `iatas` and `since` or `scope`
+read about their own rows and their window, not the observations. A very sparse filter can still
+read a whole site's range in the read model (a rare type in a scope with no window, or a quiet
+site with `since` when more than 5,000 messages were sent since then), index-only and far
+cheaper than the previous statement. Until this release a region page whose bounded reads ran out of budget (a sparse filter such as
 a narrow window, an `until` well in the past, or rare payload types over busy sites), and
 `/messages` with `iatas` and `since` or `scope`, ran the previous release's statements on a
 two-connection `api_slow` pool with a 120 s statement limit. That pool and its
@@ -1114,9 +1117,9 @@ A server whose `config.yaml` still sets `database.slow_pool_size` starts as befo
 
 If the read-model pages must be served while a model is not trusted, as in earlier releases,
 revert two server commits on `dev` rather than rolling back the image, newest first: the one
-that removed the `api_slow` pool ("Seek region and message pages from their window, drop the
-slow pool"), then the one that removed the fallbacks ("region, scope and advert pages answer
-503 until their read model is ready, instead of falling back"):
+that removed the `api_slow` pool (it adds migrations `054` to `057`), then the one that removed
+the fallbacks (region, scope and advert pages answer `503` until their read model is ready).
+Find them with `git log --oneline -- db/pools.go`:
 
 ```bash
 git revert --no-edit <the pool commit> <the fallback commit>
