@@ -236,7 +236,7 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
   large deployment it takes 12 to 14 minutes in short statements. See
   [After upgrading: route maintenance](operations.md#after-upgrading-route-maintenance).
 - **Optional, large deployments, once, off-peak:**
-  [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
+  [compact `observers`, `channels` and `nodes`](operations.md#after-upgrading-compacting-observers-and-channels)
   and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
 - **Stats pages.** Top nodes, top advertisers and paths for a region get faster as hours rolled
   before the upgrade leave the window: fully within 7 days for the default view. See

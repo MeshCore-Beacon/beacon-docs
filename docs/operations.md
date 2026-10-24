@@ -191,6 +191,10 @@ four tables during the upgrade; a blocked drop stops startup after about two min
 described below, and the next start resumes where it stopped. Afterwards, compact the two
 tables once; see [Compacting observers and channels](#after-upgrading-compacting-observers-and-channels).
 
+Migration `058` sets `fillfactor = 50` on `nodes`. It only changes the table's settings (no
+rewrite, a lock that does not block reads or writes), and applies to pages written from then on;
+the same compaction section covers `nodes`.
+
 Migrations `025` to `033` (2.1.0) change `packets`:
 
 - `025` and `027` add the checks `packets_payload_type_domain` (`payload_type` 0 to 15) and
@@ -547,23 +551,32 @@ only applies to pages written from then on. A table that bloated before the upgr
 size until it is rewritten once: on a large deployment `observers` held about 4,000 rows in
 52 MB, and about 6 MB after the rewrite.
 
-**When.** Once, off-peak, after the release is live and its last migration is recorded. This
-must return `1`:
+2.1 also sets `fillfactor = 50` on `nodes` (migration `058`). Every node advert rewrites its
+node's `last_seen` (about 1.1 million updates a day on a large deployment), and with packed pages
+almost none of those updates could stay on their page. In a benchmark of 343,000 `last_seen`
+updates over 68,700 nodes, fillfactor 50 made 60 % of them HOT instead of 0.5 %, with 47 % less
+WAL and 37 % less time. Node page times did not change: the table is about twice its packed size
+(about 23 MB instead of 11 MB for 68,700 nodes), a few more cached pages per read. Like the others,
+the setting only applies to pages written from then on; the rewrite below compacts `nodes` too.
+
+**When.** Once, off-peak, after the release is live and its last migration is recorded:
 
 ```sql
 SELECT count(*) FROM schema_migrations WHERE filename LIKE '024_%';
+SELECT count(*) FROM schema_migrations WHERE filename LIKE '058_%';
 ```
 
-Not before: without the fillfactor and the dropped indexes, the tables bloat again.
+Both must return `1`. Not before: without the fillfactor and the dropped indexes, the tables
+bloat again.
 
 **Is it worth it?** Check the sizes in `psql` as above:
 
 ```sql
 SELECT relname, relpages, pg_size_pretty(pg_relation_size(oid)) AS heap, reltuples::bigint AS rows
-FROM pg_class WHERE relname IN ('observers', 'channels');
+FROM pg_class WHERE relname IN ('observers', 'channels', 'nodes');
 ```
 
-If both are already a few MB, skip it.
+If they are already a few MB (`nodes` about twice its packed size), skip it.
 
 **Run** as the table owner (the `beacon` user) or a superuser, each statement on its own in
 autocommit mode, not inside a transaction block:
@@ -572,12 +585,13 @@ autocommit mode, not inside a transaction block:
 SET lock_timeout = '3s';
 VACUUM FULL observers;
 VACUUM FULL channels;
+VACUUM FULL nodes;
 ```
 
 - Each `VACUUM FULL` rewrites the table and its indexes under an `ACCESS EXCLUSIVE` lock, which
   blocks reads and writes on that table while it runs. On tables of this size that is a few
-  seconds, so ingest's observer and channel updates and the observer and channel API pages
-  wait that long.
+  seconds, so ingest's observer, channel and node updates and the observer, channel and node
+  API pages wait that long.
 - If it reports `canceling statement due to lock timeout`, another session held the table;
   run the same statement again.
 - It needs free disk equal to the table's new size plus its indexes, a few MB here. The old
@@ -591,7 +605,7 @@ apart and compare the change:
 ```sql
 SELECT relname, n_tup_upd, n_tup_hot_upd,
        round(100.0 * n_tup_hot_upd / nullif(n_tup_upd, 0), 1) AS hot_pct
-FROM pg_stat_user_tables WHERE relname IN ('observers', 'channels');
+FROM pg_stat_user_tables WHERE relname IN ('observers', 'channels', 'nodes');
 ```
 
 Between the two samples, nearly all new updates (`n_tup_hot_upd` growth over `n_tup_upd`
