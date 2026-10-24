@@ -60,7 +60,7 @@ Retry-After: 5
 
 The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
 
-Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account and backup admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
+Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account, backup and plan-check admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
 
 Each request falls in one family and one class:
 
