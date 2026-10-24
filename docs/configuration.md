@@ -155,7 +155,7 @@ of budget, and the all-channel message statement for `iatas` combined with `sinc
 Two connections by default (`database.slow_pool_size`), a 120 s `statement_timeout`, no parallel
 workers. A request that finds every connection busy waits at most 5 s and then answers `503`
 with `Retry-After: 5`; it never takes a connection from `api_custom`. A statement that runs past
-120 s ends with a `500`.
+120 s answers `503` `deadline_exceeded` with `Retry-After: 10`.
 
 ```yaml
 database:
