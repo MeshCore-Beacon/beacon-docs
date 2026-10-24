@@ -76,6 +76,15 @@ minutes after it closes, and packet cleanup holds back up to 24 hours of raw row
 hours are rolled, so raw data lives a little longer than `packets.retention` says. An hour
 whose raw rows were deleted first is reported as partial, with no values.
 
+`packets.retention` counts from the last time any observer heard a packet, and a packet goes
+together with all its observations and its channel message. A packet that is still being heard
+keeps its older observations, so `packet_observations` always holds a small tail of rows older
+than the retention, with ids far below the current range. Most of it is byte-identical packets
+that nodes send again and again, such as adverts from nodes whose clock was never set (their
+advert timestamp stays the same, so every advert has the same hash). A later hearing by an
+observer that already reported the packet stores no new observation, but it still counts as
+heard. On a 72 h retention this tail was about 0.5 % of observations.
+
 ## Backing up
 
 Two options.
