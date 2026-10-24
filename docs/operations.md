@@ -57,6 +57,23 @@ Everything persistent is under `data/` next to `docker-compose.yml`:
 - `data/app/config.yaml` and `.env` are your configuration. Keep copies of both somewhere
   else; no backup below includes `.env`.
 
+## Channel message backfill
+
+After every start, once the server listens, Beacon retries every stored channel message it
+could not decrypt against the configured keys, so a key added to `config.yaml` surfaces its
+channel's history. Keys a MeshMapper import adds queue their channels on the same background
+job. It runs one pass at a time, in batches of 500 packets, paced by
+[`readmodels.fill.duty`](#pacing-the-backfills) alone (no `min_pause`), and stops after 30
+minutes, pauses included; whatever it did not reach is retried after the next start. A packet it
+has started is finished (within 30 s), so a stop does not leave a message half stored. The log shows `channel message backfill started`
+with `packets`, then `channel message backfill done: N previously-undecrypted channel
+message(s)` with `decrypted` and `duration` (or a `WARN` that it stopped after 30 minutes, or
+`channel message backfill stopped by shutdown`).
+Messages it stores are not broadcast over the WebSocket, and their hours are re-rolled for the
+historical stats. A packet heard live before the backfill reaches it is decrypted by ingest
+instead: its message is stored once either way, its hours are re-rolled too, and, as a live
+message, it is broadcast over the WebSocket with its original `sentAt`.
+
 ## Retention
 
 Everything below is a duration in `config.yaml`. Shorten them if disk is tight, lengthen them
