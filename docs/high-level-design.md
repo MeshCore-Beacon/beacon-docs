@@ -761,7 +761,7 @@ retention under 24h) fail startup rather than being ignored.
 
 IATAs are still auto-created when packets arrive from unrecognized codes. The config file is only needed to override the default display name/coordinates, or to assign an IATA to a super-region.
 
-Channel hashes also auto-populate as messages arrive; adding a key in the config decrypts the stored hash-only rows for that channel on the next startup.
+Channel hashes also auto-populate as messages arrive; adding a key in the config decrypts the stored hash-only rows for that channel after the next startup, in the background.
 
 ### Admin API and access control
 

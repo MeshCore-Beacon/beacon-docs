@@ -238,6 +238,10 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
 - **Optional, large deployments, once, off-peak:**
   [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
   and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
+- **Stats pages.** Top nodes, top advertisers and paths for a region get faster as hours rolled
+  before the upgrade leave the window: fully within 7 days for the default view. See
+  [After upgrading: stats rollup row order](operations.md#after-upgrading-stats-rollup-row-order)
+  for an optional one-off `CLUSTER` that heals it at once.
 - **Plan checks.** Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only
   after the upgrade, if you want it.
 
@@ -348,13 +352,26 @@ PostgreSQL 16 client tools. Nothing to change for a PostgreSQL 16 database. A se
 with `POSTGRES_CLIENT_MAJOR=17` or `18` now works too; see
 [Backup export](backup-export.md).
 
+#### Channel message backfill after startup
+
+The retry of stored, undecrypted channel messages against the configured keys no longer
+delays startup: it runs in the background once the server listens. On a slow disk that was
+most of the boot time (reading every undecrypted packet), so MQTT ingest and the API start
+sooner. Its log lines changed: `config: backfilled N previously-undecrypted channel
+message(s)` is now `channel message backfill started` (with `packets`) and `channel message
+backfill done: N previously-undecrypted channel message(s)`, logged on every run. Keys that a
+MeshMapper import adds queue on the same job. A message a live hearing decrypts first, before
+the backfill reaches its packet, is stored once and its earlier hours are re-rolled, as the
+backfill does.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
 `docker compose restart app`. On the next start:
 
-- A newly added channel key decrypts the matching stored messages. Look for
-  `config: backfilled N previously-undecrypted channel message(s)` in the log.
+- A newly added channel key decrypts the matching stored messages, in the background once
+  the server listens. Look for
+  `channel message backfill done: N previously-undecrypted channel message(s)` in the log.
 - Border file and MeshMapper import changes take effect.
 - Changed admin or MeshMapper keys in the YAML file are picked up.
 

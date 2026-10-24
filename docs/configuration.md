@@ -298,7 +298,9 @@ writes the tables; it trusts each one only while the writing server keeps it up 
 
 `readmodels.fill` paces the one-off backfills: the `packet_sites` and `channel_message_iatas`
 fills after an upgrade or a rebuild, and the
-[payload-type backfill](operations.md#after-upgrading-observation-payload-types). After each
+[payload-type backfill](operations.md#after-upgrading-observation-payload-types). The
+[channel message backfill](operations.md#channel-message-backfill) after each start uses `duty`
+only, with no `min_pause`. After each
 slice or batch a fill sleeps `max(min_pause, elapsed × (1 − duty) / duty)`, where `elapsed` is
 how long that slice took. A slow disk makes each slice take longer, so it stretches the pauses
 on its own. Pacing changes only when the fills run, never what they write.

@@ -57,6 +57,23 @@ Everything persistent is under `data/` next to `docker-compose.yml`:
 - `data/app/config.yaml` and `.env` are your configuration. Keep copies of both somewhere
   else; no backup below includes `.env`.
 
+## Channel message backfill
+
+After every start, once the server listens, Beacon retries every stored channel message it
+could not decrypt against the configured keys, so a key added to `config.yaml` surfaces its
+channel's history. Keys a MeshMapper import adds queue their channels on the same background
+job. It runs one pass at a time, in batches of 500 packets, paced by
+[`readmodels.fill.duty`](#pacing-the-backfills) alone (no `min_pause`), and stops after 30
+minutes, pauses included; whatever it did not reach is retried after the next start. A packet it
+has started is finished (within 30 s), so a stop does not leave a message half stored. The log shows `channel message backfill started`
+with `packets`, then `channel message backfill done: N previously-undecrypted channel
+message(s)` with `decrypted` and `duration` (or a `WARN` that it stopped after 30 minutes, or
+`channel message backfill stopped by shutdown`).
+Messages it stores are not broadcast over the WebSocket, and their hours are re-rolled for the
+historical stats. A packet heard live before the backfill reaches it is decrypted by ingest
+instead: its message is stored once either way, its hours are re-rolled too, and, as a live
+message, it is broadcast over the WebSocket with its original `sentAt`.
+
 ## Retention
 
 Everything below is a duration in `config.yaml`. Shorten them if disk is tight, lengthen them
@@ -478,9 +495,13 @@ They are also guarded, but a guard's deadline applies only if its family is list
 
 For top nodes, top advertisers and paths, requests with at most 32 distinct IATAs and
 whole-hour bounds use new statements that read the hourly rollups one hour and IATA at a time.
-Only wider lists, such as every IATA at once, still run the previous statements, now without
-parallel workers. Measured over all 625 IATAs for 7 days on a copy of a large production
-database, they stay far inside the timeout:
+Top nodes with no IATA filter run their own statement over the whole window: the only API
+statement allowed parallel workers. The server raises `max_parallel_workers_per_gather` to 2 for
+that statement alone, inside its own transaction (with 2 workers it took 300-400 ms instead of
+620-850 ms over 7 days on the same copy; it is cached for an hour). If the server has no free
+worker, the statement runs without one, at the speed shown below. Lists of more than 32 IATAs
+still run the previous statements, without parallel workers. Measured over all 625 IATAs for
+7 days on a copy of a large production database, they stay far inside the timeout:
 
 | Statement | With parallel workers | Without |
 |---|---:|---:|
@@ -490,6 +511,32 @@ database, they stay far inside the timeout:
 
 Responses are unchanged. Under `split`, `ListObserverAdverts` and `GetObserverTelemetrySince`
 run on cached generic plans; see [Configuration](configuration.md#database-pools-and-cost-guards).
+
+### After upgrading: stats rollup row order
+
+2.1 writes each hourly rollup in its primary-key order, so one hour's rows for an IATA sit on a
+few adjacent pages. Older servers wrote them in hash order: one page per row. The per-(hour, IATA)
+reads (top nodes, top advertisers and paths with up to 32 IATAs) read about a tenth of the pages
+on the new layout: for a 13-IATA region over 7 days, about 11,000 buffers instead of about 116,000.
+
+Rows written before the upgrade keep the old layout, so these pages get faster as old hours leave
+the requested window: fully within 7 days for the default 7-day view, and within 30 days for a
+30-day one. Nothing needs to be done.
+
+**Optional: heal at once.** Rewrite the two tables those reads use, off-peak:
+
+```sql
+CLUSTER analytics_hourly_advert_hearings USING analytics_hourly_advert_hearings_pkey;
+CLUSTER analytics_hourly_paths USING analytics_hourly_paths_pkey;
+```
+
+- Each `CLUSTER` holds an `ACCESS EXCLUSIVE` lock for its whole run. Stats pages that read the
+  table and the hourly rollup wait for it.
+- It needs free disk for a full copy of the table and its indexes until it finishes.
+- Measured: 9.6 s for 2.0 million rows (226 MB heap) on a fast workstation. Rollups are kept for
+  90 days, so these tables grow by about 0.3 million rows a day on a large deployment. At about
+  35 days, expect around 10 million rows (1.3 GB heap) for `analytics_hourly_advert_hearings` and
+  1 to 3 minutes per table on a busy server.
 
 ### After upgrading: compacting observers and channels
 
@@ -552,6 +599,13 @@ growth) should be HOT; before this release only a few percent were. Sessions hol
 snapshots lower it somewhat.
 
 **Rollback.** None needed for the rewrite; it changes no data.
+
+Type-filtered node pages (`/nodes` with a node type) are slower in this release on purpose.
+They now read the whole `nodes` table like the unfiltered page: about 5-12 ms on a large
+deployment's 68,000 nodes, against 1.4 ms with the dropped `(node_type, last_seen)` index. That
+index held `last_seen`, which every node advert rewrites (about 1.1 million times a day on that
+deployment). In a benchmark of 100,000 `last_seen` updates it added 31 % WAL and 22 % time, more
+than doubled the table's index size, and stopped every one of those updates from being HOT.
 
 To go back to the previous server image, just deploy it: it works without the dropped
 indexes, but type-filtered node pages (`/nodes` with a node type) are slower until the indexes
