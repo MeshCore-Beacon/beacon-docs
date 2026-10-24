@@ -378,8 +378,9 @@ that `503` now carries `Retry-After: 10` and code `deadline_exceeded` (was
 `service_unavailable`), and also covers a statement timeout. Web and app retry it like the other
 `503`s. In the server log a timeout is one `request complete` line at `WARN` with `status=503`
 instead of an `ERROR` pair; a real `500` still logs `api: error 500: <message>` at `ERROR`, now
-with the database error in `error`. Only pages that read a read model count timeouts in
-`beacon_api_unavailable_total{reason="timeout"}`.
+with the database error in `error`. Every timeout `503` is counted in
+`beacon_api_unavailable_total{reason="timeout"}`: under the read model a page reads, or
+`model="none"` for the other pages.
 
 #### Runtime image on Alpine 3.24
 
