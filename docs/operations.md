@@ -754,14 +754,19 @@ On the first start the server fills the table in the background:
 1. It waits until every transaction that started before boot and holds a transaction id has
    finished (`packet_sites boot repair waits for transactions from before boot` while it
    waits), then runs one reconcile from the saved watermark.
-2. It backfills the table newest observation first, in slices of 500,000 observation ids
+2. It backfills the table newest observation first, in slices of 500,000 observations
    (`readmodels.fill.packet_sites_slice`), pausing after each slice as
    [`readmodels.fill`](#pacing-the-backfills) sets: at least 0.1 s, and by default as long as
-   the slice took, so the fill is busy at most half the time. Once a minute the log shows a
-   `packet_sites backfill progress` line with `ids_done`, `ids_remaining` and `eta`, then
-   `packet_sites backfill complete`. On a large deployment (about 766 million ids, 29.4 million
-   observations) that is about 1,530 slices; expect roughly twice the fill work, about 10 to 40
-   minutes, longer on a slow disk or a lower `duty`, and a few GB of WAL.
+   the slice took, so the fill is busy at most half the time. A slice counts observations, not
+   ids: the few old observations [retention keeps](#retention) spread over a long id range cost
+   a few slices, not one per 500,000 ids. Once a minute the log shows a
+   `packet_sites backfill progress` line with `ids_done`, `ids_remaining`,
+   `observations_done`, `observations_remaining` and `eta`, then
+   `packet_sites backfill complete`. The observation counts are the planner's estimates from
+   the table statistics, and `eta` follows them, so it no longer counts empty ids as work.
+   On a large deployment (29.4 million observations over about 766 million ids) that is about
+   60 slices; expect roughly twice the fill work, about 10 to 40 minutes, longer on a slow disk
+   or a lower `duty`, and a few GB of WAL.
 3. It runs a one-time verification. It first runs `VACUUM (ANALYZE) packet_sites` (a few
    minutes on a large deployment), then an exact check of two slices of 500,000 observation
    ids, the newest and one random older one, and a page-by-page comparison of region pages of
@@ -928,7 +933,7 @@ logged (`read-model ANALYZE failed; the fill goes on`) and the fill continues; a
 already has statistics is left to autovacuum.
 
 Measured on a laptop Postgres with 3 million synthetic observations (`packet_sites`, slices of
-500,000 ids):
+500,000 observations, dense ids):
 
 | `duty` | Fill time | Busy in fill statements |
 |---|---|---|
@@ -936,7 +941,7 @@ Measured on a laptop Postgres with 3 million synthetic observations (`packet_sit
 | `0.5` (default) | 153 s | 50 % |
 | `0.25` | 316 s | 25 % |
 
-Slices of 100,000 ids cost about 7 % more fill work (85 s at `duty: 1`) but cut the longest
+Slices of 100,000 observations cost about 7 % more fill work (85 s at `duty: 1`) but cut the longest
 burst from about 14 s to about 3 s.
 
 Settings, under [`readmodels.fill`](configuration.md#backfill-pacing) in `config.yaml`:

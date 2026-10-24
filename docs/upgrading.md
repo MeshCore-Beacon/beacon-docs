@@ -322,6 +322,14 @@ the previous statements. A page whose statement runs past its pool's limit answe
 `Retry-After: 10`. To get the fallbacks back, revert their one server commit; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
 
+#### Packet sites fill counts observations
+
+The `packet_sites` first fill slices by observations instead of observation ids, so the few
+old observations far below the live ids no longer cost a paced slice per 500,000 ids, and its
+progress line adds `observations_done` and `observations_remaining` (planner estimates) and
+bases `eta` on them. `readmodels.fill.packet_sites_slice` keeps its default and range but now
+counts observations.
+
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
