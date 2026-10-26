@@ -567,7 +567,7 @@ Channel keys come from the server config file and, optionally, MeshMapper.
 | `GET /iatas` | All IATAs, including ones created from traffic. `[]` when there are none. |
 | `GET /iatas/{iata}` | One IATA. `404` if unknown or not three letters. |
 | `GET /iatas/{iata}/border` | GeoJSON Feature (Polygon or MultiPolygon, with `bbox`); `204` when the IATA has no border, `404` if the IATA is unknown. |
-| `GET /regions` | Regions in display order. `[]` when none are configured. |
+| `GET /regions` | Regions in display order, each with the same fields as `GET /regions/{regionId}` (`iatas` always present, `[]` for a region with none), so one call resolves every region. `[]` when none are configured. Older servers list only `id`, `slug` and `name`: when `iatas` is missing, fetch each region. |
 | `GET /regions/{regionId}` | One region with its IATAs. `400` for a non-numeric ID, `404` if unknown. |
 | `GET /scopes` | Array of scope names. Location filters narrow it to manual scopes configured for a matching region and imported scopes whose MeshMapper catalogue includes a matching IATA. |
 | `GET /scopes/{name}` | Scope detail (`%23bc` for `#bc`). |
