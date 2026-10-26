@@ -14,8 +14,8 @@ This repo is where you deploy and operate it. The code lives in
 ## Deploy the all-in-one stack
 
 One server runs everything: the API, Postgres, Redis, the web frontend and Caddy with automatic
-HTTPS. You need a domain pointed at the server, ports 80 and 443 open, Docker with the compose
-plugin, and a subscriber account on a MeshCore MQTT broker
+HTTPS. You need a domain pointed at the server, TCP ports 80 and 443 and UDP port 443 open,
+Docker with the compose plugin, and a subscriber account on a MeshCore MQTT broker
 ([where packets come from](docs/getting-packets-in.md)).
 
 If you would rather run the API and the web frontend on different hosts, see
@@ -101,7 +101,9 @@ Every other key, with its default, is documented in
 ### 4. Point DNS at the server
 
 Create an `A` or `AAAA` record for `DOMAIN` pointing at the server's public IP. Caddy needs
-ports 80 and 443 reachable from the internet to get its certificate.
+ports 80 and 443 reachable from the internet to get its certificate. Open UDP 443 too, in the
+host firewall and any cloud security group, so browsers can use
+[HTTP/3](docs/reverse-proxy.md#http3).
 
 ### 5. Bring it up
 

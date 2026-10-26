@@ -73,9 +73,12 @@ there must be an obvious scraper, otherwise raise `maxretry`.
 
 **Enforce.** Caddy box: traffic to Docker-published ports is DNAT'ed through the FORWARD path, which
 the default nftables action (input hook) never sees, so switch to
-`banaction = nftables[type=allports, chain=f2b-forward, chain_hook=forward]` (a second chain in the
-existing `f2b-table`; `iptables-allports[chain=DOCKER-USER]` is equivalent). Apache box: remove the
-`dummy` line, the inherited nftables input-hook action works because Apache listens on the host.
+`banaction = nftables[type=allports, protocol="tcp,udp", chain=f2b-forward, chain_hook=forward]`
+(a second chain in the existing `f2b-table`;
+`iptables-allports[chain=DOCKER-USER, protocol="tcp,udp"]` is equivalent). The action bans TCP
+only by default; `protocol="tcp,udp"` also stops a banned address reaching Caddy over HTTP/3 on
+UDP 443. Apache box: remove the `dummy` line, the inherited nftables input-hook action works
+because Apache listens on the host.
 Then:
 
 ```bash

@@ -134,6 +134,26 @@ ratelimit:
 Then run `docker compose restart app`. If you run the [fail2ban jails](../app_config/fail2ban/README.md),
 the flood jail's `maxretry` of 900 still sits above the new limit.
 
+## HTTP/3 needs UDP 443
+
+The compose files now publish UDP 443 so Caddy can serve HTTP/3. An existing deployment keeps
+its own `docker-compose.yml`, so add the UDP line to the `caddy` service by hand (on both hosts
+of a split deployment):
+
+```yaml
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+```
+
+Open UDP 443 in the host firewall and any cloud security group, then run
+`docker compose up -d caddy`, which recreates the Caddy container. [HTTP/3](reverse-proxy.md#http3)
+shows how to check it. If you enforce the [fail2ban jails](../app_config/fail2ban/README.md),
+add `protocol="tcp,udp"` to the ban action as shown there: the default bans TCP only, so a
+banned address could still reach the site over HTTP/3.
+
 ## Upgrading to 2.1
 
 Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `060` at startup,
