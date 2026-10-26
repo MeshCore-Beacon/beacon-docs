@@ -899,6 +899,8 @@ The upgrade is checked before anything else:
 - **Origin.** A browser `Origin` must match the request's host, or one of `websocket.allowed_origins`. Anything else gets `403`. Set `allowed_origins` when the web app is served from a different host than the API.
 - **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP. Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
 
+**Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
+
 On connect the server sends a `hello`:
 
 ```json
