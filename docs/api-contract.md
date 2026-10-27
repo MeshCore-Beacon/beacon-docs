@@ -581,14 +581,18 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50). |
+| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iatas` (comma list, at most 100), `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50, larger values clamp to 200). With neither `iatas` nor `iata`, every IATA. |
 | `GET /routes/search?from=&to=[&iatas=]` | Routes within one IATA between two node hash prefixes. `from`, `to` required (hex, 1–4 bytes; widths may differ). `iatas` optional: comma list, at most 100, omitted = every IATA; the single `iata` is still accepted. At most 500 results, shortest first. `hops` is trimmed to source…destination and `hopCount` = `hops.length`. |
 | `GET /routes/cross?fromHash=&toHash=[&iatas=]` | Routes that cross from one IATA into another. `fromHash`, `toHash` required. `iatas` optional: 2–100 codes, omitted = every IATA. The legacy `fromIata`+`toIata` pair is still accepted, but not together with `iatas`. At most 500 results, sorted by `totalHops`, then `crossHop.lastSeen` newest first. |
 | `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. A lookup past the statement limit answers `503` + `Retry-After` ([Cost guards](#cost-guards)). |
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
-An `iata` that ends in a blank (`YYZ` followed by a space) matches no region and returns `200 []`.
+`iatas` returns the routes of every listed IATA, in the same order and with the same cursors as one IATA's list, so a region pages like a single IATA. Codes are trimmed, uppercased and deduplicated; one that isn't three characters, more than 100 codes, or a list with no codes (`iatas=,`) is a `400`. `iatas` takes precedence over `iata`. An empty `iatas=` counts as absent.
+
+The single `iata` is matched exactly as sent, so lowercase matches nothing. An `iata` that ends in a blank (`YYZ` followed by a space) matches no region and returns `200 []`.
+
+`iatas` is new in 2.1.0: older servers, and 2.1.0 development builds from before it, ignore it and answer with every IATA's routes. A client that asks for a region checks each route's `iata`; when one is outside the list, it pages without `iatas` and filters, as before.
 
 `/routes` and `/routes/search` return a plain array of routes:
 
