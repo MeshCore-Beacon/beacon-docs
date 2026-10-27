@@ -139,8 +139,8 @@ A few lists return a plain array instead: the backfill endpoints, `/routes*`, `/
 
 A numeric `cursor` holds a millisecond, so rows that share the last row's millisecond can fall
 between two pages. `/packets`, `/nodes`, `/observers` and `/channels` also return
-`nextPageCursor` on a page with `hasMore`: an opaque string of at most 160 characters that marks
-the exact last row. Send it back as `pageCursor`. A walk by `pageCursor` returns every row once,
+`nextPageCursor` on a page with `hasMore`: an opaque string of at most 160 characters (512 on a
+sorted `/nodes` list) that marks the exact last row. Send it back as `pageCursor`. A walk by `pageCursor` returns every row once,
 including those ties. Don't parse or build it; today it reads `v1:<epoch µs>:<packet hash hex>`
 on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
 
@@ -352,12 +352,20 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending. Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
+| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending, or in a `sort` order (see below). Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
-`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
+`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
+
+Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or `neighbors`, and `order` is `asc` (the default) or `desc`; `lastSeen` is `desc` only. Every page says which order it is in with `sort` and `order` (`lastSeen` and `desc` by default). The orders match what the web's node table shows:
+
+- `name`: natural order, as `Intl.Collator` with `numeric: true` sorts (symbols and emoji before digits, digits before letters, `Node 9` before `Node 10`, lowercase before uppercase). Nodes without a name come last in both directions.
+- `type`: companion, repeater, room server, sensor, then any other type.
+- `neighbors`: `knownNeighborCount`.
+
+Ties go newest `lastSeen` first, then by `id`. Filters work the same as without `sort`. Page a sorted list with `pageCursor` only: a numeric `cursor`, or a `pageCursor` from another sort or order, is a `400`. A sorted page has no `nextCursor`. An unknown `sort` or `order` is a `400`. A server older than 2.1.0 ignores both and returns pages in `lastSeen` order with no `sort` field; a client that sees no `sort` must sort for itself.
 
 #### MeshMapper repeater details
 
