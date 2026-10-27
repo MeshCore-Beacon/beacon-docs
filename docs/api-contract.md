@@ -129,7 +129,7 @@ Most lists return a page:
 { "items": [ ... ], "nextCursor": 1747665456000, "hasMore": true }
 ```
 
-Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last page. What the cursor holds depends on the list (a timestamp in epoch ms, or an ID), as noted per endpoint. `limit` has a per-endpoint default, must be positive, and is clamped to 200.
+Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last page. What the cursor holds depends on the list (a timestamp in epoch ms, or an ID), as noted per endpoint. `limit` has a per-endpoint default, must be positive, and is clamped to 200 (2000 for `GET /nodes`).
 
 ID cursors are 64-bit integers: the observation ID `cursor` of `/observers/{id}/adverts` and `/nodes/{id}/observations`, telemetry `afterId`, the message ID `cursor` of `/messages`, and the backfill `afterObservationId` and `afterId` ([Backpressure and reconnection](#backpressure-and-reconnection)). The same goes for the IDs they come from. Store and send them as full integers; never narrow them to 32 bits, since a busy server passes 2^31. As JSON numbers they stay exact up to 2^53, so a JavaScript `number` or a Dart `int` holds them.
 
@@ -352,7 +352,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending. Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50. |
+| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending. Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
