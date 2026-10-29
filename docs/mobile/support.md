@@ -5,9 +5,9 @@ packet analyzer.
 
 ## Getting started
 
-The app connects to the public Beacon server at `dev.meshcore.ca` out of the
-box, so live packets, the map and analytics appear right away. To use a
-different Beacon server, open **Settings → Servers** and add its address.
+On first launch, tap **Add server** and enter the address of a Beacon server;
+live packets, the map and analytics then appear right away. To add more servers
+or switch between them, open **Settings → Servers**.
 Running your own server is covered in the
 [deployment guide](https://github.com/MeshCore-Beacon/beacon-docs#readme).
 

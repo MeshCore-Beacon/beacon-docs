@@ -1,4 +1,4 @@
-x-logging: &bounded-logging
+x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
@@ -6,6 +6,7 @@ x-logging: &bounded-logging
 
 services:
   app:
+    logging: *default-logging
     image: ghcr.io/meshcore-beacon/beacon-server:latest
     env_file: .env
     ports:
@@ -18,9 +19,11 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    logging: *bounded-logging
+    # Room for a clean shutdown (docs/operations.md, Stopping the server); Docker's default is 10 s.
+    stop_grace_period: 75s
 
   db:
+    logging: *default-logging
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: beacon
@@ -36,9 +39,9 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    logging: *bounded-logging
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     volumes:
       - ./data/redis/:/data
@@ -50,13 +53,14 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    logging: *bounded-logging
 
   caddy:
+    logging: *default-logging
     image: caddy:2-alpine
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
     environment:
       - DOMAIN=${DOMAIN:?DOMAIN environment variable is required}
       - WEB_DOMAIN=${WEB_DOMAIN:?WEB_DOMAIN environment variable is required}
@@ -71,7 +75,6 @@ services:
       app:
         condition: service_started
     restart: unless-stopped
-    logging: *bounded-logging
 
 # Fixed subnet so data/app/config.yaml can trust Caddy in server.trusted_proxies.
 # Pick another private /24 if this one is already in use on the host.

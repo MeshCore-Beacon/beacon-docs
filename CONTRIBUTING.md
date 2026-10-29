@@ -1,7 +1,7 @@
 # Contributing to Beacon
 
-Thank you for your interest in contributing. This page is the shared workflow for all three
-Beacon repositories:
+Thank you for your interest in contributing. This page is the shared workflow for the
+Beacon application and documentation repositories:
 
 - [beacon-docs](https://github.com/MeshCore-Beacon/beacon-docs), this repo: deployment,
   configuration and operator documentation.
@@ -11,6 +11,8 @@ Beacon repositories:
 - [beacon-web](https://github.com/MeshCore-Beacon/beacon-web): the frontend. Its own
   [CONTRIBUTING.md](https://github.com/MeshCore-Beacon/beacon-web/blob/main/CONTRIBUTING.md)
   covers TypeScript style, tests and the feature layout.
+- [beacon-flutter-app](https://github.com/MeshCore-Beacon/beacon-flutter-app): the canonical
+  Android and iOS client. Use its mobile build and device qualification instructions.
 
 Please read this before opening a PR anywhere.
 
@@ -18,9 +20,9 @@ Please read this before opening a PR anywhere.
 
 **Talk first for anything bigger than a small fix.** On beacon-server and beacon-web, open or
 comment on an issue before starting work, so maintainers can say if something is already in
-progress or out of scope. Issues are disabled on beacon-docs; for a docs restructure, a new
-deployment type or a correction you are unsure about, reach out on the
-[MeshCore Canada Discord](https://discord.gg/Gz3KvJx2hf). For typos, broken links and small
+progress or out of scope. For a docs restructure, a new deployment type or a correction
+you are unsure about, open an issue in beacon-docs and link any affected application issues.
+For typos, broken links and small
 clarifications, just open a PR.
 
 **One thing per PR.** Each pull request covers one logical change: a bug fix, a new endpoint, a
@@ -33,17 +35,16 @@ appear to be unreviewed AI output may be closed without further comment.
 
 ## Branches
 
-beacon-server and beacon-web:
+Every Beacon repo, docs included:
 
 - `main` holds stable releases only and is protected. Never target it directly.
 - `dev` is active development. All PRs target `dev`.
 
-beacon-docs has only `main`. PRs target `main`, and the docs there describe the current
-release.
+In beacon-docs, `main` describes the current release and `dev` describes what is coming next.
 
 ## Workflow
 
-1. Fork, or create a branch from `dev` (code repos) or `main` (docs).
+1. Fork, or create a branch from `dev`.
 2. Make your change.
 3. Run that repo's checklist (below for docs; in each code repo's CONTRIBUTING for code).
 4. Open a pull request with a clear description of what changed and why, referencing any

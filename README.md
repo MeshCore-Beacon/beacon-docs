@@ -8,6 +8,15 @@ This repo is where you deploy and operate it. The code lives in
 [beacon-server](https://github.com/MeshCore-Beacon/beacon-server) (the API and ingest) and
 [beacon-web](https://github.com/MeshCore-Beacon/beacon-web) (the frontend).
 
+The [project roadmap and maintainer handoff](docs/project-roadmap.md) maps current
+repositories, issues, PRs and the staged route to live.
+
+The proposed paired backend, basic Atlas and Topology release is described in the
+[core performance candidate](docs/performance-release-candidate.md), including
+validation, operational budgets and remaining release gates.
+The separate [optional collection guide](docs/telemetry-collection.md) covers
+mobile/headless clients, intake, sensor cards and their qualification gates.
+
 > **Coming from 1.x?** 2.0.0 needs a fresh database and a few config changes. Read
 > [Upgrading](docs/upgrading.md) before you pull new images.
 
@@ -16,8 +25,8 @@ The [experimental roadmap](docs/post-140-roadmap.md) and [integration guide](doc
 ## Deploy the all-in-one stack
 
 One server runs everything: the API, Postgres, Redis, the web frontend and Caddy with automatic
-HTTPS. You need a domain pointed at the server, ports 80 and 443 open, Docker with the compose
-plugin, and a subscriber account on a MeshCore MQTT broker
+HTTPS. You need a domain pointed at the server, TCP ports 80 and 443 and UDP port 443 open,
+Docker with the compose plugin, and a subscriber account on a MeshCore MQTT broker
 ([where packets come from](docs/getting-packets-in.md)).
 
 If you would rather run the API and the web frontend on different hosts, see
@@ -104,7 +113,9 @@ Every other key, with its default, is documented in
 ### 4. Point DNS at the server
 
 Create an `A` or `AAAA` record for `DOMAIN` pointing at the server's public IP. Caddy needs
-ports 80 and 443 reachable from the internet to get its certificate.
+ports 80 and 443 reachable from the internet to get its certificate. Open UDP 443 too, in the
+host firewall and any cloud security group, so browsers can use
+[HTTP/3](docs/reverse-proxy.md#http3).
 
 ### 5. Bring it up
 
@@ -157,6 +168,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 - [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
+- [My Atlas](docs/my-atlas.md): the per-browser node watchlist and what its cards mean.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
 **Change it**
