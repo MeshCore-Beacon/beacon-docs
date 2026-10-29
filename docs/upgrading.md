@@ -156,11 +156,12 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading to 2.1
 
-Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `060` at startup,
+Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `061` at startup,
 adds two read models that region and scope pages are served from, and drops indexes and one
 column nothing reads any more. No config change is required. Beacon Web must move to 2.1 at the
-same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). The minimum app
-version stays 2.0.0, so installed apps keep working.
+same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). BEACON Mobile
+needs 2.1 too (`minAppVersion` is 2.1.0; an older release build shows the update screen). Beta
+builds are never blocked, so installed betas keep working.
 
 The upgrade has two phases. First the server runs its migrations while the API and ingest are
 down. Then it serves the API again and fills the read models in the background; until each one
@@ -226,7 +227,7 @@ routes, 30 million observations and 3 million packets; default pacing):
 | Step | Time |
 |---|---|
 | Pre-building the eight indexes, old version still serving | 1 min 50 s (route hop index 72 s, adverts index 16 s, the rest under 8 s each) |
-| Migrations `004` to `053` at startup (a 2.1 development build; the release adds `054` to `060`, a few seconds more) | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
+| Migrations `004` to `053` at startup (a 2.1 development build; the release adds `054` to `061`, a few seconds more) | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
 | API and ingest down | about 15 s |
 | Channel message pages by site back | 8 min after startup |
 | Observer advert pages | at once (no untyped observations) |
