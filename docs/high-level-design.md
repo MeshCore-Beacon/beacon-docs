@@ -664,7 +664,7 @@ bounded batches:
 | Observer telemetry | `telemetry.retention` | `744h` (31 days) |
 | Nodes not heard from | `nodes.delete_after` | `720h` (30 days) |
 | Observers not heard from | `observers.delete_after` | off (opt in; only with one ingest process per database) |
-| Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the `background.reconfirm` task |
+| Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the route retention task, run every `background.reconfirm` |
 
 Changing a value needs a restart.
 
@@ -761,7 +761,7 @@ retention under 24h) fail startup rather than being ignored.
 
 IATAs are still auto-created when packets arrive from unrecognized codes. The config file is only needed to override the default display name/coordinates, or to assign an IATA to a super-region.
 
-Channel hashes also auto-populate as messages arrive; adding a key in the config decrypts the stored hash-only rows for that channel on the next startup.
+Channel hashes also auto-populate as messages arrive; adding a key in the config decrypts the stored hash-only rows for that channel after the next startup, in the background.
 
 ### Admin API and access control
 
@@ -770,7 +770,7 @@ Public reads and the WebSocket need no credentials. The `/api/v1/admin/*` subtre
 returns 503. It currently covers inspecting the running config and replacing CORS origins at runtime,
 operator account records (no login or sessions yet), and the backup download below.
 
-`/api/v1/*` is rate limited per client IP (`ratelimit:`, 300/min by default, IPv6 grouped by /64).
+`/api/v1/*` is rate limited per client IP (`ratelimit:`, 600/min by default, IPv6 grouped by /64).
 WebSocket upgrades have their own per-IP rate and concurrency limits and a same-origin check
 (`websocket:`). The client IP is the TCP peer, or `X-Real-IP` when the peer is listed in
 `server.trusted_proxies`; `X-Forwarded-For` and `True-Client-IP` are never trusted.

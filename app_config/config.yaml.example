@@ -33,17 +33,63 @@ server:
   # With additional proxy hops, first configure their trust at the edge proxy
   # and pass its validated client address rather than a client-supplied header.
   trusted_proxies: []
+  # Address of the admin listener serving Prometheus /metrics, e.g. 127.0.0.1:9090
+  # (0.0.0.0:9090 inside Docker, published on the host's 127.0.0.1 only). Off when empty.
+  # It has no authentication: bind it to a private interface.
+  admin_listen: ""
+  # read_only: true boots a server that never writes: no migrations, no ingest, no background jobs, no
+  # MeshMapper imports, and every database session is read-only. Used to compare two builds on one database.
+  read_only: false
 
 # Applies to /api/v1/* only. Both counters are local to this Beacon instance.
 # Set trusted_proxies correctly before using a reverse proxy, or clients share
 # the proxy's budget. IPv6 clients share a /64 budget to prevent address rotation.
 ratelimit:
   enabled: true
-  requests_per_minute: 300
+  requests_per_minute: 600
   # Maximum requests in a one-second sliding window, not token-bucket capacity.
   # Omitted/zero defaults to requests_per_minute. Negative limits prevent startup.
   # A 429 returns error.code=rate_limited and Retry-After (1 or 60 seconds).
-  burst: 300
+  burst: 600
+
+# Database pools. custom_all (default) opens api_legacy 8, api_custom 8, ingest 6, maint 4 connections
+# (26); split opens 30 (api_custom 7, api_cached 5); single opens 18 (api_legacy, ingest, maint).
+# ingest grows to one connection per CPU on hosts with more than 6 CPUs, adding to each total.
+# Keep max_connections well above that. A pool_max_conns in POSTGRES_DSN is overridden.
+#database:
+#  # custom_all (default): every API statement gets a custom plan.
+#  # split: statements admitted to the generic-plan class (GetNodeByID, GetObserverTelemetrySince,
+#  #   ListKnownRoutesByIATA, ListKnownRoutesGlobal, ListObserverAdverts, ListPacketsByTypes,
+#  #   ListPacketsPage) run on cached generic plans. Keep custom_all unless the plan check is clean.
+#  # single: rollback. One API pool on the previous settings; every guard family observes.
+#  api_plan_layout: custom_all
+
+# Cost guards on the public /api/v1 group (not /admin, not /ws). Every family observes by default:
+# nothing is refused, only beacon_guard_would_refuse_total counts. Listed families enforce:
+# 429 (4 concurrent DB requests per client, 5 s wait), 503 (pool busy 5 s; class deadline 5/10/30 s).
+# Families: routes, channel_messages, packets_global, packets_region, packets_window,
+#           packet_detail, stats, other. PUT /api/v1/admin/config changes the list at runtime;
+#           a restart reloads this one.
+#guards:
+#  enforce: []
+#  budget: shadow   # the per-client DB-time budget only records; enforcement is not available
+
+# Daily read-only plan regression check (GET /api/v1/admin/db/planguard, beacon_planguard_* metrics).
+# Enable on large deployments; plan expectations assume production-sized tables.
+# Cannot be enabled together with server.read_only.
+#planguard:
+#  daily_check: false
+
+# Read models. cmi is channel_message_iatas, one row per channel message and site that heard it; region
+# and scope message pages read it once this process trusts it. enabled: false serves every page from the
+# previous statements; the table is still maintained, so turning it back on needs only a restart.
+#readmodels:
+#  cmi:
+#    enabled: true
+#  packet_sites:
+#    # Serve region packet pages (iatas, region) from packet_sites once this process has repaired and verified
+#    # it. false serves them from the original statement; the table is still maintained and swept.
+#    enabled: true
 
 # MeshMapper integrations (optional, require a regional or grouped-region API key).
 # Your local MeshMapper regional or grouped-region admin can generate the key.
@@ -111,6 +157,20 @@ ratelimit:
 #  channels:
 #    enabled: false
 #    refresh_interval: 24h # 24h-168h (one get_channels.php per region per 23.5h)
+#
+# Repeater site details (get_repeaters.php). Every known IATA that MeshMapper
+# lists is fetched from its site, the same way as channels. Each repeater's
+# admin-entered site details (power, hardware, antenna, heights, power source,
+# notes), CARpeater flag, admin names, confirmed scopes and default scope are
+# shown on node detail as `meshmapper`, matched by full public key. Positions,
+# status and radio data are not imported. A failed refresh keeps the last good
+# list and retries after 1h (or Retry-After); an empty list clears the region.
+# Each request counts against the key's shared budget (1,000/day, 30/min), so
+# 6h costs 4 requests per IATA per day. Turning it off deletes the import on
+# restart. Logged under component=meshmapper.repeaters.
+#  repeaters:
+#    enabled: false
+#    refresh_interval: 6h # 1h-24h
 
 iatas:
   YVR:

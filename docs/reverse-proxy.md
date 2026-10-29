@@ -45,6 +45,29 @@ server:
   trusted_proxies: [172.30.0.0/24]
 ```
 
+### HTTP/3
+
+Caddy serves HTTP/3 (QUIC) by default and announces it in an `alt-svc` header. QUIC runs on
+UDP, so the compose files publish `443:443/udp` next to `443:443`. Open UDP 443 wherever TCP
+443 is open: the host firewall and the cloud provider's security group. HTTP/3 helps most on
+lossy mobile links: a lost packet no longer holds up every request on the connection, and
+connections start faster and survive a change of network.
+
+After `docker compose up -d`, responses carry the header:
+
+```bash
+curl -sI https://beacon.example.com/ | grep -i alt-svc
+# alt-svc: h3=":443"; ma=2592000
+```
+
+Caddy sends it even when UDP is blocked, so it only shows that HTTP/3 is on. To see HTTP/3 get
+through, open the browser's network panel and reload the page, more than once if needed: the
+Protocol column shows `h3`. A curl built with HTTP/3 (`curl -V` lists `HTTP3`) checks it
+directly with `curl --http3-only -sI https://beacon.example.com/`.
+
+Nothing breaks where UDP is blocked, by your firewall or the visitor's network: browsers fall
+back to HTTP/2. The nginx and Apache setups below have no HTTP/3.
+
 ## Behind a CDN
 
 Behind Cloudflare or another CDN, `{remote_host}` is the CDN, not the visitor. The comment at

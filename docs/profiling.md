@@ -31,8 +31,8 @@ services:
 
 - A 30-second sample at start, another 35 minutes later, then every 30 minutes (the extra
   five minutes keeps a maintenance trigger from landing in the cooldown).
-- An extra sample when route reconfirmation maintenance starts (including its retention
-  step).
+- An extra sample when the route retention run starts (every `background.reconfirm`, default
+  hourly). The 5-minute route reconfirm sweep does not request one.
 - A five-minute cooldown between capture starts. A periodic sample due during it runs when it
   ends; a triggered one is skipped, and any sample cancels a periodic one that's waiting.
 - Background task stacks carry a `task` label.

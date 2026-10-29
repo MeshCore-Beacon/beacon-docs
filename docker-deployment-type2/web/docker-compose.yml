@@ -4,6 +4,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
     environment:
       - DOMAIN=${DOMAIN:?DOMAIN environment variable is required}
     volumes:

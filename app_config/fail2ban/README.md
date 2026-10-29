@@ -73,9 +73,12 @@ there must be an obvious scraper, otherwise raise `maxretry`.
 
 **Enforce.** Caddy box: traffic to Docker-published ports is DNAT'ed through the FORWARD path, which
 the default nftables action (input hook) never sees, so switch to
-`banaction = nftables[type=allports, chain=f2b-forward, chain_hook=forward]` (a second chain in the
-existing `f2b-table`; `iptables-allports[chain=DOCKER-USER]` is equivalent). Apache box: remove the
-`dummy` line, the inherited nftables input-hook action works because Apache listens on the host.
+`banaction = nftables[type=allports, protocol="tcp,udp", chain=f2b-forward, chain_hook=forward]`
+(a second chain in the existing `f2b-table`;
+`iptables-allports[chain=DOCKER-USER, protocol="tcp,udp"]` is equivalent). The action bans TCP
+only by default; `protocol="tcp,udp"` also stops a banned address reaching Caddy over HTTP/3 on
+UDP 443. Apache box: remove the `dummy` line, the inherited nftables input-hook action works
+because Apache listens on the host.
 Then:
 
 ```bash
@@ -85,9 +88,10 @@ sudo fail2ban-client set beacon-api-flood banip <phone-on-cellular>   # site unr
 sudo fail2ban-client set beacon-api-flood unbanip <phone-on-cellular>
 ```
 
-beacon-server's own per-IP limit (`ratelimit.requests_per_minute`, 300 by default) answers first
-with 429s; the flood `maxretry` of 900 is 3× that allowance. Re-derive it if you change the server
-limit. Consider `bantime.increment` only after a clean week.
+beacon-server's own per-IP limit (`ratelimit.requests_per_minute`, 600 by default) answers first
+with 429s; the flood `maxretry` of 900 sits 1.5× above that allowance, so only a client that keeps
+going after its 429s gets banned (the web app waits out Retry-After). Re-derive it if you change the
+server limit. Consider `bantime.increment` only after a clean week.
 
 ## 3. Finding scrapers by hand
 
