@@ -134,13 +134,34 @@ ratelimit:
 Then run `docker compose restart app`. If you run the [fail2ban jails](../app_config/fail2ban/README.md),
 the flood jail's `maxretry` of 900 still sits above the new limit.
 
+## HTTP/3 needs UDP 443
+
+The compose files now publish UDP 443 so Caddy can serve HTTP/3. An existing deployment keeps
+its own `docker-compose.yml`, so add the UDP line to the `caddy` service by hand (on both hosts
+of a split deployment):
+
+```yaml
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+```
+
+Open UDP 443 in the host firewall and any cloud security group, then run
+`docker compose up -d caddy`, which recreates the Caddy container. [HTTP/3](reverse-proxy.md#http3)
+shows how to check it. If you enforce the [fail2ban jails](../app_config/fail2ban/README.md),
+add `protocol="tcp,udp"` to the ban action as shown there: the default bans TCP only, so a
+banned address could still reach the site over HTTP/3.
+
 ## Upgrading to 2.1
 
-Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `053` at startup,
+Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `061` at startup,
 adds two read models that region and scope pages are served from, and drops indexes and one
 column nothing reads any more. No config change is required. Beacon Web must move to 2.1 at the
-same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). The minimum app
-version stays 2.0.0, so installed apps keep working.
+same time (`minWebVersion` is 2.1.0; an older web build shows the reload screen). BEACON Mobile
+needs 2.1 too (`minAppVersion` is 2.1.0; an older release build shows the update screen). Beta
+builds are never blocked, so installed betas keep working.
 
 The upgrade has two phases. First the server runs its migrations while the API and ingest are
 down. Then it serves the API again and fills the read models in the background; until each one
@@ -159,7 +180,7 @@ then show an error with a retry button.
    `readmodels.fill.duty: 0.25` and `readmodels.fill.packet_sites_slice: 100000` in `config.yaml`
    before upgrading. At full speed the first fill can stall such a machine; paced, it takes
    longer but the server stays responsive. See [Pacing the backfills](operations.md#pacing-the-backfills).
-4. **Connections.** The server now opens one pool per workload: 20 connections by default, plus
+4. **Connections.** The server now opens one pool per workload: 18 connections by default, plus
    one for each CPU above 6. Check that Postgres `max_connections` leaves room for that and your
    own sessions; see [Database pools and connections](operations.md#database-pools-and-connections).
 5. **Large deployments only** (tens of millions of routes, hundreds of millions of observations):
@@ -170,7 +191,12 @@ then show an error with a retry button.
    - [the four packets indexes](operations.md#pre-building-the-packets-indexes),
    - [the observer adverts index](operations.md#pre-building-the-observer-adverts-index).
 
-   Everyone else can skip this: the server builds them at startup.
+   Everyone else can skip this: the server builds them at startup. The five indexes of
+   [`054` to `057` and `059`](operations.md#indexes-for-deep-region-and-message-pages-054-to-057-059)
+   need no pre-build: four build on tables the same startup creates, and
+   `idx_channel_messages_sent` reads `channel_messages` in well under a second. A server already
+   on a 2.1 development build builds all five on full tables in a few seconds; pre-build them
+   there only if you want, with the text in that section.
 6. Run the [pre-deploy check](operations.md#before-deploying-a-release) (no long transactions,
    no anti-wraparound vacuum, no `pg_dump` running), and pick a quiet hour.
 
@@ -201,16 +227,18 @@ routes, 30 million observations and 3 million packets; default pacing):
 | Step | Time |
 |---|---|
 | Pre-building the eight indexes, old version still serving | 1 min 50 s (route hop index 72 s, adverts index 16 s, the rest under 8 s each) |
-| Migrations `004` to `053` at startup | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
+| Migrations `004` to `053` at startup (a 2.1 development build; the release adds `054` to `061`, a few seconds more) | 7.4 s (the two `packets` checks 3.7 s and 1.8 s) |
 | API and ingest down | about 15 s |
 | Channel message pages by site back | 8 min after startup |
 | Observer advert pages | at once (no untyped observations) |
 | Region packet pages back | 50 min after startup |
 | Database size | 91 GB before, 71 GB after |
 
-The region packet fill walks the whole observation id range, newest to oldest, so a database that
-still holds a few very old observations fills for longer than its row count suggests, and the
-`eta` in its progress lines overstates the time left.
+That development build walked the whole observation id range in fixed id slices, so the few very
+old observations the database still held stretched its fill and its `eta`. The release slices the
+fill by observations instead and reports progress and `eta` in rows (see
+[Pacing the backfills](operations.md#pacing-the-backfills)); on a copy of the same data it needs
+about 60 slices instead of 1,533.
 
 Watch the log for these lines; each one ends a phase:
 
@@ -229,15 +257,22 @@ see [Pages that wait for a read model](operations.md#pages-that-wait-for-a-read-
 - **Ingest cost.** Each stored observation now costs about 15 to 21 % more insert time and 37 to
   53 % more WAL. Watch `beacon_ingest_queue_depth` for the first hours; see
   [Ingest cost](operations.md#ingest-cost).
-- **Alerts.** Load the read-model `Untrusted` rules, `BeaconAdvertsNotReady`,
-  `BeaconSlowPoolBusy` and the sequence rules from
+- **Alerts.** Load the read-model `Untrusted` rules, `BeaconAdvertsNotReady` and the sequence
+  rules from
   [Example alert rules](operations.md#example-alert-rules).
 - **Route maintenance.** The first route retention run after the upgrade is a full pass; on a
   large deployment it takes 12 to 14 minutes in short statements. See
   [After upgrading: route maintenance](operations.md#after-upgrading-route-maintenance).
 - **Optional, large deployments, once, off-peak:**
-  [compact `observers` and `channels`](operations.md#after-upgrading-compacting-observers-and-channels)
+  [compact `observers`, `channels` and `nodes`](operations.md#after-upgrading-compacting-observers-and-channels)
   and [rebuild the route keyset indexes](operations.md#rebuilding-the-route-keyset-indexes).
+- **Stats pages.** Top nodes, top advertisers and paths for a region get faster as hours rolled
+  before the upgrade leave the window: fully within 7 days for the default view. See
+  [After upgrading: stats rollup row order](operations.md#after-upgrading-stats-rollup-row-order)
+  for an optional one-off `CLUSTER` that heals it at once.
+- **Stop grace period.** If you run your own compose file, give the `app` service
+  `stop_grace_period: 75s` (Docker's default is 10 s), so a stop finishes storing what ingest has
+  queued; see [Stopping the server](operations.md#stopping-the-server).
 - **Plan checks.** Turn on the [daily plan check](operations.md#turning-on-the-daily-check) only
   after the upgrade, if you want it.
 
@@ -258,6 +293,15 @@ To go back to 2.0.7, two objects it needs must come back first, because migratio
 ALTER TABLE known_routes ADD COLUMN last_reconfirmed_at timestamp with time zone DEFAULT now() NOT NULL;
 CREATE INDEX CONCURRENTLY idx_observations_observer_id ON packet_observations USING btree (observer_id, id);
 SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid = 'idx_observations_observer_id'::regclass;
+```
+
+Also clear clock drifts an older server cannot read: `060` lets drifts exceed the 32-bit range, and
+2.0.7 fails node detail and the clock-drift stats on such a row. It is a few rows at most, and
+each node measures its drift again on its next advert:
+
+```sql
+UPDATE nodes SET device_clock_drift_seconds = NULL
+WHERE device_clock_drift_seconds NOT BETWEEN -2147483648 AND 2147483647;
 ```
 
 The `ALTER` is a catalog change (milliseconds, brief lock on `known_routes`). Run the `CREATE` on
@@ -304,13 +348,39 @@ See [Read models: packets by site](operations.md#read-models-packets-by-site).
 
 #### Pools, dropped indexes and a dropped column (`046` to `053`)
 
-- `api_legacy` opens only under the `single` layout. `api_slow` (2 connections by default,
-  `database.slow_pool_size`, 120 s statement limit) runs the few statements that may read whole
-  site histories; see
-  [Slow region and message statements](operations.md#slow-region-and-message-statements).
+- `api_legacy` opens only under the `single` layout. The 2.1 development builds also had an
+  `api_slow` pool and a `database.slow_pool_size` key; both are gone (see below).
 - `046` drops `idx_observations_observer_id`, `047` to `052` drop six cold lookup-table indexes,
   and `053` drops `known_routes.last_reconfirmed_at`. Every 2.0.x image reads or writes that
   column, hence the rollback steps above.
+
+#### Deep region and message pages (`054` to `057`, `059`)
+
+Region `/packets` pages with a `since`/`until` window or scopes seek from the window instead of
+reading each site from its newest row, and `/messages` with `iatas` and `since` or `scope` read
+`channel_message_iatas`; no page reads a whole site history in one statement any more. Two
+partial indexes on `packet_sites` (`054`, `055`), one on `channel_message_iatas` (`056`), one on
+`channel_messages` (`057`), and one on the scoped rows of `packet_sites` for a scope with a type
+filter (`059`, 61 MB on a large deployment). Pages are full until the last; rows, order and cursors
+are unchanged. On production the busiest region with `until` 24 hours back took 48-51 s before;
+on a production-size copy it went from 131,591 buffers to 2,442. See
+[Deep region and message pages](operations.md#deep-region-and-message-pages).
+
+The 2.1 development builds ran those pages on a two-connection `api_slow` pool. It is gone, and
+so is `beacon_api_unavailable_total{reason="slow_pool_busy"}` (and the `BeaconSlowPoolBusy`
+alert in the examples). A `database.slow_pool_size` left in `config.yaml` is ignored, with a
+`WARN` at startup; remove it. The default connection total drops from 20 to 18 (22 under
+`split`).
+
+#### Nodes table (`058`, `060`)
+
+`058` sets `fillfactor = 50` on `nodes` so the `last_seen` update of every advert can stay on its
+page (fewer index writes, about half the WAL); it changes settings only and applies to pages
+written from then on. `060` widens `nodes.device_clock_drift_seconds` to `bigint`, so device
+clocks more than about 68 years off are stored as they are instead of wrapping; it rewrites
+`nodes` once at startup (about 0.1 s for 70,000 nodes). See
+[How startup migrations wait for locks](operations.md#how-startup-migrations-wait-for-locks) and,
+before going back to 2.0.x, the extra step in [Rolling back from 2.1](#rolling-back-from-21).
 
 #### Read-model pages without fallback
 
@@ -318,17 +388,60 @@ Region `/packets` pages, channel message pages filtered by `iatas` (or by `scope
 `since`), and observer advert pages are served only from their read model or backfilled data.
 While that is not ready they answer `503` with `Retry-After: 30`; there is no fallback to the
 previous statements. The kill switches above turn those pages off instead of serving them from
-the previous statements. A page whose statement runs past its pool's limit answers `503` with
-`Retry-After: 10`. To get the fallbacks back, revert their one server commit; see
+the previous statements. To get the fallbacks back, revert their two server commits; see
 [Reverting to the read-model fallbacks](operations.md#reverting-to-the-read-model-fallbacks).
+
+#### Packet sites fill counts observations
+
+The `packet_sites` first fill slices by observations instead of observation ids, so the few
+old observations far below the live ids no longer cost a paced slice per 500,000 ids, and its
+progress line adds `observations_done` and `observations_remaining` (planner estimates) and
+bases `eta` on them. `readmodels.fill.packet_sites_slice` keeps its default and range but now
+counts observations. The hourly audit and the first-time verification pick their random older
+slice by observations too, so on a database with a long, sparse old id range they check real
+rows. The observation payload-type backfill's progress line gains the same `observations_*`
+estimates and bases its `eta` on them.
+
+#### Statement timeouts answer 503
+
+Every `/api/v1` read whose statement runs past its pool's limit (35 s)
+now answers `503` `deadline_exceeded` with `Retry-After: 10` instead of a `500`. The heavy
+stats endpoints and route searches already answered `503` when their own time limit ran out;
+that `503` now carries `Retry-After: 10` and code `deadline_exceeded` (was
+`service_unavailable`), and also covers a statement timeout. Web and app retry it like the other
+`503`s. In the server log a timeout is one `request complete` line at `WARN` with `status=503`
+instead of an `ERROR` pair; a real `500` still logs `api: error 500: <message>` at `ERROR`, now
+with the database error in `error`. Every timeout `503` is counted in
+`beacon_api_unavailable_total{reason="timeout"}`: under the read model a page reads, or
+`model="none"` for the other pages.
+
+#### Runtime image on Alpine 3.24
+
+The server image moved from Alpine 3.19, which is out of support, to Alpine 3.24 with the
+PostgreSQL 16 client tools. Nothing to change for a PostgreSQL 16 database. A self-built image
+with `POSTGRES_CLIENT_MAJOR=17` or `18` now works too; see
+[Backup export](backup-export.md).
+
+#### Channel message backfill after startup
+
+The retry of stored, undecrypted channel messages against the configured keys no longer
+delays startup: it runs in the background once the server listens. On a slow disk that was
+most of the boot time (reading every undecrypted packet), so MQTT ingest and the API start
+sooner. Its log lines changed: `config: backfilled N previously-undecrypted channel
+message(s)` is now `channel message backfill started` (with `packets`) and `channel message
+backfill done: N previously-undecrypted channel message(s)`, logged on every run. Keys that a
+MeshMapper import adds queue on the same job. A message a live hearing decrypts first, before
+the backfill reaches its packet, is stored once and its earlier hours are re-rolled, as the
+backfill does.
 
 ## Changes that need a restart
 
 Beacon reads `config.yaml` once at startup. After editing it, run
 `docker compose restart app`. On the next start:
 
-- A newly added channel key decrypts the matching stored messages. Look for
-  `config: backfilled N previously-undecrypted channel message(s)` in the log.
+- A newly added channel key decrypts the matching stored messages, in the background once
+  the server listens. Look for
+  `channel message backfill done: N previously-undecrypted channel message(s)` in the log.
 - Border file and MeshMapper import changes take effect.
 - Changed admin or MeshMapper keys in the YAML file are picked up.
 

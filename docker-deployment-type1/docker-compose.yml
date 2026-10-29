@@ -19,6 +19,8 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # Room for a clean shutdown (docs/operations.md, Stopping the server); Docker's default is 10 s.
+    stop_grace_period: 75s
 
   db:
     logging: *default-logging
@@ -58,6 +60,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
     environment:
       - DOMAIN=${DOMAIN:?DOMAIN environment variable is required}
     env_file: .env

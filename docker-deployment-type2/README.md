@@ -12,7 +12,8 @@ docker-deployment-type2/
 
 ## What you need
 
-- Two hosts with Docker and ports 80 and 443 open.
+- Two hosts with Docker, TCP ports 80 and 443 and UDP port 443 open (UDP is for
+  [HTTP/3](../docs/reverse-proxy.md#http3)).
 - Two DNS names pointing at them, for example `api.example.com` and `beacon.example.com`.
 - A subscriber account on a MeshCore MQTT broker. See
   [Getting packets in](../docs/getting-packets-in.md).
