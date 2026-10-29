@@ -60,7 +60,7 @@ Retry-After: 5
 
 The body is the usual error envelope. Wait at least `Retry-After` seconds before retrying; a `deadline_exceeded` request will likely run as long again, so narrow it (a shorter window, a region) rather than repeat it. Clients are keyed by IP after the trusted-proxy step above.
 
-Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s; 120 s for the slow region and message statements) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers route evidence (`/routes/{iata}/{pathKey}/observations`) and the [background-data pages](#pages-that-wait-for-server-data) (region packets, region and scope messages, observer adverts). Other endpoints still answer `500` in that case.
+Separately from the guards, and on every server, a page whose database statement runs past its pool's statement limit (35 s) answers `503` with code `deadline_exceeded` and `Retry-After: 10`. This covers every `/api/v1` endpoint that reads the database; account, backup and plan-check admin routes keep their own errors. The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) and route searches (`/routes/search`, `/routes/cross`) answer the same `503` when their own request time limit runs out, with a message that names the query. Any other failed read is a `500` without `Retry-After`.
 
 Each request falls in one family and one class:
 
@@ -91,10 +91,10 @@ Some pages are served only from data the server prepares in the background. Whil
 | Pages | Ready when |
 |---|---|
 | `/packets` with `iata`, `iatas`, `region` or `regionId`, without `hashPrefix` (region pages) | the server trusts its `packet_sites` read model |
-| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` and neither `since` nor `scope`, or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
+| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` (with or without `since` or `scope`), or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
 | `/observers/{observerId}/adverts` | every observation carries its payload type |
 
-That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` reads no read model and is always served, on a small pool of its own. The same pool answers trusted region `/packets` pages whose filter is too sparse for the read model's bounded reads. When that pool is busy, those requests answer `503` `service_unavailable` with `Retry-After: 5`.
+That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` is in the table since 2.1: development builds of 2.1 served it from the observations whatever the read model's state, and answered `503` with `Retry-After: 5` when that pool was busy; that `503` is gone.
 
 ```
 HTTP/1.1 503 Service Unavailable
@@ -117,7 +117,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). The heavy stats endpoints (`series`, `signal`, `paths`, `observer-comparison`) return `503` when the query times out; try a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
@@ -129,7 +129,7 @@ Most lists return a page:
 { "items": [ ... ], "nextCursor": 1747665456000, "hasMore": true }
 ```
 
-Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last page. What the cursor holds depends on the list (a timestamp in epoch ms, or an ID), as noted per endpoint. `limit` has a per-endpoint default, must be positive, and is clamped to 200.
+Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last page. What the cursor holds depends on the list (a timestamp in epoch ms, or an ID), as noted per endpoint. `limit` has a per-endpoint default, must be positive, and is clamped to 200 (2000 for `GET /nodes`).
 
 ID cursors are 64-bit integers: the observation ID `cursor` of `/observers/{id}/adverts` and `/nodes/{id}/observations`, telemetry `afterId`, the message ID `cursor` of `/messages`, and the backfill `afterObservationId` and `afterId` ([Backpressure and reconnection](#backpressure-and-reconnection)). The same goes for the IDs they come from. Store and send them as full integers; never narrow them to 32 bits, since a busy server passes 2^31. As JSON numbers they stay exact up to 2^53, so a JavaScript `number` or a Dart `int` holds them.
 
@@ -139,8 +139,8 @@ A few lists return a plain array instead: the backfill endpoints, `/routes*`, `/
 
 A numeric `cursor` holds a millisecond, so rows that share the last row's millisecond can fall
 between two pages. `/packets`, `/nodes`, `/observers` and `/channels` also return
-`nextPageCursor` on a page with `hasMore`: an opaque string of at most 160 characters that marks
-the exact last row. Send it back as `pageCursor`. A walk by `pageCursor` returns every row once,
+`nextPageCursor` on a page with `hasMore`: an opaque string of at most 160 characters (512 on a
+sorted `/nodes` list) that marks the exact last row. Send it back as `pageCursor`. A walk by `pageCursor` returns every row once,
 including those ties. Don't parse or build it; today it reads `v1:<epoch µs>:<packet hash hex>`
 on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
 
@@ -352,12 +352,20 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending. Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50. |
+| `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending, or in a `sort` order (see below). Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
-`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`) and, when `nodes.mark_foreign` is on, `possiblyForeign`.
+`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
+
+Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or `neighbors`, and `order` is `asc` (the default) or `desc`; `lastSeen` is `desc` only. Every page says which order it is in with `sort` and `order` (`lastSeen` and `desc` by default). The orders match what the web's node table shows:
+
+- `name`: natural order, as `Intl.Collator` with `numeric: true` sorts (symbols and emoji before digits, digits before letters, `Node 9` before `Node 10`, lowercase before uppercase). Nodes without a name come last in both directions.
+- `type`: companion, repeater, room server, sensor, then any other type.
+- `neighbors`: `knownNeighborCount`.
+
+Ties go newest `lastSeen` first, then by `id`. Filters work the same as without `sort`. Page a sorted list with `pageCursor` only: a numeric `cursor`, or a `pageCursor` from another sort or order, is a `400`. A sorted page has no `nextCursor`. An unknown `sort` or `order` is a `400`. A server older than 2.1.0 ignores both and returns pages in `lastSeen` order with no `sort` field; a client that sees no `sort` must sort for itself.
 
 #### MeshMapper repeater details
 
@@ -567,7 +575,7 @@ Channel keys come from the server config file and, optionally, MeshMapper.
 | `GET /iatas` | All IATAs, including ones created from traffic. `[]` when there are none. |
 | `GET /iatas/{iata}` | One IATA. `404` if unknown or not three letters. |
 | `GET /iatas/{iata}/border` | GeoJSON Feature (Polygon or MultiPolygon, with `bbox`); `204` when the IATA has no border, `404` if the IATA is unknown. |
-| `GET /regions` | Regions in display order. `[]` when none are configured. |
+| `GET /regions` | Regions in display order, each with the same fields as `GET /regions/{regionId}` (`iatas` always present, `[]` for a region with none), so one call resolves every region. `[]` when none are configured. Older servers list only `id`, `slug` and `name`: when `iatas` is missing, fetch each region. |
 | `GET /regions/{regionId}` | One region with its IATAs. `400` for a non-numeric ID, `404` if unknown. |
 | `GET /scopes` | Array of scope names. Location filters narrow it to manual scopes configured for a matching region and imported scopes whose MeshMapper catalogue includes a matching IATA. |
 | `GET /scopes/{name}` | Scope detail (`%23bc` for `#bc`). |
@@ -581,14 +589,18 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50). |
+| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iatas` (comma list, at most 100), `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50, larger values clamp to 200). With neither `iatas` nor `iata`, every IATA. |
 | `GET /routes/search?from=&to=[&iatas=]` | Routes within one IATA between two node hash prefixes. `from`, `to` required (hex, 1–4 bytes; widths may differ). `iatas` optional: comma list, at most 100, omitted = every IATA; the single `iata` is still accepted. At most 500 results, shortest first. `hops` is trimmed to source…destination and `hopCount` = `hops.length`. |
 | `GET /routes/cross?fromHash=&toHash=[&iatas=]` | Routes that cross from one IATA into another. `fromHash`, `toHash` required. `iatas` optional: 2–100 codes, omitted = every IATA. The legacy `fromIata`+`toIata` pair is still accepted, but not together with `iatas`. At most 500 results, sorted by `totalHops`, then `crossHop.lastSeen` newest first. |
 | `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. A lookup past the statement limit answers `503` + `Retry-After` ([Cost guards](#cost-guards)). |
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
-An `iata` that ends in a blank (`YYZ` followed by a space) matches no region and returns `200 []`.
+`iatas` returns the routes of every listed IATA, in the same order and with the same cursors as one IATA's list, so a region pages like a single IATA. Codes are trimmed, uppercased and deduplicated; one that isn't three characters, more than 100 codes, or a list with no codes (`iatas=,`) is a `400`. `iatas` takes precedence over `iata`. An empty `iatas=` counts as absent.
+
+The single `iata` is matched exactly as sent, so lowercase matches nothing. An `iata` that ends in a blank (`YYZ` followed by a space) matches no region and returns `200 []`.
+
+`iatas` is new in 2.1.0: older servers, and 2.1.0 development builds from before it, ignore it and answer with every IATA's routes. A client that asks for a region checks each route's `iata`; when one is outside the list, it pages without `iatas` and filters, as before.
 
 `/routes` and `/routes/search` return a plain array of routes:
 
@@ -707,6 +719,9 @@ clamped to the oldest hour the rollups still hold. An empty region returns zeros
   `{ observerA, observerB, since, until, totalPackets, onlyA, onlyB, both }`.
 - `clock-drift` lists repeaters and room servers whose last advert clock is off by more than
   `nodes.clock_drift_threshold`, worst first. It is current state, not windowed.
+  `clockDriftSeconds` (here and on node detail) is the advert's clock minus the server's, in seconds.
+  A device clock decades off gives values from about -1.8 × 10⁹ to +2.5 × 10⁹ (the negative bound
+  grows over time); every value fits a JSON number exactly.
 - `radio-presets` is `[{ preset, iata, sourceType, count }]`, where `preset` is `freqMhz,bwKhz,sf` and
   `sourceType` is `observer` or `node`; it is rebuilt every `background.view_refresh` (default `1h`).
   `node-types` is `[{ nodeType, nodeTypeName, count }]` over all known nodes.
@@ -895,6 +910,8 @@ The upgrade is checked before anything else:
 - **Connect rate.** Each client IP gets `websocket.max_connects_per_minute` attempts per minute (default 10, IPv6 per /64), failed handshakes included. Over that, the server answers `429` with `Retry-After: 60` and no upgrade.
 - **Origin.** A browser `Origin` must match the request's host, or one of `websocket.allowed_origins`. Anything else gets `403`. Set `allowed_origins` when the web app is served from a different host than the API.
 - **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP. Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
+
+**Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
 
 On connect the server sends a `hello`:
 
