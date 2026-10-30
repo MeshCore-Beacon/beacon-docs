@@ -1,5 +1,10 @@
 # Beacon project roadmap and maintainer handoff
 
+**Current refresh: [29 October 2026](atlas-topology-refresh-20261029.md).** The
+inventory below is the preserved 23 October audit. Its deployed revisions,
+dependency warnings and production findings are historical, not fresh runtime
+claims. The refresh supersedes its candidate composition and qualification status.
+
 **Snapshot: 23 October 2026.** Scope: seven org repositories, seven related forks, all 25 pre-existing open issues and 34 open PRs, current main/dev/dev1 source, and fresh read-only production/dev/dev1/Canadaverse runtime checks. This review also finishes the bounded Topology follow-up already in progress. Tracking issue: [beacon-docs #45](https://github.com/MeshCore-Beacon/beacon-docs/issues/45).
 
 ## Decision summary
