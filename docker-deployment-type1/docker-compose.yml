@@ -1,6 +1,13 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   app:
-    image: ghcr.io/meshcore-beacon/beacon-server:latest
+    logging: *default-logging
+    image: ${BEACON_SERVER_IMAGE:?Set BEACON_SERVER_IMAGE to the reviewed server tag or digest}
     env_file: .env
     ports:
       - "127.0.0.1:8080:8080"
@@ -16,6 +23,7 @@ services:
     stop_grace_period: 75s
 
   db:
+    logging: *default-logging
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: beacon
@@ -33,6 +41,7 @@ services:
     restart: unless-stopped
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     volumes:
       - ./data/redis/:/data
@@ -46,6 +55,7 @@ services:
     restart: unless-stopped
 
   caddy:
+    logging: *default-logging
     image: caddy:2-alpine
     ports:
       - "80:80"
@@ -66,7 +76,8 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/meshcore-beacon/beacon-web:latest
+    logging: *default-logging
+    image: ${BEACON_WEB_IMAGE:?Set BEACON_WEB_IMAGE to the reviewed web tag or digest}
     env_file: .env
     environment:
       - VITE_API_BASE=${VITE_API_BASE:?VITE_API_BASE environment variable is required}
