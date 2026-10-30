@@ -6,7 +6,8 @@ Atlas sensor cards are a separate dependent change. Basic Atlas and Topology do
 not require that optional service.
 
 See the [21 October qualification record](release-qualification-20261021.md)
-for the paired drafts, exact preview build, measurements and remaining gates.
+for historical measurements and the [29 October refresh](atlas-topology-refresh-20261029.md)
+for current source composition, migration qualification and remaining gates.
 
 ## What the core changes
 
@@ -14,8 +15,8 @@ for the paired drafts, exact preview build, measurements and remaining gates.
 | --- | --- |
 | Database baseline | Retains current upstream bigint cursors, exact pagination, workload pools, route/index cleanup, regional read models and trust/recovery rules |
 | First-fill work | Preserves duty pacing while bounding individual boot writes, serializing their disk work and retrying smaller ranges on statement pressure |
-| Channel history | HTTP/MQTT startup no longer waits for a full historical decrypt scan. A scheduled job scans at most 500 primary-key candidates per tick, within a five-second work context, saving its cursor after successful work |
-| Imported channel keys | A changed key-set fingerprint restarts the resumable history pass. Metadata changes alone do not start another scan. Backfilled messages remain historical and are not broadcast as new chat |
+| Channel history | Uses upstream's deferred `DecryptBackfill` lifecycle and paced processing. The initial undecrypted-packet list is still materialized; bounded keyset loading is a follow-up, not an implemented claim |
+| Imported channel keys | Upstream queues requests for newly available channel hashes, coalesces overlapping work and resumes from the stored decrypted state. Historical messages remain distinct from newly heard traffic |
 | Cache outage | Concurrent misses and Redis read failures share bounded database work. A canceled caller can leave without canceling useful work for other callers. Cache operations have short network deadlines and no internal retry multiplication |
 | Signal quality | Missing, malformed, non-finite or out-of-range RSSI/SNR remain absent. Measured zero is retained. Stored observations, neighbor evidence and live events use the same validity distinction |
 | Input work | Oversized MQTT envelopes/topics and oversized neighbor snapshots are rejected before expensive processing |
@@ -25,17 +26,15 @@ for the paired drafts, exact preview build, measurements and remaining gates.
 | Provenance | `/info` keeps its API-version meaning and adds optional `buildVersion` and `buildRevision` for the actual artifact |
 | Runtime image | Moves off Alpine 3.19, keeps the PostgreSQL 16 client and runs the app as UID/GID 65532 |
 
-The history scan advances through all packet candidates, including pages without
-undecrypted group text. That bounds database work rather than merely limiting
-the number of matches returned. A failed page leaves its cursor unchanged;
-idempotent message inserts make a retry safe. A completed pass is restored after
-restart. Existing live ingest decrypts newly received messages. This job is
-disabled in read-only server mode.
+The refresh removes the superseded candidate `channel_history` job rather than
+running two decryption workers. Its old 500-candidate/five-second guarantees and
+metrics no longer describe the active implementation. Keep upstream's safe packet
+completion, cancellation and idempotent message behavior when adding bounded
+loading later. Measure undecrypted-candidate count, list latency and peak memory.
 
-The core has no new database migration beyond the current 001-053 baseline.
-It adds a `channel_history` entry to the existing `background_state` table.
-It does not delete raw observations, rewrite old signal readings, change
-retention or initiate RF traffic.
+The core includes upstream migrations 001-061, with no feature-specific migration
+added. Schema 060 widens device clock drift to bigint; 061 adds the ICU natural
+text collation. Raw observations, retention and radio operation are preserved.
 
 ## Configure the deployment deliberately
 
@@ -93,8 +92,6 @@ reverse proxy. Scrape the existing metrics and the additional bounded series:
 | `beacon_cache_requests_total{outcome}` | Hit, miss, invalid cached value or read error |
 | `beacon_ingest_rejected_total{reason}` | Input rejected for a bounded shape/size reason |
 | `beacon_stream_dropped_total{queue}` | Global, per-client or best-effort repeat event drops |
-| `beacon_channel_history_scanned_total` | Packet candidates examined by resumable historical decryption |
-| `beacon_job_rows_total{job="channel_history"}` | Newly decrypted historical messages, distinct from scanned candidates |
 
 Also monitor the existing pool waits, statement families, queue depth/drops,
 read-model trust/age and job durations. PostgreSQL `pg_stat_statements` requires
@@ -137,7 +134,7 @@ candidate does not automatically revoke roles or edit production credentials.
    hashes. A source branch or container tag alone is insufficient provenance.
 2. Run build, vet, unit/race tests, PostgreSQL integration, plan policy/corpus,
    backup checks, and web lint/tests/build against the combined heads. Test
-   signal null/zero, interrupted history pages, cache failure/cancellation,
+   signal null/zero, decryption cancellation/resume, cache failure/cancellation,
    stream control limits/global gaps and Topology exact boundaries.
 3. Use separate disposable databases for functional tests and the large plan
    fixture. Concurrent index creation can wait for older snapshots even when
