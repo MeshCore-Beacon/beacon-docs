@@ -80,7 +80,7 @@ Each request falls in one family and one class:
 | `/observers/directory` | otherwise | `other` | aggregation |
 | `/observers/{id}/activity` | | `other` | aggregation |
 | `/observers/{id}`, `/observers/{id}/telemetry`, `/nodes/{id}`, `/nodes/{id}/neighbors`, `/channels/{id}`, `/traces/{tag}` | | `other` | entity |
-| everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/brokers`, unknown paths) | | `other` | entity |
+| everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/ws-ticket`, `/brokers`, unknown paths) | | `other` | entity |
 
 "Region set" means a non-empty `iata`, `iatas`, `region` or `regionId`.
 
@@ -778,13 +778,33 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 `minAppVersion` and `minWebVersion` are the oldest BEACON Mobile and Beacon Web releases allowed
 to use this server, as strict `X.Y.Z` strings, or `null` when there is no requirement. Each is the
 higher of the server's built-in floor and the operator's `mobile.min_app_version` /
-`web.min_web_version`. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
+`web.min_web_version`. With `websocket.require_origin` on, `minAppVersion` is at least `2.1.1`, the
+first release that sends a [WebSocket ticket](#websocket-ticket). `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
 Swagger shows. Servers older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
 app. A `404`, a `null` or malformed value, and network errors never block.
+
+### WebSocket ticket
+
+```
+GET /api/v1/ws-ticket
+```
+
+Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-store`.
+
+```json
+{ "ticket": "AAABmZ1s4CgLBvU1n1yN3v8hQm9YtVq2", "expiresAt": 1793470167000 }
+```
+
+For clients that send no `Origin` header, such as BEACON Mobile. The client sends `ticket` in the
+`X-Beacon-Ticket` header of its next `/ws` upgrade. A ticket works until `expiresAt` (60 seconds),
+only from the address that asked for it (IPv6: the same /64), and only on the server process that
+issued it, so a restart retires every outstanding ticket. Fetch a fresh one before each connect.
+Only servers with `websocket.require_origin` on check it; browsers never need one. Servers older
+than this endpoint return `404`.
 
 ### Admin
 
@@ -910,6 +930,7 @@ The upgrade is checked before anything else:
 
 - **Connect rate.** Each client IP gets `websocket.max_connects_per_minute` attempts per minute (default 10, IPv6 per /64), failed handshakes included. Over that, the server answers `429` with `Retry-After: 60` and no upgrade.
 - **Origin.** A browser `Origin` must match the request's host, or one of `websocket.allowed_origins`. Anything else gets `403`. Set `allowed_origins` when the web app is served from a different host than the API.
+- **No Origin.** By default an upgrade without an `Origin` is accepted. With `websocket.require_origin` on, it needs a valid [ticket](#websocket-ticket) in `X-Beacon-Ticket`, or it gets `403` and no upgrade.
 - **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP (IPv6 per /64). Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
 
 **Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
@@ -1131,6 +1152,10 @@ Flutter on iOS background suspension and Android battery saver will kill the Web
 3. On return to foreground: reopen, re-subscribe, and fire a REST refresh on whatever screen is active to backfill anything missed.
 
 The protocol doesn't need to know about backgrounding; the client just treats reconnection as the recovery mechanism.
+
+**WebSocket ticket.** Before each connect the app asks `GET /ws-ticket` and sends the ticket in
+`X-Beacon-Ticket`. If that request fails (a `404` from an older server, a network error), it
+connects without one, which works on any server that leaves `websocket.require_origin` off.
 
 **Minimum app version.** The app calls `GET /info` on launch, on return to foreground and when
 the user switches servers. When the app's own version is lower than `minAppVersion` (compared
