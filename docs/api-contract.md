@@ -933,7 +933,7 @@ The upgrade is checked before anything else:
 - **No Origin.** By default an upgrade without an `Origin` is accepted. With `websocket.require_origin` on, it needs a valid [ticket](#websocket-ticket) in `X-Beacon-Ticket`, or it gets `403` and no upgrade.
 - **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP (IPv6 per /64). Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
 
-**Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
+**Compression.** When a Chromium or Firefox browser, or BEACON Mobile (`dart:io`), offers `permessage-deflate`, the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Every other client gets uncompressed frames: iOS WebKit (every browser on iPhone and iPad) drops the connection on the first compressed message, and an iPad in desktop mode reports itself as Mac Safari, so Safari on any platform is not compressed. Message content is the same either way.
 
 On connect the server sends a `hello`:
 
@@ -1122,7 +1122,7 @@ Each connection has a 256-event send buffer. When it is full, the server evicts 
 
 `droppedCount` is 1 or 2 per buffer notice; `since` is when the notice was sent. Several can arrive in a burst.
 
-Each connection also has a send budget: at most `websocket.max_send_bytes_per_second` of event JSON (default 131072, 128 KiB/s, counted before compression), with a `websocket.send_burst_bytes` burst (default 2 MiB). Events past it are dropped, and a `lagged` notice, at most one every 30 seconds, carries how many; its `droppedCount` can be any size. The connection stays open.
+Each connection also has a send budget: at most `websocket.max_send_bytes_per_second` of event JSON (default 1048576, 1 MiB/s, counted before compression), with a `websocket.send_burst_bytes` burst (default 8 MiB). Events past it are dropped, and a `lagged` notice, at most one every 30 seconds, carries how many; its `droppedCount` can be any size. The connection stays open.
 
 Clients should treat any `lagged` notice as a gap and refresh the affected view over REST.
 
