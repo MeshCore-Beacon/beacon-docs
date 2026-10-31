@@ -80,7 +80,7 @@ Each request falls in one family and one class:
 | `/observers/directory` | otherwise | `other` | aggregation |
 | `/observers/{id}/activity` | | `other` | aggregation |
 | `/observers/{id}`, `/observers/{id}/telemetry`, `/nodes/{id}`, `/nodes/{id}/neighbors`, `/channels/{id}`, `/traces/{tag}` | | `other` | entity |
-| everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/brokers`, unknown paths) | | `other` | entity |
+| everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/ws-ticket`, `/brokers`, unknown paths) | | `other` | entity |
 
 "Region set" means a non-empty `iata`, `iatas`, `region` or `regionId`.
 
@@ -357,15 +357,16 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
-`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
+`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
 
-Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or `neighbors`, and `order` is `asc` (the default) or `desc`; `lastSeen` is `desc` only. Every page says which order it is in with `sort` and `order` (`lastSeen` and `desc` by default). The orders match what the web's node table shows:
+Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or `neighbors`, and `order` is `asc` (the default) or `desc`. `lastSeen` defaults to `desc`, the newest-first list; from 2.1.1 it also takes `asc`, oldest heard first, which is a sorted list like the others (a server before 2.1.1 answers it with a `400`). Every page says which order it is in with `sort` and `order` (`lastSeen` and `desc` by default). The orders match what the web's node table shows:
 
 - `name`: natural order, as `Intl.Collator` with `numeric: true` sorts (symbols and emoji before digits, digits before letters, `Node 9` before `Node 10`, lowercase before uppercase). Nodes without a name come last in both directions.
 - `type`: companion, repeater, room server, sensor, then any other type.
 - `neighbors`: `knownNeighborCount`.
+- `lastSeen` with `asc`: oldest heard first.
 
-Ties go newest `lastSeen` first, then by `id`. Filters work the same as without `sort`. Page a sorted list with `pageCursor` only: a numeric `cursor`, or a `pageCursor` from another sort or order, is a `400`. A sorted page has no `nextCursor`. An unknown `sort` or `order` is a `400`. A server older than 2.1.0 ignores both and returns pages in `lastSeen` order with no `sort` field; a client that sees no `sort` must sort for itself.
+Ties go newest `lastSeen` first, then by `id`. Filters work the same as without `sort`. Page a sorted list (any order but the default newest first) with `pageCursor` only: a numeric `cursor`, or a `pageCursor` from another sort or order, is a `400`. A sorted page has no `nextCursor`. An unknown `sort` or `order` is a `400`. A server older than 2.1.0 ignores both and returns pages in `lastSeen` order with no `sort` field; a client that sees no `sort` must sort for itself.
 
 #### MeshMapper repeater details
 
@@ -777,13 +778,33 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 `minAppVersion` and `minWebVersion` are the oldest BEACON Mobile and Beacon Web releases allowed
 to use this server, as strict `X.Y.Z` strings, or `null` when there is no requirement. Each is the
 higher of the server's built-in floor and the operator's `mobile.min_app_version` /
-`web.min_web_version`. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
+`web.min_web_version`. With `websocket.require_origin` on, `minAppVersion` is at least `2.1.1`, the
+first release that sends a [WebSocket ticket](#websocket-ticket). `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
 Swagger shows. Servers older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
 app. A `404`, a `null` or malformed value, and network errors never block.
+
+### WebSocket ticket
+
+```
+GET /api/v1/ws-ticket
+```
+
+Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-store`.
+
+```json
+{ "ticket": "AAABmZ1s4CgLBvU1n1yN3v8hQm9YtVq2", "expiresAt": 1793470167000 }
+```
+
+For clients that send no `Origin` header, such as BEACON Mobile. The client sends `ticket` in the
+`X-Beacon-Ticket` header of its next `/ws` upgrade. A ticket works until `expiresAt` (60 seconds),
+only from the address that asked for it (IPv6: the same /64), and only on the server process that
+issued it, so a restart retires every outstanding ticket. Fetch a fresh one before each connect.
+Only servers with `websocket.require_origin` on check it; browsers never need one. Servers older
+than this endpoint return `404`.
 
 ### Admin
 
@@ -909,7 +930,8 @@ The upgrade is checked before anything else:
 
 - **Connect rate.** Each client IP gets `websocket.max_connects_per_minute` attempts per minute (default 10, IPv6 per /64), failed handshakes included. Over that, the server answers `429` with `Retry-After: 60` and no upgrade.
 - **Origin.** A browser `Origin` must match the request's host, or one of `websocket.allowed_origins`. Anything else gets `403`. Set `allowed_origins` when the web app is served from a different host than the API.
-- **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP. Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
+- **No Origin.** By default an upgrade without an `Origin` is accepted. With `websocket.require_origin` on, it needs a valid [ticket](#websocket-ticket) in `X-Beacon-Ticket`, or it gets `403` and no upgrade.
+- **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP (IPv6 per /64). Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
 
 **Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
 
@@ -1098,7 +1120,11 @@ Each connection has a 256-event send buffer. When it is full, the server evicts 
 { "v": 1, "type": "lagged", "droppedCount": 1, "since": 1747665440000 }
 ```
 
-`droppedCount` is 1 or 2 per notice; `since` is when the notice was sent. Several can arrive in a burst. Clients should treat a `lagged` notice as a gap and refresh the affected view over REST.
+`droppedCount` is 1 or 2 per buffer notice; `since` is when the notice was sent. Several can arrive in a burst.
+
+Each connection also has a send budget: at most `websocket.max_send_bytes_per_second` of event JSON (default 131072, 128 KiB/s, counted before compression), with a `websocket.send_burst_bytes` burst (default 2 MiB). Events past it are dropped, and a `lagged` notice, at most one every 30 seconds, carries how many; its `droppedCount` can be any size. The connection stays open.
+
+Clients should treat any `lagged` notice as a gap and refresh the affected view over REST.
 
 Reconnection is the client's responsibility. On any disconnect, the client should:
 1. Reconnect with backoff (1s, 2s, 5s, 10s, 30s cap)
@@ -1126,6 +1152,10 @@ Flutter on iOS background suspension and Android battery saver will kill the Web
 3. On return to foreground: reopen, re-subscribe, and fire a REST refresh on whatever screen is active to backfill anything missed.
 
 The protocol doesn't need to know about backgrounding; the client just treats reconnection as the recovery mechanism.
+
+**WebSocket ticket.** Before each connect the app asks `GET /ws-ticket` and sends the ticket in
+`X-Beacon-Ticket`. If that request fails (a `404` from an older server, a network error), it
+connects without one, which works on any server that leaves `websocket.require_origin` off.
 
 **Minimum app version.** The app calls `GET /info` on launch, on return to foreground and when
 the user switches servers. When the app's own version is lower than `minAppVersion` (compared
