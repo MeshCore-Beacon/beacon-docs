@@ -910,7 +910,7 @@ The upgrade is checked before anything else:
 
 - **Connect rate.** Each client IP gets `websocket.max_connects_per_minute` attempts per minute (default 10, IPv6 per /64), failed handshakes included. Over that, the server answers `429` with `Retry-After: 60` and no upgrade.
 - **Origin.** A browser `Origin` must match the request's host, or one of `websocket.allowed_origins`. Anything else gets `403`. Set `allowed_origins` when the web app is served from a different host than the API.
-- **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP. Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
+- **Concurrent connections.** At most `websocket.max_connections_per_ip` (default 5) open sockets per IP (IPv6 per /64). Past that, the socket is accepted and immediately closed with code `1013` (try again later), reason `connection limit reached`, so the browser can back off.
 
 **Compression.** When the client offers `permessage-deflate` (browsers and `dart:io` do by default), the server accepts it with context takeover, unless the client asks for `no_context_takeover`, and compresses messages of 128 bytes or more. The live feed shrinks about 3× on the wire. Clients that don't offer the extension get uncompressed frames, as before. Message content is the same either way.
 
@@ -1099,7 +1099,11 @@ Each connection has a 256-event send buffer. When it is full, the server evicts 
 { "v": 1, "type": "lagged", "droppedCount": 1, "since": 1747665440000 }
 ```
 
-`droppedCount` is 1 or 2 per notice; `since` is when the notice was sent. Several can arrive in a burst. Clients should treat a `lagged` notice as a gap and refresh the affected view over REST.
+`droppedCount` is 1 or 2 per buffer notice; `since` is when the notice was sent. Several can arrive in a burst.
+
+Each connection also has a send budget: at most `websocket.max_send_bytes_per_second` of event JSON (default 131072, 128 KiB/s, counted before compression), with a `websocket.send_burst_bytes` burst (default 2 MiB). Events past it are dropped, and a `lagged` notice, at most one every 30 seconds, carries how many; its `droppedCount` can be any size. The connection stays open.
+
+Clients should treat any `lagged` notice as a gap and refresh the affected view over REST.
 
 Reconnection is the client's responsibility. On any disconnect, the client should:
 1. Reconnect with backoff (1s, 2s, 5s, 10s, 30s cap)
