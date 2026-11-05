@@ -84,7 +84,7 @@ which ones to read.
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
 | `presence` | How observer and packet last-seen timestamps are batched before writing. | Rarely. |
 | `routes` | How long known routes are kept, with a shorter window for routes seen only a few times, and `reconfirm_rows_per_hour`: how many routes an hour are rechecked for a departed or now-ambiguous hop (default `81000`, run in 5-minute slices; `0` or omitted means the default). | Rarely. |
-| `websocket` | Connections per client, upgrade attempts per minute, and which other sites may open `/ws`. | The web app is served from a different host than the API. |
+| `websocket` | Connections per client, upgrade attempts per minute, the live-event send budget per connection, which other sites may open `/ws`, and `require_origin`: whether a client with no `Origin` needs a ticket from `/api/v1/ws-ticket` (off by default; on raises the minimum app version). | The web app is served from a different host than the API, real clients keep getting `lagged` notices from the send budget, or scripts with no `Origin` read the live feed. |
 | `nodes` | When a node is marked stale, when it is deleted, the clock-drift threshold, and the optional foreign repeater flag. | You want `possiblyForeign` on repeaters. |
 | `observers` | Optional deletion of observers not seen for a long time. Off by default. | Rarely. |
 | `mobile` | `min_app_version`: the oldest BEACON Mobile release allowed to use this server. Older apps show an update screen. Unset by default. | You need users on a newer app release. |
@@ -116,8 +116,9 @@ cannot honour. These are the ones people hit:
   that is not `host:port` with a port from 1 to 65535.
 - `planguard.daily_check: true` together with `server.read_only: true`. A read-only server runs
   no background jobs, so it cannot run the check.
-- A negative `ratelimit.requests_per_minute`, `ratelimit.burst`, `websocket.max_connects_per_minute`
-  or `routes.reconfirm_rows_per_hour`.
+- A negative `ratelimit.requests_per_minute`, `ratelimit.burst`, `websocket.max_connects_per_minute`,
+  `websocket.max_send_bytes_per_second`, `websocket.send_burst_bytes` or
+  `routes.reconfirm_rows_per_hour`.
   A negative `websocket.max_connections_per_ip` is not caught at startup and rejects every
   connection instead, so leave it at a positive number.
 
