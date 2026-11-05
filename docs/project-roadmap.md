@@ -1,5 +1,9 @@
 # Beacon project roadmap and maintainer handoff
 
+**Current PR disposition: [review map after Atlas landed on dev](review-map-20261105.md).**
+Use its eleven canonical PRs and single dev target. The older open-PR tables below
+are historical snapshots, including entries now superseded or closed.
+
 **Current compatibility: [5 November 2026](upstream-refresh-20261105.md).** The
 inventory below is the preserved 23 October audit. Its deployed revisions,
 dependency warnings and production findings are historical, not fresh runtime

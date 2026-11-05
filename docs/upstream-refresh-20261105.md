@@ -1,5 +1,9 @@
 # Current development compatibility
 
+**Later on 5 November:** Atlas landed on web dev at `38017d8`. The
+[current review map](review-map-20261105.md) supersedes the morning PR counts and
+targets below. It preserves the dated source/build qualification recorded here.
+
 Checked 5 November 2026. Server and web main/dev remain at the v2.1.1 release
 already incorporated into the current development candidates. Refresh the mobile
 and documentation drafts before accepting the optional collection work.
