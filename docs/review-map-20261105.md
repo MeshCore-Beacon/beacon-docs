@@ -71,7 +71,7 @@ the single chosen review entry is #266.
 
 ## Runtime and acceptance boundary
 
-This cleanup changes review organization and rebases the remaining web proposal
+This cleanup changes review organization and refreshes the remaining web proposal
 on the accepted Atlas source through a history-preserving merge. It does not
 deploy dev, dev1, live or the Canadaverse preview. The preview remains the broader
 experimental source pair identified in its published build metadata.
