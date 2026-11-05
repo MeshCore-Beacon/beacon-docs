@@ -12,13 +12,18 @@ Topology and ordinary observer telemetry continue to work without it.
 | Beacon server | Optional bounded proxy and `/info` capability for the selected instance |
 | Telemetry intake | Automatic enrollment validation, sample validation/deduplication, quotas, separate storage, retention, history and availability |
 | Beacon web | Repeaters-with-telemetry filter, attributed battery/environmental series and explicit gaps/partial history |
-| Headless Collector | Alternate polling client for unattended USB/BLE use; it uses the same intake contract |
+| Headless Collector | Alternate unattended polling client using the same intake contract |
 
 The app replaces the user-operated polling client, not the intake/storage service.
 The current intake is packaged in the separate Collector project. The org
 `beacon-agent` scaffold is not a deployable replacement for that implementation.
 Software distribution/access for the alpha is separate from client enrollment:
 there is no per-user operator approval list.
+
+On the Canadaverse preview, the legacy Pi polling worker was disabled on
+2 November 2026. Flutter is the intended polling client. Keep the shared intake
+running for app enrollment, submissions and retained history; RemoteTerm also
+remains disabled. Do not reactivate either radio service during a source refresh.
 
 ## Enable an instance
 
@@ -126,9 +131,10 @@ IDs, concurrent quotas, expiry, history/directory caps, cache invalidation and
 outage recovery on an isolated database. Synthetic signed samples belong in that
 isolated test instance, not in the shared preview's public repeater history.
 
-Then verify the preview's actual retained data, API proxy, web filter/cards and
-normal collector acceptance without resetting RF cooldowns. Preserve the
-exclusive radio lease and unrelated services during updates. Check before/after
+Then verify the preview's actual retained data, API proxy and web filter/cards.
+Use a separately authorized Flutter collection run to verify fresh acceptance,
+without resetting RF cooldowns or starting the retired Pi worker. Preserve
+radio ownership and unrelated services during updates. Check before/after
 source/binary/asset hashes, database/configuration identity and recovery copies.
 
 Physical qualification remains separate: a real selected companion/repeater,
