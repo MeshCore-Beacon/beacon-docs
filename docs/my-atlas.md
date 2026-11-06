@@ -1,8 +1,8 @@
 # My Atlas
 
 A per-browser watchlist of up to twelve radios, each shown as a card of recent activity and signal.
-A card can follow a node, an observer, or a node that is also an observer. It is the last tab in
-the desktop row and under **More** on a phone; the URL is `?tab=MyAtlas`. Hide it for a deployment
+A card can follow a node, an observer, or a node that is also an observer. The tab sits just before
+**Analytics**, in the desktop row and under **More** on a phone; the URL is `?tab=MyAtlas`. Hide it for a deployment
 with `VITE_DISABLED_TABS=MyAtlas` (see [Configuration](configuration.md)).
 
 ## What is stored, and where
