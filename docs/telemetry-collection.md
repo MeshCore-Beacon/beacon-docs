@@ -57,7 +57,7 @@ retryable error rather than an empty successful collection.
 In the app, select the Beacon instance, open Telemetry sharing, connect the
 companion, choose saved repeaters and an interval from 1 to 72 hours. Optional
 repeater/admin passwords stay on the client. The companion private key is never
-exported. First use starts with flood discovery; subsequently learned routes are
+exported. The default nearby mode requires an unambiguous direct/one-hop route; explicit discovery can flood. Learned routes are
 used within the client's hop/congestion policy. Environmental decoding preserves
 channel numbers, including channel 2, and explicit zero values.
 
@@ -75,7 +75,7 @@ service is not an exact-time or uninterrupted-work guarantee. iOS collection is
 foreground-only in this draft.
 
 No global cross-instance RF lease or hardware attestation is claimed. Cooperating
-clients still need coordination before a broad rollout. The server validates
+clients now coordinate through per-instance pre-RF permits; independent instances do not share one authority. The server validates
 key possession and report structure; public data remains attributed community
 measurements rather than independently verified sensor truth.
 
@@ -142,3 +142,8 @@ status plus channel-2 readings, intake acceptance, matching Atlas display, locke
 screen intervals, notification actions and transport/network failure. The current
 consolidation found no Android device attached, so these new physical runs are
 not claimed. Build/unit/API success does not replace them.
+
+See [coordinated telemetry](telemetry-coordination.md) for the permit, nearby-route,
+observer-reply, authenticated relay and recovery contracts. Existing historical
+readings and older signed outboxes stay compatible; new clients never fall back
+to uncoordinated RF when permission is unavailable.

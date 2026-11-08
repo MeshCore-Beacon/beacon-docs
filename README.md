@@ -14,6 +14,8 @@ repositories, issues, PRs and the staged route to live.
 The proposed paired backend, basic Atlas and Topology release is described in the
 [core performance candidate](docs/performance-release-candidate.md), including
 validation, operational budgets and remaining release gates.
+The [coordination and shared-reply contract](docs/telemetry-coordination.md) describes polling permits and observer integration.
+
 The separate [optional collection guide](docs/telemetry-collection.md) covers
 mobile/headless clients, intake, sensor cards and their qualification gates.
 
