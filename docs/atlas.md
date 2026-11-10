@@ -42,11 +42,15 @@ A node card opens on **Analytics**, the Analytics Signal row for that node over 
 
 - **Observations**: stored receptions of packets originating from that key. The count and the
   hourly bars come from hourly totals the server keeps for the selected window (24 hours or 3
-  days), so a busy node is counted in full rather than cut off at its newest receptions.
+  days), so a busy node is counted in full rather than cut off at its newest receptions. Hours
+  the server has not covered are left empty rather than drawn as zero, and the tile then says
+  "Partial history" in place of the window.
 - **Mean SNR / Mean RSSI**: averages of the observers' last-hop measurements, with an hourly
   sparkline. The zero-RSSI / zero-SNR "no measurement" sentinel is excluded; a real zero SNR is
   included. These describe the receivers' side, not the node's radio health.
 - **Active hours**: hours in the window with at least one reception.
+- Underneath: when the node was last seen, **Mean hops** (the average hop count of those
+  receptions) and the node's neighbor count.
 - The **Recent** / **Stale** badge is the server's `stale` verdict; the client does not infer
   online or offline.
 
@@ -54,18 +58,31 @@ A node card opens on **Analytics**, the Analytics Signal row for that node over 
 it was heard and a link to open that packet in the analyzer. It is not lifetime reach. The card
 keeps its height when it flips.
 
+On a server that has no node activity endpoint, the tiles have no data, the info tip and the
+**Heard by** view say "This server does not provide node activity.", and the card stops asking
+for it.
+
 **Observer** appears when the node is also an observer, and is the only view of an observer card.
 It shows what that observer received and reported over the window:
 
-- **Packets heard** and **Mean SNR heard** (weighted by packets) from the observer's activity.
-  Hours the server has no data for are left empty, and the tile says "Partial history".
+- **Airtime**: the share of the window the radio spent transmitting and receiving, from its own
+  counters, with the TX and RX shares underneath. When the observer does not report those
+  counters, the figure is estimated from the packets it heard, covers receive only, and is marked
+  "RX, from heard".
+- **Battery**, or **Uptime** when the observer reports no battery (a mains-powered one).
+- **Packet types**: the number of packets the observer heard, over a bar of the payload types
+  they were, busiest first. The five busiest get their own slice and the rest are grouped as
+  "other". Hours the server has not covered are left out, and the tile then says "Partial
+  history".
 - **Noise floor** from the observer's latest status report, or from telemetry when the status has
   none, the same order as the Observers page.
-- **Battery**, or **Uptime** for a mains-powered observer, with online status, last status time
-  and radio settings underneath.
+- Underneath: **Online** or **Offline**, the last status time, the radio settings, and the uptime
+  when the tile above shows the battery.
 
-Solid sparkline segments are readings; dashed segments join across missing hours and are only a
-visual guide. Only one card at a time is away from its default view.
+Status reports with no readings are ignored. On the Airtime, Battery and Noise floor sparklines,
+solid segments are readings and dashed segments join across missing hours as a visual guide only;
+gaps in Uptime stay open. On a server without observer activity or telemetry, the info tip says
+so. Only one card at a time is away from its default view.
 
 ## Arranging cards
 

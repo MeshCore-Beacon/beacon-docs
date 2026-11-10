@@ -78,7 +78,7 @@ Each request falls in one family and one class:
 | `/channels`, `/nodes`, `/observers`, `/traces`, `/nodes/{id}/observations`, `/observers/{id}/adverts` | | `other` | list |
 | `/observers/directory` | region set | `other` | list |
 | `/observers/directory` | otherwise | `other` | aggregation |
-| `/observers/{id}/activity` | | `other` | aggregation |
+| `/observers/{id}/activity`, `/nodes/{id}/activity` | | `other` | aggregation |
 | `/observers/{id}`, `/observers/{id}/telemetry`, `/nodes/{id}`, `/nodes/{id}/neighbors`, `/channels/{id}`, `/traces/{tag}` | | `other` | entity |
 | everything else (`/iatas*`, `/regions*`, `/scopes*`, `/info`, `/ws-ticket`, `/brokers`, unknown paths) | | `other` | entity |
 
@@ -372,15 +372,16 @@ Ties go newest `lastSeen` first, then by `id`. Filters work the same as without 
 #### Node activity
 
 `GET /nodes/{nodeId}/activity` reports how often a node's packets were heard, in one-hour buckets
-over a trailing window. `range` is a Go duration (default `24h`); it must be positive and at most
-`720h`, anything else is a `400`. An unknown node is a `404`. There is no `interval`: buckets are
-always one hour. The response is cached for 60 seconds.
+over a trailing window that ends now. `range` is a Go duration (default `24h`); it must be positive
+and at most `720h`. A bad `range` or node ID is a `400` and an unknown node is a `404`. There is no
+`interval`: buckets are always one hour, aligned to the clock in UTC. The response is cached for 60
+seconds.
 
 ```json
 {
-  "windowStart": 1747526400000,
-  "windowEnd": 1747612800000,
-  "generatedAt": 1747612800000,
+  "windowStart": 1747530000000,
+  "windowEnd": 1747612980000,
+  "generatedAt": 1747612980000,
   "rolledUntil": 1747609200000,
   "rawFrom": 1747609200000,
   "range": "24h",
@@ -392,17 +393,22 @@ always one hour. The response is cached for 60 seconds.
 }
 ```
 
+- `windowEnd` is the time of the request, so the last hour is still filling. `windowStart` is
+  `windowEnd` minus `range`, rounded up to the hour. `range` echoes the request.
 - `points` are in ascending order and hold only the hours that have records; `t` is the start of
   the hour. A missing hour means nothing was recorded, except for uncovered hours (below).
 - `summary` covers the whole window. Its averages are the sum over the samples, not a mean of the
   hourly averages.
 - An observation whose RSSI and SNR are both zero or missing counts in `observations` but is not a
-  signal sample. `snrAvg`, `rssiAvg` and `hopAvg` are `null` when there is nothing to average.
-- `latest` is the node's most recently heard packet, or `null` when there is none.
+  signal sample. An average is `null` when its hour, or the window, has no samples for it.
+- `latest` is the node's packet that was first heard most recently, whether or not it falls in the
+  window, and `heardAt` is the later of that packet's first and last heard times. It is `null`
+  when the node has no stored packet.
 - Complete hours come from the hourly rollup. Hours after the newest rolled one are read from raw
-  observations, at most the last 24 hours. `rolledUntil` and `rawFrom` (both optional) mean the
-  same as on [observer activity](#observers): when `rawFrom` is later than `rolledUntil`, the
-  hours between are uncovered, not quiet.
+  observations, at most the last 24 hours. `rolledUntil` and `rawFrom` mean the same as on
+  [observer activity](#observers): `rolledUntil` is omitted before the first rollup, and when
+  `rawFrom` is later than `rolledUntil` (or `rolledUntil` is missing), the hours between are
+  uncovered, not quiet.
 
 #### MeshMapper repeater details
 
