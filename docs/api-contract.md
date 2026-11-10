@@ -355,6 +355,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending, or in a `sort` order (see below). Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
+| `GET /nodes/{nodeId}/activity?range=24h` | Hourly totals of those observations, with signal averages. See [Node activity](#node-activity). |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
@@ -367,6 +368,41 @@ Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or
 - `lastSeen` with `asc`: oldest heard first.
 
 Ties go newest `lastSeen` first, then by `id`. Filters work the same as without `sort`. Page a sorted list (any order but the default newest first) with `pageCursor` only: a numeric `cursor`, or a `pageCursor` from another sort or order, is a `400`. A sorted page has no `nextCursor`. An unknown `sort` or `order` is a `400`. A server older than 2.1.0 ignores both and returns pages in `lastSeen` order with no `sort` field; a client that sees no `sort` must sort for itself.
+
+#### Node activity
+
+`GET /nodes/{nodeId}/activity` reports how often a node's packets were heard, in one-hour buckets
+over a trailing window. `range` is a Go duration (default `24h`); it must be positive and at most
+`720h`, anything else is a `400`. An unknown node is a `404`. There is no `interval`: buckets are
+always one hour. The response is cached for 60 seconds.
+
+```json
+{
+  "windowStart": 1747526400000,
+  "windowEnd": 1747612800000,
+  "generatedAt": 1747612800000,
+  "rolledUntil": 1747609200000,
+  "rawFrom": 1747609200000,
+  "range": "24h",
+  "summary": { "observations": 412, "snrAvg": 5.8, "rssiAvg": -94.1, "hopAvg": 2.3 },
+  "points": [
+    { "t": 1747605600000, "observations": 18, "snrAvg": 6.2, "rssiAvg": -92.3, "hopAvg": 2.1 }
+  ],
+  "latest": { "packetHash": "a1b2c3d4e5f60718", "heardAt": 1747612500000 }
+}
+```
+
+- `points` are in ascending order and hold only the hours that have records; `t` is the start of
+  the hour. A missing hour means nothing was recorded, except for uncovered hours (below).
+- `summary` covers the whole window. Its averages are the sum over the samples, not a mean of the
+  hourly averages.
+- An observation whose RSSI and SNR are both zero or missing counts in `observations` but is not a
+  signal sample. `snrAvg`, `rssiAvg` and `hopAvg` are `null` when there is nothing to average.
+- `latest` is the node's most recently heard packet, or `null` when there is none.
+- Complete hours come from the hourly rollup. Hours after the newest rolled one are read from raw
+  observations, at most the last 24 hours. `rolledUntil` and `rawFrom` (both optional) mean the
+  same as on [observer activity](#observers): when `rawFrom` is later than `rolledUntil`, the
+  hours between are uncovered, not quiet.
 
 #### MeshMapper repeater details
 

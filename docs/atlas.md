@@ -40,10 +40,9 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 A node card opens on **Analytics**, the Analytics Signal row for that node over the selected window:
 
-- **Observations**: stored receptions of packets originating from that key. The card loads the
-  latest 200; when those do not reach back to the start of the window, the tile says "latest 200"
-  and the bars start at the oldest loaded reception rather than drawing empty hours the sample
-  cannot speak for.
+- **Observations**: stored receptions of packets originating from that key. The count and the
+  hourly bars come from hourly totals the server keeps for the selected window (24 hours or 3
+  days), so a busy node is counted in full rather than cut off at its newest receptions.
 - **Mean SNR / Mean RSSI**: averages of the observers' last-hop measurements, with an hourly
   sparkline. The zero-RSSI / zero-SNR "no measurement" sentinel is excluded; a real zero SNR is
   included. These describe the receivers' side, not the node's radio health.
@@ -51,9 +50,9 @@ A node card opens on **Analytics**, the Analytics Signal row for that node over 
 - The **Recent** / **Stale** badge is the server's `stale` verdict; the client does not infer
   online or offline.
 
-**Heard by** swaps the tiles for the observers of the newest loaded packet, with when it was heard
-and a link to open that packet in the analyzer. It is not lifetime reach. The card keeps its height
-when it flips.
+**Heard by** swaps the tiles for the observers of the node's most recently heard packet, with when
+it was heard and a link to open that packet in the analyzer. It is not lifetime reach. The card
+keeps its height when it flips.
 
 **Observer** appears when the node is also an observer, and is the only view of an observer card.
 It shows what that observer received and reported over the window:
