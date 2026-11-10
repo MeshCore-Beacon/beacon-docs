@@ -354,7 +354,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 |---|---|
 | `GET /nodes` | Page of node summaries, newest `lastSeen` first, ties by `id` descending, or in a `sort` order (see below). Cursor is `lastSeen` epoch ms; `pageCursor` is exact. Default limit 50, at most 2000 (older servers clamp to 200, so ask for 2000 and keep paging): clients that load a whole region, like the map, use big pages. |
 | `GET /nodes/{nodeId}` | Node detail: capability flags, `minFirmwareVersion`, `iatas` (`[{iata, lastHeard}]`), `neighbors`, clock drift for repeaters and room servers, and `meshmapper` when imported (see [MeshMapper repeater details](#meshmapper-repeater-details)). |
-| `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated. Cursor is the observation ID. |
+| `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated, ordered by the packet's first heard time, newest first, then by packet, then by observation ID descending. Observation IDs do not descend across the whole list, and an old packet heard again recently keeps its original place. Cursor is the last item's observation ID; a cursor whose observation no longer exists returns an empty page with `hasMore` false, not an error. |
 | `GET /nodes/{nodeId}/activity?range=24h` | Hourly totals of those observations, with signal averages. See [Node activity](#node-activity). |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 

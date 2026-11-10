@@ -10,6 +10,8 @@ with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
 Cards live only in the visitor's browser, under the localStorage key `beacon-atlas-v2`: each
 card's kind, ID, last known name, card order and the activity window (24h or 3d). A node card also
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
+A card whose Observer view tiles were changed also keeps its four tiles (see
+[Choosing the Observer tiles](#choosing-the-observer-tiles)).
 
 There is no account and no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
@@ -63,26 +65,46 @@ On a server that has no node activity endpoint, the tiles have no data, the info
 for it.
 
 **Observer** appears when the node is also an observer, and is the only view of an observer card.
-It shows what that observer received and reported over the window:
+It shows what that observer received and reported over the window, in four tiles. A new card
+shows Airtime, Battery, Packet types and Noise floor, with a line underneath: **Online** or
+**Offline**, the last status time, the radio settings, and the uptime when the battery is known
+and no tile shows the uptime.
+
+### Choosing the Observer tiles
+
+Each tile's label opens a list of the metrics that are not already on the card; picking one puts
+it in that tile's place. The choice is saved per card. **Reset tiles**, shown under the tiles
+once a card differs from the default, puts the four defaults back.
+
+There are ten metrics:
 
 - **Airtime**: the share of the window the radio spent transmitting and receiving, from its own
   counters, with the TX and RX shares underneath. When the observer does not report those
   counters, the figure is estimated from the packets it heard, covers receive only, and is marked
   "RX, from heard".
-- **Battery**, or **Uptime** when the observer reports no battery (a mains-powered one).
+- **Battery**: the latest battery reading. When the observer reports no battery (a mains-powered
+  one), the tile shows Uptime instead, unless the card already has an Uptime tile.
+- **Uptime**: how long the radio has been up.
 - **Packet types**: the number of packets the observer heard, over a bar of the payload types
   they were, busiest first. The five busiest get their own slice and the rest are grouped as
-  "other". Hours the server has not covered are left out, and the tile then says "Partial
-  history".
+  "other".
+- **Packets heard**: the same count, with hourly bars.
+- **Mean SNR** and **Mean RSSI**: the signal of what the observer heard, with an hourly
+  sparkline. The figure for the window weights each hour's average by that hour's packet count.
 - **Noise floor** from the observer's latest status report, or from telemetry when the status has
   none, the same order as the Observers page.
-- Underneath: **Online** or **Offline**, the last status time, the radio settings, and the uptime
-  when the tile above shows the battery.
+- **Queue length**: the latest reading in the window.
+- **Receive errors**: the number of new errors in the window. The radio reports a running
+  counter, so the tile adds up the increases between readings; a counter that went backwards
+  adds nothing.
 
-Status reports with no readings are ignored. On the Airtime, Battery and Noise floor sparklines,
-solid segments are readings and dashed segments join across missing hours as a visual guide only;
-gaps in Uptime stay open. On a server without observer activity or telemetry, the info tip says
-so. Only one card at a time is away from its default view.
+Hours the server has not covered are left out of Packet types and Packets heard, and those tiles
+then say "Partial history".
+
+Status reports with no readings are ignored. On the Airtime, Battery, Noise floor and Queue
+length sparklines, solid segments are readings and dashed segments join across missing hours as a
+visual guide only; gaps in Uptime stay open. On a server without observer activity or telemetry,
+the info tip says so. Only one card at a time is away from its default view.
 
 ## Arranging cards
 
@@ -107,10 +129,16 @@ The file is the saved collection plus a format tag:
   "range": "24h",
   "pins": [
     { "kind": "node", "id": "<node UUID>", "publicKey": "<64 hex>", "name": "Hill repeater", "observerId": "<observer UUID, optional>" },
-    { "kind": "observer", "observerId": "<observer UUID>", "name": "Roof listener" }
+    { "kind": "observer", "observerId": "<observer UUID>", "name": "Roof listener", "tiles": ["packets", "snr", "rssi", "noise"] }
   ]
 }
 ```
+
+`tiles` is optional on either kind of card and is left out for the default layout. It is exactly
+four different metric IDs, in tile order, from `airtime`, `battery`, `uptime`, `types`, `packets`,
+`snr`, `rssi`, `noise`, `queue` and `errors`. The file is still version 2. Anything else in
+`tiles` is dropped on import and the card keeps the default layout; a build from before the tile
+picker ignores the field.
 
 Imports go through the same checks as a saved collection: a file without the format tag is
 refused, malformed or duplicate cards are dropped, at most twelve are kept, and the page says how
