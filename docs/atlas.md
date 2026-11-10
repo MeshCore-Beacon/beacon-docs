@@ -42,6 +42,14 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 ## Reading a card
 
+A card's header is its name and badges, with icon buttons at the top right: the pin (on cards
+with more than one view), an x that removes the card, and the drag grip. On a card with more
+than one view, the Analytics / Heard by / Observer switch spans the card below the header.
+
+The Analytics and Observer views end in a one-line footer. It never wraps: text that does not fit
+is cut short, and the info tip at its end lists every fact in full, with absolute times, followed
+by the help text. While a view's data is loading, or when it fails to load, the line says so.
+
 A node card opens on **Analytics** unless it is pinned to another tab (see
 [The tab a card opens on](#the-tab-a-card-opens-on)). Analytics is the Analytics Signal row for
 that node over the selected window:
@@ -55,8 +63,8 @@ that node over the selected window:
   sparkline. The zero-RSSI / zero-SNR "no measurement" sentinel is excluded; a real zero SNR is
   included. These describe the receivers' side, not the node's radio health.
 - **Active hours**: hours in the window with at least one reception.
-- Underneath: when the node was last seen, **Mean hops** (the average hop count of those
-  receptions) and the node's neighbor count.
+- The footer has when the node was last seen on the left, and **Mean hops** (the average hop
+  count of those receptions) and the node's neighbor count on the right.
 - The **Recent** / **Stale** badge is the server's `stale` verdict; the client does not infer
   online or offline.
 
@@ -70,15 +78,15 @@ for it.
 
 **Observer** appears when the node is also an observer, and is the only view of an observer card.
 It shows what that observer received and reported over the window, in four tiles. A new card
-shows Airtime, Battery, Packet types and Noise floor, with a line underneath: **Online** or
-**Offline**, the last status time, the radio settings, and the uptime when the battery is known
-and no tile shows the uptime.
+shows Airtime, Battery, Packet types and Noise floor. The footer has **Online** or **Offline**
+with the last status time on the left, and the radio frequency and spreading factor on the right.
+Its info tip adds the full radio settings, and the uptime when no tile is showing it.
 
 ### Choosing the Observer tiles
 
 Each tile's label opens a list of the metrics that are not already on the card; picking one puts
-it in that tile's place. The choice is saved per card. **Reset tiles**, shown under the tiles
-once a card differs from the default, puts the four defaults back.
+it in that tile's place. The choice is saved per card. Once a card differs from the default,
+the list ends with **Reset tiles**, which puts the four defaults back.
 
 There are ten metrics:
 
@@ -112,8 +120,8 @@ the info tip says so.
 
 ### The tab a card opens on
 
-A card with more than one view has a pin button beside the Analytics / Heard by / Observer
-switch. The pin is pressed while the card shows the tab it opens on. Pressing it on another tab
+A card with more than one view has a pin button in its header. The pin is pressed while the card
+shows the tab it opens on. Pressing it on another tab
 makes that the tab the card opens on, and the choice is saved with the card.
 
 Switching tabs without pressing the pin is temporary: only one card at a time is away from the
