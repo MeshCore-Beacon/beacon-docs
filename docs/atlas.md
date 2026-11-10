@@ -1,17 +1,15 @@
-# My Atlas
+# Atlas
 
 A per-browser watchlist of up to twelve radios, each shown as a card of recent activity and signal.
 A card can follow a node, an observer, or a node that is also an observer. The tab sits just before
-**Analytics**, in the desktop row and under **More** on a phone; the URL is `?tab=MyAtlas`. Hide it for a deployment
-with `VITE_DISABLED_TABS=MyAtlas` (see [Configuration](configuration.md)).
+**Analytics**, in the desktop row and under **More** on a phone; the URL is `?tab=Atlas`. Hide it for a deployment
+with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
 
 ## What is stored, and where
 
-Cards live only in the visitor's browser, under the localStorage key `beacon-my-atlas-v2`: each
+Cards live only in the visitor's browser, under the localStorage key `beacon-atlas-v2`: each
 card's kind, ID, last known name, card order and the activity window (24h or 3d). A node card also
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
-A collection saved by an earlier version under `beacon-my-atlas-v1` is still read when there is
-nothing under the new key, and moves to the new key on the next change; the old entry is left alone.
 
 There is no account and no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
