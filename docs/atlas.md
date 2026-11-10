@@ -11,7 +11,9 @@ Cards live only in the visitor's browser, under the localStorage key `beacon-atl
 card's kind, ID, last known name, card order and the activity window (24h or 3d). A node card also
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
 A card whose Observer view tiles were changed also keeps its four tiles (see
-[Choosing the Observer tiles](#choosing-the-observer-tiles)).
+[Choosing the Observer tiles](#choosing-the-observer-tiles)), and a node card pinned to open on
+**Heard by** or **Observer** keeps that tab (see
+[The tab a card opens on](#the-tab-a-card-opens-on)).
 
 There is no account and no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
@@ -40,7 +42,9 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 ## Reading a card
 
-A node card opens on **Analytics**, the Analytics Signal row for that node over the selected window:
+A node card opens on **Analytics** unless it is pinned to another tab (see
+[The tab a card opens on](#the-tab-a-card-opens-on)). Analytics is the Analytics Signal row for
+that node over the selected window:
 
 - **Observations**: stored receptions of packets originating from that key. The count and the
   hourly bars come from hourly totals the server keeps for the selected window (24 hours or 3
@@ -104,7 +108,20 @@ then say "Partial history".
 Status reports with no readings are ignored. On the Airtime, Battery, Noise floor and Queue
 length sparklines, solid segments are readings and dashed segments join across missing hours as a
 visual guide only; gaps in Uptime stay open. On a server without observer activity or telemetry,
-the info tip says so. Only one card at a time is away from its default view.
+the info tip says so.
+
+### The tab a card opens on
+
+A card with more than one view has a pin button beside the Analytics / Heard by / Observer
+switch. The pin is pressed while the card shows the tab it opens on. Pressing it on another tab
+makes that the tab the card opens on, and the choice is saved with the card.
+
+Switching tabs without pressing the pin is temporary: only one card at a time is away from the
+tab it opens on, so switching a tab on another card sends the first one back.
+
+A card pinned to Observer whose node has no observer link opens on Analytics; the pin is kept
+and applies again once the link is there. An observer card has one view and no pin. When an
+observer card becomes a node card, it keeps opening on Observer.
 
 ## Arranging cards
 
@@ -128,7 +145,7 @@ The file is the saved collection plus a format tag:
   "exportedAt": 1793923200000,
   "range": "24h",
   "pins": [
-    { "kind": "node", "id": "<node UUID>", "publicKey": "<64 hex>", "name": "Hill repeater", "observerId": "<observer UUID, optional>" },
+    { "kind": "node", "id": "<node UUID>", "publicKey": "<64 hex>", "name": "Hill repeater", "observerId": "<observer UUID, optional>", "view": "observer" },
     { "kind": "observer", "observerId": "<observer UUID>", "name": "Roof listener", "tiles": ["packets", "snr", "rssi", "noise"] }
   ]
 }
@@ -139,6 +156,10 @@ four different metric IDs, in tile order, from `airtime`, `battery`, `uptime`, `
 `snr`, `rssi`, `noise`, `queue` and `errors`. The file is still version 2. Anything else in
 `tiles` is dropped on import and the card keeps the default layout; a build from before the tile
 picker ignores the field.
+
+`view` is optional on a node card: `heard` or `observer`, the tab the card opens on, left out
+when that is Analytics. Any other value is dropped on import and the card is kept, opening on
+Analytics. A build from before the pin ignores the field.
 
 Imports go through the same checks as a saved collection: a file without the format tag is
 refused, malformed or duplicate cards are dropped, at most twelve are kept, and the page says how
