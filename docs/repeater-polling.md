@@ -174,8 +174,14 @@ In `approved` mode an observer you have not approved:
 - can still poll its own repeaters. Where an approved observer polls the repeater it is told to
   wait last in line. Where no approved observer claims the repeater it is told to poll.
 - is never elected poller or ranked standby, and its readings never count toward the reading time
-  that stands other observers down. It cannot hold anyone back. Taking approval away applies at
-  the next election, within a minute.
+  that stands other observers down. It cannot hold anyone back.
+
+Approval is checked when a repeater's election runs. Elections are scheduled every minute, so
+new answers from Beacon normally stop trusting the observer within about a minute, once an election
+has succeeded. Devices that already fetched an answer keep acting on it until their next successful
+refresh, which can be ten minutes or more. Until its old assignment is replaced, that observer's
+readings can still count toward the newest reading time. Blocking an observer takes effect on its
+next message, and is the faster remedy.
 
 In both modes:
 
