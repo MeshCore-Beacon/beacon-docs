@@ -322,7 +322,7 @@ the key.
 | `grace` | `30m` | `10m` to `2h` | The extra wait for each standby rank. |
 | `max_requests` | `2` | 1 to 3 | Poll starts per repeater per window, sent to observers. |
 | `reading_retention` | `744h` | not negative | How long readings are kept. |
-| `min_client_version` | empty | `X.Y.Z` | The oldest observer firmware allowed to poll. Empty allows all. A value that is not `X.Y.Z` is ignored. |
+| `min_client_version` | empty | `X.Y.Z` | The oldest observer firmware allowed to poll. Empty allows all. Observer firmware that sends no version fails the check when this is set. Any other value stops Beacon at startup. |
 | `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
 | `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |
 

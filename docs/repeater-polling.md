@@ -24,7 +24,8 @@ web app or the mobile app shows the readings yet. Charts come in a later release
    newest reading is older than the poll window. A standby waits the window plus one grace period
    for each rank, so it only polls if the poller has not.
 6. The poller publishes the reading to the broker. Beacon stores it. The next owners answer
-   carries the new reading time, which tells every observer the repeater is fresh.
+   carries the new reading time, which tells every observer the repeater is fresh. Only readings
+   from the poller, or from a standby that heard the repeater's adverts directly, move that time.
 
 An observer that reports 3 or more misses in a row for a repeater ranks below every healthy
 observer, and a healthy poller keeps the job unless another healthy observer beats it by 3 dB.
@@ -88,14 +89,17 @@ The poll interval comes from Beacon's policy (`direct_window`), so the owner doe
 | Operator flags per observer | Until you change them. |
 
 A reading is stored once per repeater, observer and sample. The same reading arriving twice, for
-example over two brokers, is ignored. Beacon also counts how many other observers heard the
+example over two brokers, is ignored. Beacon also keeps at most one new reading per observer,
+repeater and method every 5 minutes, and accepts at most 8 readings in one message. A claim can
+list at most 32 repeaters, and a claim that arrives less than 30 seconds after the same observer's
+last one is dropped. The firmware stays well inside all of these. Beacon also counts how many other observers heard the
 repeater's reply. That count is informational. A reading is never refused for lacking it.
 
 Beacon accepts a reading only when all of these hold:
 
 - The topic key and the message's `origin_id` are the same observer.
 - That observer has a claim under 65 minutes old that lists the repeater.
-- `sampled_at` is not in the future and not older than 2 hours.
+- `sampled_at` is at most 1 minute ahead of Beacon's clock and not older than 2 hours.
 - The observer is not blocked.
 
 ## Pause, exclude and block
@@ -106,7 +110,8 @@ Otherwise they answer `503`. The same shapes are in the [API contract](api-contr
 
 | Route | What it does |
 |---|---|
-| `GET /api/v1/admin/polling` | Returns the pause state, the excluded repeaters and every observer with a flag set. |
+| `GET /api/v1/admin/polling` | Returns the pause state, the excluded repeaters and every observer with a flag set. `paused` turns `false` once `pausedUntil` has passed; `configPaused` shows `polling.paused` from the config. |
+| `GET /api/v1/admin/polling/targets` | Lists up to 500 repeaters, newest claim first, with every observer that claims each one, its rank (`null` when it has none), its advert evidence, state and misses, and the newest trusted and newest overall reading times. Use it to see who polls what. |
 | `PUT /api/v1/admin/polling/state` | Replaces the pause state and the excluded repeaters. |
 | `PUT /api/v1/admin/polling/observers/{publicKey}` | Replaces one observer's `blocked`, `approved` and `note`. |
 
@@ -127,6 +132,24 @@ curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: applica
 - `approved` is stored for a later release and changes nothing now.
 - Runtime changes survive a restart. They live in the database, not in `config.yaml`.
 
+## Trust
+
+Claims and readings are statements by whoever runs the observer. Beacon authenticates them only
+through that observer's broker login and the topic it publishes on. An owner could claim a
+repeater the observer cannot hear, or publish made-up readings. Beacon limits what that can do:
+
+- It ranks observers on its own evidence, the repeater's zero-hop adverts it saw the observer
+  hear, not on the signal the observer claims.
+- The reading time that tells other observers a repeater is fresh only counts readings from the
+  poller or from a standby with that advert evidence. A bystander's readings are stored and
+  attributed to it, but they do not stand anyone else down.
+- Claims and readings are rate limited and capped in size per observer.
+- Each reading records how many other observers heard the repeater's reply. It is not checked
+  against anything, but a reading nobody else heard is worth a look.
+
+The remedy for an observer that misbehaves is to block it (see above). Its claims and readings
+are then dropped, and the election moves its repeaters to other observers.
+
 ## Troubleshooting
 
 - **The device polls nothing.** No MQTT slot on the device matches `mqtt_hosts`. Compare the
@@ -143,4 +166,8 @@ curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: applica
   not blocked.
 - **Everything is paused.** Check `polling.paused`, then `GET /api/v1/admin/polling`.
 - **An old firmware is refused.** If `polling.min_client_version` is set, the policy tells
-  observers below it that `version_ok` is false.
+  observers below it, and observers that send no version, that `version_ok` is false. The value
+  must be `X.Y.Z` (for example `1.18.0`) or empty; anything else stops Beacon at startup.
+- **The device keeps its old settings.** When Beacon cannot read its database the policy and
+  owners routes answer `503` with `Retry-After: 60`. The device keeps the policy and roles it
+  already has until Beacon answers again.
