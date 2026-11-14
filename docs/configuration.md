@@ -325,6 +325,7 @@ the key.
 | `min_client_version` | empty | `X.Y.Z` | The oldest observer firmware allowed to poll. Empty allows all. Observer firmware that sends no version fails the check when this is set. Any other value stops Beacon at startup. |
 | `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
 | `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |
+| `authority` | `evidence` | `evidence` or `approved` | Who can be elected to poll. `evidence`: any observer, ranked on the advert evidence it reports. `approved`: only observers approved through the admin route. See [Trust](repeater-polling.md#trust). |
 
 ```yaml
 polling:
@@ -333,7 +334,9 @@ polling:
 ```
 
 Pause, exclusions and blocked observers can also change at runtime through
-`/api/v1/admin/polling`, with no restart. Config and runtime exclusions are added together.
+`/api/v1/admin/polling`, with no restart. Config and runtime exclusions are added together and
+may name at most 16 different repeaters between them; the admin route refuses a list that would
+go over.
 
 ## MeshMapper API key
 

@@ -860,9 +860,9 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
-| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each) and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `503` unless `polling.enabled` is true and the server is not read-only. |
-| `GET /admin/polling/targets` | Who polls what. `{targets: [...]}`, at most 500 repeaters with a live claim or an assignment, newest claim first. Each is `{publicKey, latestTrustedReading, latestReading, candidates}`; the two times are epoch ms or `null`, `latestTrustedReading` follows the same rule as `latest_ts` in [Owners](#owners) and `latestReading` counts every observer. Each candidate is `{observerPublicKey, rank, evidenceSnr, evidenceCount, keyMode, state, misses, lastOk}`: `rank` is `0` for the poller, `1` and up for standbys and `null` when unassigned; `evidenceSnr` and `evidenceCount` come from the last election, `lastOk` is epoch ms or `null`. Same `503` rule as above. |
-| `PUT /admin/polling/state` | Replaces `{paused, pausedUntil, excludedNodes}`. `pausedUntil` is epoch ms in the future or `null`; at most 16 distinct excluded keys of 64 hex characters (repeats count once). Body up to 4 KiB, `application/json`, unknown fields rejected. Returns the full state. |
+| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `503` unless `polling.enabled` is true and the server is not read-only. |
+| `GET /admin/polling/targets` | Who polls what. `{targets: [...]}`, at most 500 repeaters with a live claim or an assignment, newest claim first. Each is `{publicKey, latestTrustedReading, latestReading, candidates}`; the two times are epoch ms or `null`, `latestTrustedReading` follows the same rule as `latest_ts` in [Owners](#owners) and `latestReading` counts every observer. Each candidate is `{observerPublicKey, rank, evidenceSnr, evidenceCount, keyMode, state, misses, lastOk, approved}`: `rank` is `0` for the poller, `1` and up for standbys and `null` when unassigned; `evidenceSnr` and `evidenceCount` come from the last election; `keyMode`, `state`, `misses` and `lastOk` come from the observer's live claim and are empty, `0` or `null` when it has none; `lastOk` is epoch ms or `null`; `approved` is the operator's flag for the observer. Same `503` rule as above. |
+| `PUT /admin/polling/state` | Replaces `{paused, pausedUntil, excludedNodes}`. `pausedUntil` is epoch ms in the future or `null`; excluded keys are 64 hex characters (repeats count once), and together with `configExcludedNodes` they may name at most 16 distinct repeaters. Otherwise `400` with a message giving the counts, and nothing changes. Body up to 4 KiB, `application/json`, unknown fields rejected. Returns the full state. |
 | `PUT /admin/polling/observers/{publicKey}` | Replaces one observer's `{blocked, approved, note}` (note up to 200 characters). The key is 64 hex characters in either case. Returns the observer. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
 
@@ -966,8 +966,9 @@ Observer firmware with repeater polling calls four routes and publishes two kind
 message. They follow the firmware's contract, not the rest of this one:
 
 - JSON is **snake_case**, not camelCase.
-- The HTTP routes are at the site root, **outside `/api/v1`**, with no authentication and their
-  own rate limit (240 requests a minute per client IP, separate from `/api/v1`).
+- The HTTP routes are at the site root, **outside `/api/v1`**, with no authentication. The policy
+  and owners routes have their own rate limit (240 requests a minute per client IP, separate from
+  `/api/v1`); the two key routes have none.
 - Times are RFC 3339 strings, not epoch milliseconds. Keys are hex.
 
 How an operator turns this on is in [Repeater polling](repeater-polling.md). The bodies are not
@@ -982,7 +983,8 @@ in the Swagger UI.
 | `POST /api/guest-keys` | `404`, always. The body is never read or logged. |
 | `GET /api/shared-guest/key` | `404`, always. |
 
-Beacon never accepts polling keys, so the two key routes always answer `404`. The firmware
+Beacon never accepts polling keys, so the two key routes always answer `404`, even to a client
+that has used up the policy and owners rate limit. The firmware
 reads a `404` on the policy route as "upload keys instead", so the policy route never answers
 `404`. With `polling.enabled: false` the policy and owners routes still answer `200`, with
 `paused: true`, no hosts and no nodes. A read-only server answers them normally.
@@ -1033,11 +1035,11 @@ Every answer carries every field.
 | Field | Type | Meaning |
 |---|---|---|
 | `role` | string | `polling` or `standby`, or `excluded` for an excluded repeater. Case-sensitive. |
-| `mine` | bool | True for the poller. A repeater nobody has been elected for yet is `polling` and `mine` for every claimant; once one has a poller, a claimant the election has not placed is the last standby. |
+| `mine` | bool | True for the poller. A repeater nobody has been elected for yet is `polling` and `mine` for every claimant; once one has a poller, a claimant the election has not placed (for example one not approved in `approved` mode) is the last standby. |
 | `excluded` | bool | True when `role` is `excluded`. |
 | `standby_rank` | int | 1 and up for a standby. The poller and excluded repeaters send 1. |
 | `owner_hops` | int | `0`. |
-| `latest_ts` | string or `null` | `sampled_at` of the newest trusted reading for the repeater. A reading is trusted when its observer is the poller, or a standby that heard the repeater's own adverts directly (zero hops) in the day before the last election. Other readings are stored but do not count here, so an observer cannot hold the real pollers back by claiming a repeater it cannot hear. |
+| `latest_ts` | string or `null` | `sampled_at` of the newest trusted reading for the repeater. A reading is trusted when its observer is ranked for the repeater (poller or standby) and Beacon saw it hear the repeater's own adverts directly (zero hops) in the day before the last election. Other readings, including a poller's without that evidence, are stored but do not count here, so claiming a repeater alone does not hold anyone back. Advert evidence comes from the observer's own packet uplink, so it is not proof; with `polling.authority: approved` only approved observers are ranked. |
 
 ### Claim message
 
@@ -1057,7 +1059,9 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 - `node_id` is the repeater's 64 character public key. `key` is `own`, `shared` or `password`.
 - `state` is `pending`, `ok`, `no_reply`, `login_failed`, `admin_stop` or `not_direct`. A claim
   with an unknown state is still accepted.
-- `misses` is the count of failed polls in a row. At 3 or more the observer ranks as failing.
+- `misses` is the count of failed polls in a row. At 3 or more the observer ranks as failing,
+  below healthy observers with the same kind of evidence. An observer with advert evidence ranks
+  above one without, failing or not.
 - `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and
   `last_ok` are absent from claims sent by clients without request support. Those still send
   `"v": 2`; there is no v1 claim.
@@ -1065,7 +1069,8 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 - A claim is ignored when its `timestamp` is not newer than the stored one or is more than
   10 minutes ahead of Beacon's clock. It is live for 65 minutes after Beacon receives it.
 - A claim that arrives less than 30 seconds after Beacon received the observer's last one is
-  dropped before anything is written. The firmware claims at most once a minute.
+  dropped. The check is made where the claim is stored, so two claims arriving together cannot
+  both pass it. The firmware claims at most once a minute.
 - `misses` and `request_slots` are clamped (0 to 255, 0 to 8). A number too large for a 64-bit
   integer counts as absent.
 
@@ -1096,13 +1101,18 @@ readings in one message and drops a message with more.
 - Beacon keeps at most one new reading per observer, repeater and `method` every 5 minutes of
   receive time; a second one inside that window is dropped. The firmware's shortest poll window is
   30 minutes.
+- Beacon keeps at most 120 readings per observer in any hour of receive time, across all
+  repeaters and methods, and drops the rest. The firmware stays under 100.
+- Both reading limits hold when readings from one observer arrive at the same moment: Beacon
+  checks and stores one observer's readings one at a time.
 - A `stats` value or `battery_mv` that does not fit its column (32-bit for the small counters,
   64-bit for the large ones) is stored as absent, never wrapped.
 - A reading is stored only when `origin_id` equals the topic key, the observer has a live claim
   listing `node_id`, the observer is not blocked, and `sampled_at` is not more than a minute in
   the future or more than 2 hours old. Other readings in the message are skipped one by one.
 - `packet_hash` lets Beacon count how many other observers heard the repeater's reply. It is
-  never required.
+  never required. It must be 16 hex characters (8 bytes); any other value is ignored and the
+  reading is kept without it.
 
 ---
 
