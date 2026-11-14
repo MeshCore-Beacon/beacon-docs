@@ -144,6 +144,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 **Run it**
 
 - [Getting packets in](docs/getting-packets-in.md): brokers, the account Beacon needs, topics.
+- [Repeater polling](docs/repeater-polling.md): observers asking repeaters for telemetry, and how Beacon coordinates them.
 - [Configuration](docs/configuration.md): every environment variable and a map of `config.yaml`.
 - [Reverse proxy](docs/reverse-proxy.md): Caddy, nginx, Apache, rate limits, split origins.
 - [Securing a deployment](docs/security.md): the admin key, the listener, origins, bans.

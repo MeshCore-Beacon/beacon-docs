@@ -79,6 +79,7 @@ which ones to read.
 | `channel_keys` | Hashtag channels and explicit keys for decrypting group messages. | Always. Without keys, channel messages are stored as hashes only. |
 | `scopes` | Transport scope names for matching `TRANSPORT_FLOOD` packets. Each needs a `region`. | Your mesh uses transport scopes. |
 | `telemetry` | How long observer telemetry snapshots are kept and how often one is stored. | Disk is tight. |
+| `polling` | Repeater polling: whether Beacon coordinates observers polling repeaters, which broker hosts they publish to, and how long readings are kept. Off by default. | You want [Repeater polling](repeater-polling.md). See [Repeater polling](#repeater-polling). |
 | `backup` | Turns on the admin backup download. Off by default. | You want [Backup and export](backup-export.md). |
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
@@ -306,6 +307,33 @@ The defaults suit a small server. On a slow (rotational or shared) disk, set `du
 value out of range stops the server at startup with an error naming the key. The startup log
 line `config: loaded` shows the values in force (`fillDuty`, `fillMinPause`,
 `fillPacketSitesSlice`, `fillCmiBatch`). See [Pacing the backfills](operations.md#pacing-the-backfills).
+
+## Repeater polling
+
+The `polling` block turns on [Repeater polling](repeater-polling.md). It is off by default.
+Zero or omitted values use the default. A value out of range stops startup with an error naming
+the key.
+
+| Key | Default | Range | What it does |
+|---|---|---|---|
+| `enabled` | `false` | | Turns polling on. Needs `mqtt_hosts`. |
+| `mqtt_hosts` | none | 1 to 4 hosts when enabled | Broker hosts observers publish to. Plain hostnames of 1 to 63 letters, digits, dots or hyphens, no port. Sent to observers so they pick the matching MQTT slot. |
+| `direct_window` | `1h` | `30m` to `24h` | How old the newest reading may get before the poller asks again. |
+| `grace` | `30m` | `10m` to `2h` | The extra wait for each standby rank. |
+| `max_requests` | `2` | 1 to 3 | Poll starts per repeater per window, sent to observers. |
+| `reading_retention` | `744h` | not negative | How long readings are kept. |
+| `min_client_version` | empty | `X.Y.Z` | The oldest observer firmware allowed to poll. Empty allows all. A value that is not `X.Y.Z` is ignored. |
+| `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
+| `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |
+
+```yaml
+polling:
+  enabled: true
+  mqtt_hosts: [mqtt1.example.com]
+```
+
+Pause, exclusions and blocked observers can also change at runtime through
+`/api/v1/admin/polling`, with no restart. Config and runtime exclusions are added together.
 
 ## MeshMapper API key
 

@@ -1,6 +1,6 @@
 # Beacon: API Contract
 
-The Go server exposes one REST API namespace under `/api/v1/` and one WebSocket endpoint at `/ws`. React (web) and Flutter (mobile) consume identical endpoints. All JSON is camelCase. Times are Unix epoch milliseconds as integers (e.g. `1747668456000`), bytes are hex strings, UUIDs are stringified.
+The Go server exposes one REST API namespace under `/api/v1/` and one WebSocket endpoint at `/ws`. React (web) and Flutter (mobile) consume identical endpoints. All JSON is camelCase. Times are Unix epoch milliseconds as integers (e.g. `1747668456000`), bytes are hex strings, UUIDs are stringified. The one exception is [Firmware polling](#firmware-polling): four routes outside `/api/v1` that use snake_case and RFC 3339 times.
 
 **Why epoch ms:** smaller on the wire, no timezone or parser ambiguity, no string parsing in hot paths (chart axes, sorts, comparisons), and matches the units MeshCore uses internally (uint32 Unix seconds in adverts and traces). JS `new Date(ms)` and Dart `DateTime.fromMillisecondsSinceEpoch(ms)` consume it natively.
 
@@ -860,6 +860,9 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
+| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `excludedNodes` (64 hex each) and `observers`, each `{publicKey, blocked, approved, note}`. `503` unless `polling.enabled` is true and the server is not read-only. |
+| `PUT /admin/polling/state` | Replaces `{paused, pausedUntil, excludedNodes}`. `pausedUntil` is epoch ms in the future or `null`; at most 16 excluded keys of 64 hex characters. Body up to 4 KiB, `application/json`, unknown fields rejected. Returns the full state. |
+| `PUT /admin/polling/observers/{publicKey}` | Replaces one observer's `{blocked, approved, note}` (note up to 200 characters). The key is 64 hex characters in either case. Returns the observer. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
 
 `PUT /admin/config` accepts `{"cors":{"allowed_origins":[...]}}`, `{"guards":{"enforce":[...]}}`
@@ -955,6 +958,131 @@ the `Authorization` and `Content-Type` headers, or preflight blocks requests tha
 curl. CORS controls browser access, not authentication.
 
 Backup details are in [Backup and export](backup-export.md).
+
+## Firmware polling
+
+Observer firmware with repeater polling calls four routes and publishes two kinds of MQTT
+message. They follow the firmware's contract, not the rest of this one:
+
+- JSON is **snake_case**, not camelCase.
+- The HTTP routes are at the site root, **outside `/api/v1`**, with no authentication and their
+  own rate limit (240 requests a minute per client IP, separate from `/api/v1`).
+- Times are RFC 3339 strings, not epoch milliseconds. Keys are hex.
+
+How an operator turns this on is in [Repeater polling](repeater-polling.md). The bodies are not
+in the Swagger UI.
+
+### Routes
+
+| Route | Answer |
+|---|---|
+| `GET /api/guest-polling/policy` | `200`, the policy. Always, on every instance. |
+| `GET /api/guest-polling/owners` | `200`, `{"nodes": {...}, "policy": {...}}`. |
+| `POST /api/guest-keys` | `404`, always. The body is never read or logged. |
+| `GET /api/shared-guest/key` | `404`, always. |
+
+Beacon never accepts polling keys, so the two key routes always answer `404`. The firmware
+reads a `404` on the policy route as "upload keys instead", so the policy route never answers
+`404`. With `polling.enabled: false` the policy and owners routes still answer `200`, with
+`paused: true`, no hosts and no nodes. A read-only server answers them normally.
+
+Both GET routes take these query parameters. Beacon only uses the ones listed. Each answer
+is under 6144 bytes, has an exact `Content-Length`, is not compressed and carries
+`Cache-Control: no-store`.
+
+| Parameter | Meaning |
+|---|---|
+| `observer` | The observer's public key, 64 lowercase hex characters. It is a claim, not proof. Anything else is treated as no observer. |
+| `client` | The firmware family, such as `meshcore.observer_fw`. Up to 32 characters. |
+| `client_version` | The firmware version. Up to 23 characters. |
+
+### Policy
+
+Every answer carries every field.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `reading_format` | string | Always `"telemetry"`. |
+| `mqtt_hosts` | array of strings | `polling.mqtt_hosts`, lowercase. |
+| `direct_s` | int | Poll window in seconds, 1800 to 86400. |
+| `one_hop_s` | int | Twice `direct_s`, at most 86400. Sent for completeness. |
+| `grace_s` | int | Wait per standby rank in seconds, 600 to 7200. |
+| `max_requests` | int | 1 to 3. |
+| `version` | string | A short hash of the settings. The firmware echoes it in claims. |
+| `paused` | bool | Every observer should stop. |
+| `paused_until` | string | RFC 3339 end of a timed pause, or `""`. |
+| `observer_blocked` | bool | The caller is blocked. |
+| `min_plugin_version` | string | Sent as `""`. |
+| `version_ok` | bool | False when `client` is the observer firmware and `client_version` is below `polling.min_client_version`. |
+| `excluded_nodes` | array of strings | Repeater keys never polled, up to 16. |
+| `node_windows` | object | Sent as `{}`. |
+
+### Owners
+
+`nodes` has one entry for each repeater the caller has a live claim for, keyed by the repeater's
+64 lowercase hex key. It is `{}` when the observer is unknown, blocked or has no live claim.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `role` | string | `polling` or `standby`, or `excluded` for an excluded repeater. Case-sensitive. |
+| `mine` | bool | True for the poller. |
+| `excluded` | bool | True when `role` is `excluded`. |
+| `standby_rank` | int | 1 and up for a standby. The poller and excluded repeaters send 1. |
+| `owner_hops` | int | `0`. |
+| `latest_ts` | string or `null` | `sampled_at` of the newest stored reading for the repeater from any observer. |
+
+### Claim message
+
+An observer publishes this to `meshcore/{IATA}/{OBSERVER PUBLIC KEY, UPPER HEX}/polling` at QoS 1,
+not retained, and refreshes it about every 30 minutes. Each claim replaces the previous one.
+
+```json
+{"v": 2, "origin": "Name", "origin_id": "<UPPER hex>", "timestamp": "2026-11-13T22:13:20Z",
+ "plugin": "meshcore.observer_fw/<fw>", "policy_version": "a1b2", "community": true,
+ "accepts_requests": true, "request_slots": 3,
+ "nodes": [{"node_id": "<lower hex>", "reply_hops": 0, "via": null, "key": "own", "snr": 6.5,
+            "state": "ok", "misses": 2,
+            "last_attempt": "2026-11-13T22:11:40Z", "last_ok": "2026-11-13T22:12:30Z"}]}
+```
+
+- `origin_id` must equal the topic's key. Otherwise the claim is dropped.
+- `node_id` is the repeater's 64 character public key. `key` is `own`, `shared` or `password`.
+- `state` is `pending`, `ok`, `no_reply`, `login_failed`, `admin_stop` or `not_direct`. A claim
+  with an unknown state is still accepted.
+- `misses` is the count of failed polls in a row. At 3 or more the observer ranks as failing.
+- `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and
+  `last_ok` are absent from older (`"v": 1`) claims.
+- A claim is ignored when its `timestamp` is not newer than the stored one or is more than
+  10 minutes ahead of Beacon's clock. It is live for 65 minutes after Beacon receives it.
+
+### Reading message
+
+Published to `.../telemetry` (`"v": 2`) or `.../battery` (`"v": 1`), same topic prefix, QoS 1,
+not retained. One reading per message in the v2 format, up to 1664 bytes.
+
+```json
+{"v":2,"origin":"Name","origin_id":"<UPPER hex>","timestamp":"2026-11-13T22:13:23Z",
+ "plugin":"meshcore.observer_fw/<fw>","readings":[{"node_id":"<lower hex>","battery_mv":4038,
+ "source":"poll","reply_hops":0,"method":"status","sampled_at":"2026-11-13T22:13:20Z","snr":6.5,
+ "stats":{"uptime_secs":788089,"noise_floor":-116,"last_rssi":-114,"last_snr":1.25,"tx_queue":0,
+ "packets_recv":81234,"packets_sent":20276,"recv_flood":76198,"recv_direct":5012,
+ "sent_flood":19211,"sent_direct":1065,"tx_air_secs":18301,"rx_air_secs":73835,
+ "flood_dups":56298,"direct_dups":36,"recv_errors":28074,"err_events":2},
+ "tag":1794484800,"packet_hash":"0123456789ABCDEF"}]}
+```
+
+- `method` is `status` (has `stats`) or `telemetry` (has `lpp`, raw CayenneLPP as lower hex up to
+  160 bytes, and `battery_mv` and `temperature_c` when decoded). Any other value drops the message.
+  Each `stats` key is present only if the repeater's reply was long enough to hold it.
+- A `battery_mv` of 0 means no voltage and is stored as none.
+- Beacon decodes the parts of `lpp` that parse and keeps the bytes.
+- A reading is stored once per repeater, observer, `tag` and `method`. With no `tag`, `sampled_at`
+  stands in for it. The same reading arriving twice is stored once.
+- A reading is stored only when `origin_id` equals the topic key, the observer has a live claim
+  listing `node_id`, the observer is not blocked, and `sampled_at` is not more than a minute in
+  the future or more than 2 hours old. Other readings in the message are skipped one by one.
+- `packet_hash` lets Beacon count how many other observers heard the repeater's reply. It is
+  never required.
 
 ---
 
