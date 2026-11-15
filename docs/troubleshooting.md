@@ -76,6 +76,7 @@ Check `GET /api/v1/brokers` first.
   [Getting packets in](getting-packets-in.md).
 - **Connected but nothing stored.** No observers are publishing to that broker, or
   `ingest.allow_countries` / `allow_continents` in `config.yaml` is filtering them out.
+  `ingest.allow_iatas` lets in single IATA codes on top of those.
   `GET /api/v1/observers` shows who Beacon has heard from.
 - **Packets arrive but with no signal data.** The account is Role 3, which strips `snr` and
   `rssi`. Ask for a Role 2 account.

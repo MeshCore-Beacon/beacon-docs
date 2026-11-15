@@ -197,6 +197,9 @@ are then dropped, and the election moves its repeaters to other observers.
 
 ## Troubleshooting
 
+- **Nothing from the observer is stored at all.** The observer's IATA code is outside the
+  ingest filter. The filter drops claims and readings as well as packets. Add its country to
+  `ingest.allow_countries` or its code to `ingest.allow_iatas`, then restart.
 - **The device polls nothing.** No MQTT slot on the device matches `mqtt_hosts`. Compare the
   host in the slot with the list, and set `poll.slot` if needed.
 - **The device acts like it never got a policy.** Open
