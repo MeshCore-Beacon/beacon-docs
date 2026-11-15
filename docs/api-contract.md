@@ -439,7 +439,8 @@ Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a
       "t": 1794700800000, "readings": 3,
       "batteryMv": 4226, "temperatureC": 16.5, "noiseFloorDb": -97, "lastRssiDb": -20, "lastSnrDb": 12.0,
       "uptimeSeconds": 79884, "queueLength": 0,
-      "airtimeTxSecs": 1.5, "airtimeRxSecs": 220.0, "packetsReceived": 410, "packetsSent": 6, "receiveErrors": 12
+      "airtimeTxSecs": 1.5, "airtimeRxSecs": 220.0, "packetsReceived": 410, "packetsSent": 6, "receiveErrors": 12,
+      "counterSpanSecs": 21600
     }
   ]
 }
@@ -460,12 +461,23 @@ Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a
 | `lastSnrDb` | SNR of that packet, dB. Average, rounded to a tenth. |
 | `queueLength` | Packets waiting to be sent. Average, rounded to a whole number. |
 | `uptimeSeconds` | Seconds since the repeater started. The largest value in the bucket, not an average. |
-| `airtimeTxSecs`, `airtimeRxSecs` | Seconds of radio time spent sending and receiving. Increase within the bucket. |
-| `packetsReceived`, `packetsSent`, `receiveErrors` | Packet counts. Increase within the bucket. |
+| `airtimeTxSecs`, `airtimeRxSecs` | Seconds of radio time spent sending and receiving. Increase within the bucket, covering `counterSpanSecs`. |
+| `packetsReceived`, `packetsSent`, `receiveErrors` | Packet counts. Increase within the bucket, covering `counterSpanSecs`. |
+| `counterSpanSecs` | Seconds of elapsed time that the five counter increases in this point cover. Left out when zero. See below. |
 
 Every field after `readings` is left out when no reading in the bucket carried it. Repeaters do not all report every field.
 
-The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases, so each point is what was added during that bucket and a chart can plot it directly. A reboot restarts the totals and Beacon accounts for it. A reading that cannot be right is dropped: a total that goes down without a reboot, or one that grows faster than the radio could produce (more than twice real time for airtime, 20 per second for receive errors, 100 per second for packets). Growth across a gap of more than 48 hours between two readings that carry the counter is also dropped, because it cannot be placed in a bucket. The first reading in a range is measured against the newest status reading before the range.
+The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases, and each point holds the increases from the readings that fell in its bucket. A reboot restarts the totals and Beacon accounts for it. A reading that cannot be right is dropped: a total that goes down without a reboot, or one that grows faster than the radio could produce (more than twice real time for airtime, 20 per second for receive errors, 100 per second for packets). Growth across a gap of more than 48 hours between two readings that carry the counter is also dropped, because it cannot be placed in a bucket. The first reading in a range is measured against the newest status reading before the range.
+
+Counters only arrive on status readings, which are hours apart (6 hours by default, up to 24). An increase can therefore cover more time than the bucket it lands in, so it is not a rate per bucket. `counterSpanSecs` says how much time the increases in a point cover. Divide an increase by it to get a rate. For example, `airtimeRxSecs / counterSpanSecs` is the share of time the repeater spent receiving. Do not divide by the bucket length.
+
+`counterSpanSecs` is the sum, over the status readings in the bucket that added an increase, of the time since the previous status reading used as the baseline. Three cases change that:
+
+- After a reboot the counters count from boot, so the span added is the reading's uptime, capped at the time since the previous status reading.
+- After a gap of more than 48 hours the increase is dropped, and no span is added.
+- The first status reading Beacon has for a node (no earlier baseline) adds neither an increase nor a span.
+
+A point with no span has no counter fields either, since an increase without a span cannot become a rate. That includes a bucket that holds only telemetry readings. A client should treat such a point as having no value, not as zero.
 
 A reading is trusted when, at the moment it was stored, its observer was assigned to that repeater and Beacon had itself heard the repeater directly through that observer. The decision is made once, when the reading is stored, and does not change later, so a chart does not shift when assignments change. Readings stored before this was recorded were judged against the assignments as they stood when the server was upgraded. Only trusted readings are in `points` by default, so an observer that merely claims a repeater cannot put numbers on its chart. `include=untrusted` adds the rest and `untrustedReadings` tells a client how many it left out.
 
