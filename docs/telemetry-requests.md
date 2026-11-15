@@ -109,13 +109,25 @@ owners answer for it, and the device drops it.
 A requested assignment is made before the device lists the repeater in its claim, so the hourly
 cleanup keeps it for as long as that observer's live claim accepts requests, even though no claim
 row names the repeater yet. Once the claim expires or stops accepting requests, the assignment is
-cleaned up as any other.
+cleaned up as any other. Cleanup renumbers the ranks that are left (0, 1, ...) and brings the
+requests in step: `active` while an observer still polls the repeater, `waiting` with
+`no_observer` when none does.
+
+A claim and the state reports in it (`admin_stop`, `login_failed`) are stored together. If a report
+cannot be stored, the claim is not stored either, so the device's next claim repeats the report.
+
+A repeater the observer polls from its own configuration never takes a requested seat, and cannot
+push a requested repeater out of one.
 
 When Beacon cannot record which password version it served in an owners answer that carries a
 requested repeater (the instance is read-only, or the store fails), or cannot read the password in
 use, the owners route answers `503` with `Retry-After: 60` instead of a `200` without the requested
 entries. The device would read an omitted entry as withdrawn and drop it, so it keeps what it has
-and asks again. See [Firmware polling](api-contract.md#firmware-polling).
+and asks again. Approval is read the same way: if it cannot be read, the answer is `503`. See
+[Firmware polling](api-contract.md#firmware-polling).
+
+When a device is full and holds a younger repeater, the owners answer offers the older one in the
+seat a withdrawn target frees, in the same answer.
 
 ## What the user sees
 
@@ -127,9 +139,11 @@ and asks again. See [Firmware polling](api-contract.md#firmware-polling).
 | `admin_stopped` | The repeater answered with admin access. | `admin_stopped`, `blank_blocked` |
 | `disabled` | Nobody heard the repeater for `polling.offline_disable_days` days. | `offline` |
 
-The profile also shows the poller's name and when the newest trusted reading arrived. The user
-fixes `login_failed` and `admin_stopped` by entering a new guest password, and restarts a `disabled`
-request with `enabled: true`. Removing a request deletes its password, and when it was the last
+The profile also shows the poller's name and when the newest trusted reading arrived. Only a new
+guest password restarts a `login_failed` or `admin_stopped` request. `enabled: true` changes
+nothing on them, and the offline sweep leaves their status alone. On an `admin_stopped` request
+removing the password (the blank login) is refused with `422 password_invalid`. The user restarts a
+`disabled` request with `enabled: true`. Removing a request deletes its password, and when it was the last
 request for the repeater observers stop polling it.
 
 After the password changed, a `login_failed` report from an observer is ignored, so the report of an
@@ -158,10 +172,15 @@ poller.
 
 ## Offline repeaters
 
-Every hour Beacon turns off all requests for a repeater that no observer has heard for
+Every hour Beacon turns off the waiting and active requests for a repeater that no observer has heard for
 `polling.offline_disable_days` days, counted from when its newest request was created or last
-re-enabled. The reason reads "Not heard by any observer for N days." The user restarts a request by
-hand, which restarts the clock.
+re-enabled. The reason reads "Not heard by any observer for N days." The user restarts a disabled
+request by hand, which restarts the clock. A `login_failed` or `admin_stopped` request keeps its
+status and reason while the repeater is unheard, because only a new password restarts it.
+
+Migration `080` adds an index on `polling_targets.active_request_id`, so deleting a request does
+not scan every repeater ever requested. It is built with `CREATE INDEX CONCURRENTLY`, outside a
+transaction, and the server rebuilds it if an earlier build was cut short.
 
 ## Admin routes
 

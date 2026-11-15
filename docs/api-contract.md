@@ -1329,7 +1329,7 @@ password is never returned, only `hasPassword`.
 | `login_failed` | `blank_login_failed` | The repeater did not accept a blank or hello login. |
 | `admin_stopped` | `admin_stopped` | The password gave admin access and Beacon deleted it. |
 | `admin_stopped` | `blank_blocked` | The repeater gives admin access to a blank login; a guest password is needed. |
-| `disabled` | `offline` | No observer heard the repeater for `statusReasonDays` days. |
+| `disabled` | `offline` | No observer heard the repeater for `statusReasonDays` days. Only a `waiting` or `active` request becomes `disabled`; `login_failed` and `admin_stopped` keep their status and code. |
 | any | `other` | A reason the server has no code for. Show `statusReason`. |
 
 `statusReason` is the English sentence for the same reason.
@@ -1348,9 +1348,14 @@ PATCH /api/v1/me/telemetry-requests/{id}
 { "password": "new" }        or  { "password": null }   or  { "enabled": true }
 ```
 
-At least one field. `enabled` can only be `true`, and restarts a disabled request. A new password
-clears a `login_failed` or `admin_stopped` state. `null` removes the password. Answers `200` with
-the request.
+At least one field. `enabled` can only be `true`, and restarts a `disabled` request. On a
+`login_failed` or `admin_stopped` request it changes nothing: only a new password restarts those,
+and they keep their status and reason code even while nobody hears the repeater. `null` removes the
+password (a blank or hello login); on an `admin_stopped` request it is refused with
+`422 password_invalid` and the request stays as it was, because that user must enter a guest
+password. A `login_failed` request may still switch to the blank login. Answers `200` with the
+request. Status can change in the same step as the edit that caused it (create, edit, enable,
+cleanup), not only at the next election.
 
 ```
 DELETE /api/v1/me/telemetry-requests/{id}
@@ -1515,6 +1520,10 @@ the password in use, it is `503` with `Retry-After: 60`, never a `200` that leav
 entries out, because the device would read an omitted entry as withdrawn and drop it. Owners
 answers with no requested repeater are unaffected.
 
+A device that is full of requested repeaters and holds a younger one gets the older replacement in
+the same answer: the seat a withdrawn target frees is offered to it at once. A repeater the
+observer polls from its own configuration never uses a requested seat.
+
 When Beacon cannot read the pause state, the caller's blocked flag or the caller's roles, both
 routes answer `503` with the standard error body, an exact `Content-Length` and
 `Retry-After: 60`. On any non-200 answer other than `404` the firmware keeps the policy it
@@ -1593,7 +1602,9 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 - `accepts_requests` says the observer takes requested repeaters, and `request_slots` is how many
   free seats it has (clamped to 8). A node entry with `"requested": true` is one the observer was
   given by a request. A report of `admin_stop` or `login_failed` for a requested repeater counts only
-  from the observer that was assigned it.
+  from the observer that was assigned it. A claim and the state reports in it are stored in one
+  transaction, so a report that fails to store rolls the claim back and the device's next claim
+  repeats it.
 - `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and
   `last_ok` are absent from claims sent by clients without request support. Those still send
   `"v": 2`; there is no v1 claim.
