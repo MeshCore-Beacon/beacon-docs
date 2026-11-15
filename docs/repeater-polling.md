@@ -6,8 +6,8 @@ observers that both hear a repeater do not both spend airtime on it, and stores 
 Polling is off by default.
 
 This page is for an operator who runs Beacon and for someone who owns an observer. Beacon only
-coordinates and stores. It does not talk to repeaters itself, and in this release nothing in the
-web app or the mobile app shows the readings yet. Charts come in a later release.
+coordinates and stores. It does not talk to repeaters itself. See [Seeing the readings](#seeing-the-readings)
+for where the readings show up.
 
 ## How it works
 
@@ -115,6 +115,20 @@ Beacon accepts a reading only when all of these hold:
 - That observer has a claim under 65 minutes old that lists the repeater.
 - `sampled_at` is at most 1 minute ahead of Beacon's clock and not older than 2 hours.
 - The observer is not blocked.
+
+## Seeing the readings
+
+With polling enabled, a repeater's or room server's detail view in Beacon Web and in the mobile
+app shows charts of its readings, and so do Atlas cards. With polling off, none of them appear.
+
+Only trusted readings are charted. A reading is trusted when its observer was assigned to the
+repeater and Beacon had itself heard the repeater directly through that observer when the reading
+was stored. Readings from any other observer are kept but left out of the charts. To see them,
+call the API with `include=untrusted`, for example
+`/api/v1/nodes/{nodeId}/telemetry?range=168h&include=untrusted`. The answer also says how many
+readings it left out. See the [API contract](api-contract.md#node-telemetry).
+
+A gap in a chart is a missed poll. It does not mean the repeater was down.
 
 ## Pause, exclude and block
 

@@ -357,6 +357,8 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/{nodeId}/observations` | Page of observations of packets the node originated, ordered by the packet's first heard time, newest first, then by packet, then by observation ID descending. Observation IDs do not descend across the whole list, and an old packet heard again recently keeps its original place. Cursor is the last item's observation ID; a cursor whose observation no longer exists returns an empty page with `hasMore` false, not an error. |
 | `GET /nodes/{nodeId}/activity?range=24h` | Hourly totals of those observations, with signal averages. See [Node activity](#node-activity). |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
+| `GET /nodes/{nodeId}/telemetry?range=168h&interval=6h` | Repeater readings of a polled node, bucketed for charts. See [Node telemetry](#node-telemetry). |
+| `GET /nodes/{nodeId}/polling` | Which observer polls the node and when it last got a trusted reading. See [Node polling](#node-polling). |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
 
@@ -409,6 +411,89 @@ seconds.
   [observer activity](#observers): `rolledUntil` is omitted before the first rollup, and when
   `rawFrom` is later than `rolledUntil` (or `rolledUntil` is missing), the hours between are
   uncovered, not quiet.
+
+#### Node telemetry
+
+```
+GET /api/v1/nodes/{nodeId}/telemetry?range=168h&interval=6h&include=untrusted
+```
+
+The readings that observers took from a repeater or room server when [repeater polling](repeater-polling.md) is on, folded into UTC buckets. Every parameter is optional.
+
+| Param | Values | Default |
+|---|---|---|
+| `range` | `24h`, `168h`, `720h` | `168h` |
+| `interval` | `1h`, `6h`, `24h` | `1h` for `24h`, `6h` for `168h`, `24h` for `720h` |
+| `include` | `untrusted` | none |
+
+Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a UUID, is a `400`. An unknown node is a `404`. A node with no readings is a `200` with `polled` false and `points` empty. This holds when polling is off on the server, so a client can ask without checking `features` first.
+
+```json
+{
+  "range": "168h",
+  "interval": "6h",
+  "polled": true,
+  "untrustedReadings": 0,
+  "points": [
+    {
+      "t": 1794700800000, "readings": 3,
+      "batteryMv": 4226, "temperatureC": 16.5, "noiseFloorDb": -97, "lastRssiDb": -20, "lastSnrDb": 12.0,
+      "uptimeSeconds": 79884, "queueLength": 0,
+      "airtimeTxSecs": 1.5, "airtimeRxSecs": 220.0, "packetsReceived": 410, "packetsSent": 6, "receiveErrors": 12
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `range`, `interval` | The values used, defaults filled in. |
+| `polled` | True when Beacon has ever stored a reading for this node, trusted or not. It does not depend on `range` or `include`. |
+| `untrustedReadings` | Readings inside `range` that were left out because `include=untrusted` was not sent. Always 0 when it was sent. |
+| `points` | Ascending by `t`. A bucket with no readings is not sent, so a gap between points is a gap in polling. |
+| `t` | Bucket start, epoch ms, aligned to UTC. |
+| `readings` | How many readings fell in the bucket. |
+| `batteryMv` | Battery, millivolts. Average, rounded to a whole number. |
+| `temperatureC` | Degrees Celsius. Average, rounded to a tenth. |
+| `noiseFloorDb` | Noise floor, dBm. Average, rounded to a whole number. |
+| `lastRssiDb` | RSSI of the last packet the repeater heard, dBm. Average, rounded to a whole number. |
+| `lastSnrDb` | SNR of that packet, dB. Average, rounded to a tenth. |
+| `queueLength` | Packets waiting to be sent. Average, rounded to a whole number. |
+| `uptimeSeconds` | Seconds since the repeater started. The largest value in the bucket, not an average. |
+| `airtimeTxSecs`, `airtimeRxSecs` | Seconds of radio time spent sending and receiving. Increase within the bucket. |
+| `packetsReceived`, `packetsSent`, `receiveErrors` | Packet counts. Increase within the bucket. |
+
+Every field after `readings` is left out when no reading in the bucket carried it. Repeaters do not all report every field.
+
+The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases, so each point is what was added during that bucket and a chart can plot it directly. A reboot restarts the totals and Beacon accounts for it. A reading that cannot be right is dropped: a total that goes down without a reboot, or one that grows faster than the radio could produce (more than twice real time for airtime, 20 per second for receive errors, 100 per second for packets). Growth across a gap of more than 48 hours between two readings that carry the counter is also dropped, because it cannot be placed in a bucket. The first reading in a range is measured against the newest status reading before the range.
+
+A reading is trusted when, at the moment it was stored, its observer was assigned to that repeater and Beacon had itself heard the repeater directly through that observer. The decision is made once, when the reading is stored, and does not change later, so a chart does not shift when assignments change. Readings stored before this was recorded were judged against the assignments as they stood when the server was upgraded. Only trusted readings are in `points` by default, so an observer that merely claims a repeater cannot put numbers on its chart. `include=untrusted` adds the rest and `untrustedReadings` tells a client how many it left out.
+
+#### Node polling
+
+```
+GET /api/v1/nodes/{nodeId}/polling
+```
+
+Who polls this node right now. A `400` for a `nodeId` that is not a UUID and a `404` for an unknown node. With polling off it answers as for a node nobody polls.
+
+```json
+{
+  "polled": true,
+  "latestReadingAt": 1794702630000,
+  "poller": { "observerId": "8f0c6a52-0d56-4a47-9c36-3e8f1c2f4b11", "name": "HOWL V4.2" },
+  "standbys": [ { "observerId": "5b1d0f1e-7c3a-4d0e-8a56-9f2b6c1d7a20", "name": "Ridge West", "rank": 1 } ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `polled` | True when Beacon has ever stored a reading for this node, trusted or not. Same meaning as in the telemetry answer. |
+| `latestReadingAt` | Time of the newest trusted reading, epoch ms. `null` when there is none, even if untrusted readings exist. |
+| `poller` | The observer ranked first: `observerId` and `name`. `null` when nobody is assigned. |
+| `standbys` | The other assigned observers, in rank order, each with `observerId`, `name` and `rank` (1, 2, ...). An empty array when there are none. The poller has no `rank` field. |
+
+`name` is the observer's display name, or the first 8 hex characters of its public key when it has none.
 
 #### MeshMapper repeater details
 
@@ -814,7 +899,10 @@ GET /api/v1/info
 Public, no key. Counts against the normal rate limit and is sent with `Cache-Control: no-cache`.
 
 ```json
-{ "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4" }
+{
+  "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
+  "features": { "polling": true, "accounts": "off", "telemetryRequests": false, "alerts": false }
+}
 ```
 
 `minAppVersion` and `minWebVersion` are the oldest BEACON Mobile and Beacon Web releases allowed
@@ -824,6 +912,17 @@ higher of the server's built-in floor and the operator's `mobile.min_app_version
 first release that sends a [WebSocket ticket](#websocket-ticket). `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
 Swagger shows. Servers older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
+
+`features` tells a client which optional parts of the API this server offers, so it can hide what is off.
+
+| Flag | Meaning |
+|---|---|
+| `polling` | True when [repeater polling](repeater-polling.md) is enabled on this server. Clients show the reading charts only when it is true. |
+| `accounts` | A string. `"off"` for now. |
+| `telemetryRequests` | `false` for now. |
+| `alerts` | `false` for now. |
+
+`accounts`, `telemetryRequests` and `alerts` are fixed values until later releases and nothing behind them exists yet. A client must treat a missing `features`, as sent by an older server, as all off.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
