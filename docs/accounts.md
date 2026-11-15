@@ -110,7 +110,9 @@ The app does not use the cookie. It holds a bearer token (see below), so CORS do
   confirmed gets `email_unverified`, only after the password was right.
 - **Reset a password.** A mailed link that lasts 1 hour. Using it ends every session of that user and
   clears the sign-in throttle. A refused new password does not use up the link. The link is bound to
-  the address it was mailed to: if the account's address changes first, the link stops working.
+  the address it was mailed to: if the account's address changes first, the link stops working. The
+  link is spent in the same step as the password change, under the per-user lock, so a second
+  outstanding link fails once one has been used, and a password change made first revokes the link.
   Beacon mails the account address when a password was changed, by reset or from the profile.
 - **Profile.** Change the display name, the password (ends every other session), the email (the new
   address is held as `pendingEmail` and changes only when its mailed link is used; the old address is

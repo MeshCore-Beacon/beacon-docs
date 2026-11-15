@@ -1379,9 +1379,12 @@ GET /api/v1/me/alerts
 ```
 
 One target per Atlas pin, in Atlas order. `id` is the node's or observer's id as used by
-`/nodes/{id}` and `/observers/{id}`, or `null` when the radio no longer exists. `polled` is true when
-Beacon has trusted telemetry for the radio now (readings in the last 14 days for a repeater, telemetry
-for an observer); it is what offers the telemetry kinds and, for a repeater, the 3 and 6 hour
+`/nodes/{id}` and `/observers/{id}`, or `null` when the radio no longer exists. `polled` is true while
+the radio has a current source of telemetry: for a repeater, an observer holds it as a polling
+assignment now; for an observer, it sent status telemetry in the last 24 hours. Old readings do not
+count, so a target that was polled can read `polled: false`, its telemetry kinds then move to
+`unavailable` with `not_polled` (repeater) or `observer_no_data` (observer), and its telemetry rules
+read `inactive`. It is what offers the telemetry kinds and, for a repeater, the 3 and 6 hour
 `gone_quiet` thresholds. `available` is always an array and `unavailable` always an object of kind to
 English reason. `unavailableCodes` is always an object with the same keys, kind to a stable code a
 client can translate; fall back to the sentence for a code it does not know. `delivery` is `push` or
@@ -1394,7 +1397,7 @@ Reason codes (`unavailableCodes`, and `reasonCode` in the `kind_unavailable` err
 |---|---|
 | `observer_no_data` | An observer does not report this value. |
 | `repeaters_only` | Only repeaters report this value; the radio is not one. |
-| `not_polled` | Beacon is not polling this repeater; request telemetry for it first. |
+| `not_polled` | No observer holds this repeater as a polling assignment now; request telemetry for it first. |
 | `no_data` | A polled repeater does not report this value. |
 | `observer_no_clock` | Observers have no clock drift value. |
 | `clock_repeaters_only` | Only repeaters and room servers report a clock. |
@@ -1411,11 +1414,11 @@ Kinds, thresholds and ranges (`threshold` is null where none is taken):
 | `battery_low` | millivolts | 2500 to 5000 |
 | `battery_falling` | millivolts per day | 100, 200, 300 |
 | `rebooted` | none | null |
-| `temperature` | tenths of a degree C | `threshold` is the low limit, `thresholdHigh` the high limit, -500 to 1500; at least one, low below high |
+| `temperature` | tenths of a degree C | `threshold` is the low limit, `thresholdHigh` the high limit, -500 to 1500; at least one, low below high. With both set on a rule that is on, `thresholdHigh - threshold` must be at least 20 (2.0 C), else `422 invalid_threshold` ("The range must be at least 2 degrees wide."); turning a rule off is not held to it |
 | `noise_high` | dBm | -130 to -50 |
 | `observer_offline` | minutes | 30, 60, 180, 360 (observers only) |
 
-`state` is `ok`, `firing`, `inactive` (the data is gone) or `unknown` (not enough data yet).
+`state` is `ok`, `firing`, `inactive` (the data is gone, or the radio is no longer polled) or `unknown` (not enough data yet).
 `request_attention` is announced to users with telemetry requests but is not a stored rule and never
 appears here.
 

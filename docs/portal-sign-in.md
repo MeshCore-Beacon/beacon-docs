@@ -54,6 +54,9 @@ Beacon expects the portal to provide two things, and nothing else is needed from
 2. A token call, `POST <portal.url>/portal_beacon_api.php?action=token` with a JSON body of
    `client_id`, `client_secret`, `code`, `code_verifier` and `redirect_uri`, answering `200` with
    `{"user":{"id":...,"username":"...","display_name":"..."}}`. The id may be a string or digits.
+   Beacon keeps it exactly as the user's subject (digits compare as their decimal text). A subject
+   that is blank, longer than 128 bytes, not valid UTF-8 or holding a control character fails the
+   sign-in, like any other failure below.
 
 ## How a sign-in goes
 

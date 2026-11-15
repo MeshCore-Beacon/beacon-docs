@@ -66,7 +66,10 @@ observer is faster still.
      `request_observers` is `all`);
    - the repeater is not in `admin_stop` or `not_direct` state for it.
 3. Observers are ranked as for any polled repeater. At most one poller and two standbys are chosen.
-   Seats go to the oldest requests first.
+   Seats are reserved in request age order: when two repeaters compete for the same observer's
+   seats, the repeater with the older request keeps its seat and the younger one loses it, even if
+   the younger one is elected first. A repeater left with no observer goes back to `waiting` with
+   `no_seat`.
 4. If an observer already polls the repeater because its owner set it as a target, it keeps the job
    and the requests ride on its readings. No password is sent.
 5. The next owners answer to each chosen observer lists the repeater with `"requested": true` and,
@@ -113,7 +116,11 @@ A guest password is shared with the volunteer observer that polls the repeater, 
 an admin password. Beacon cannot tell them apart when they are entered, and says so on the form. If
 a repeater answers a login with admin access, the observer reports `admin_stop` and Beacon:
 
-- deletes the password that was in use, and sets that request to `admin_stopped`;
+- deletes the password that was in use, and sets that request to `admin_stopped`. The stop is judged
+  against the password version that observer was last given. If the repeater's password in use
+  has changed since then (another request took over), the stop is recorded for that observer only
+  and the newer password stays, because the observer never tried it. Without a record of what
+  was given, the password in use is deleted;
 - records the stop for that observer and repeater, so the observer is not offered the repeater again;
 - when no password was in use (the blank or hello login got admin), blocks passwordless requests for
   that repeater, because anyone could request it and the observer would log in as admin. Such a

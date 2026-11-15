@@ -107,7 +107,7 @@ repeater, which an observer then uses to log in.
 - **Guest only, never admin.** A password given to Beacon is shared with a volunteer's observer, so
   it must be a guest password. Beacon cannot tell an admin password from a guest one when it is
   entered, and says so on the form. When a repeater answers a login with admin access, the observer
-  reports `admin_stop`; Beacon deletes the password, marks the request `admin_stopped`, records that
+  reports `admin_stop`; Beacon deletes the password that observer was given (a newer password for the same repeater stays), marks the request `admin_stopped`, records that
   observer as stopped for that repeater, and, if the login had no password, blocks passwordless
   requests for the repeater until you lift it. An admin password is never stored after that and never
   forwarded again.

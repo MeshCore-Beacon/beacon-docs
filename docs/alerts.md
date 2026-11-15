@@ -30,8 +30,8 @@ clients whether to show the section. A read-only server never evaluates or sends
 
 A user sets rules per radio on their Atlas. A radio has one rule per kind. Which kinds a radio
 offers depends on what it is and what Beacon has seen it report. Kinds that need readings are
-offered for a repeater only while Beacon is polling it, meaning trusted readings arrived in the
-last 14 days; the user is told to request telemetry for it first (see
+offered for a repeater only while Beacon is polling it, meaning an observer holds it as a polling
+assignment right now; the user is told to request telemetry for it first (see
 [Requested telemetry](telemetry-requests.md)).
 
 | Kind | Radios | Threshold |
@@ -42,7 +42,7 @@ last 14 days; the user is told to request telemetry for it first (see
 | `battery_low` | with a battery reading | Millivolts, 2500 to 5000. |
 | `battery_falling` | with a battery reading | Millivolts per day: 100, 200 or 300. |
 | `rebooted` | with an uptime reading | None. Notifies on each new reboot seen. |
-| `temperature` | with a temperature reading | Tenths of a degree C, -500 to 1500. A low limit (`threshold`), a high limit (`thresholdHigh`) or both; low must be below high. |
+| `temperature` | with a temperature reading | Tenths of a degree C, -500 to 1500. A low limit (`threshold`), a high limit (`thresholdHigh`) or both; low must be below high. With both set on a rule that is on, the high limit must be at least 20 tenths (2.0 degrees C) above the low one, or the change is refused with `422 invalid_threshold`; a rule being turned off is not held to it. |
 | `noise_high` | with a noise floor reading | dBm, -130 to -50. |
 | `observer_offline` | observers | Minutes without a status report: 30, 60, 180 or 360. |
 
@@ -50,19 +50,26 @@ A sixth announcement, `request_attention`, is not a rule. Every user who has a t
 gets one notice when it moves to `login_failed`, `admin_stopped` or `disabled`, and another if it
 recovers and fails again. It is sent whenever alerts are on.
 
-A rule is `ok`, `firing`, `inactive` (the data it needs is gone) or `unknown` (not enough data yet).
+A rule is `ok`, `firing`, `inactive` (the data it needs is gone, for instance a repeater no
+observer polls any more) or `unknown` (not enough data yet).
 Changing a threshold or turning a rule on resets it to `unknown` and starts from now, so there is
 no alert about the past. Taking a radio off the Atlas deletes its rules. A `back_online` rule whose
 `gone_quiet` rule is turned off or deleted reads `inactive` and sends nothing.
 
-The overview marks each radio `polled` when Beacon has trusted telemetry for it, which is what
-offers the 3 and 6 hour `gone_quiet` thresholds and the telemetry kinds. When a kind is not offered
+The overview marks each radio `polled` while it has a current source of telemetry, which is what
+offers the 3 and 6 hour `gone_quiet` thresholds and the telemetry kinds. A repeater is polled while
+an observer holds it as a polling assignment (a standby counts). An observer is polled only if it
+sent status telemetry in the last 24 hours. Old readings alone do not count, so a radio that was
+polled can turn `polled: false`; its telemetry kinds then move to `unavailable` with code
+`not_polled` (repeater) or `observer_no_data` (observer), and its telemetry rules read `inactive`. When a kind is not offered
 the overview gives the reason as an English sentence and as a stable code (`unavailableCodes`), so
 clients can translate it. The codes are listed in the [API contract](api-contract.md#alerts).
 
 ## How often, and the limits
 
-- Rules are evaluated every 5 minutes. Only one instance does it at a time.
+- Rules are evaluated every 5 minutes. Only one instance does it at a time. A pass is bounded, so it
+  continues where the last one ended and starts over only after it has reached the last rule; the
+  position is kept in the database. Every enabled rule is evaluated in the end.
 - A rule notifies when it changes into `firing`, and at most once every 6 hours. `rebooted` and
   `back_online` notify on the event itself, under the same 6 hour limit.
 - A rule goes back to `ok` only when the reading is clear of the threshold by some margin: 100 mV
@@ -75,9 +82,13 @@ clients can translate it. The codes are listed in the [API contract](api-contrac
 ## Email
 
 One message per user for each evaluation pass: subject "Beacon: 1 alert" or "Beacon: n alerts",
-one plain sentence per alert, and a link to `<public_url>/?tab=Atlas`. Mail uses the account mail
-queue. A notice counts as delivered when it is queued, so a mail the SMTP server later refuses is
-logged and not retried. A user with no verified address gets nothing.
+one plain sentence per alert, and a link to `<public_url>/?tab=Atlas`. The alert sender sends it
+directly, not through the account mail queue, with a 30 second timeout for each message. A notice
+counts as delivered only once the SMTP server accepted the mail. A failed send is retried after 1,
+2, 4 and 8 minutes, at most 5 attempts in all, and within the 2 hour limit above; it also ends that
+minute's run, so one dead mail server costs one timeout a minute. At most 16 mails go out per run,
+and the notices of one user and pass are never split across mails. A user with no verified address
+gets nothing.
 
 ## Push
 
@@ -104,7 +115,9 @@ With `push` and no `BEACON_PUSH_CREDENTIALS`, startup stops with an error: other
 rules that never send. A file that cannot be read or is not a service account key also stops
 startup, and the message names neither the path nor the content. Keep the file private.
 
-Each live app session with a registered token gets one message per notice. The title is the
+Each live app session with a registered token gets one message per notice. Delivery is tracked per
+device: a retry goes only to the devices that do not have the notice yet, and a notice is delivered
+once every device has it. The title is the
 radio's name and the body is one English sentence; the app opens the radio from the message data
 (`targetKind`, `publicKey` and, when the radio is known, its `id`). A token Google reports as no longer registered is deleted. A user
 with no app signed in gets no push alerts. Only an app session can register a token; a browser
