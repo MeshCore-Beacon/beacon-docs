@@ -46,7 +46,7 @@ Visitors get the new values on their next page load. Any characters are fine in 
 | `VITE_MAP_CENTER`, `VITE_MAP_ZOOM` | no | Fallback map view as decimal `lat,lon` and a zoom from 0 to 22, used before airports load or when the selected region has no location. Unset is a world view. |
 | `VITE_DISABLED_TABS` | no | Comma-separated tabs to hide. Options: `Packets,Channels,Map,Nodes,Observers,Routes,Traces,Analytics,Atlas`. |
 | `VITE_ENABLED_THEMES` | no | Comma-separated theme ids. When set, only these themes are offered. Listing `meshmapper_dark` or `meshmapper_light` is the only way to enable those two. |
-| `VITE_APP_NAME` | no | Wordmark text in the top left. Default `BEACON`. |
+| `VITE_APP_NAME` | no | Wordmark text in the top left. Default `BEACON`. The server also reads it as the instance name in the mail it sends: the sender name (when `accounts.smtp.from` is a bare address), the subjects and the bodies. Unset, blank or `BEACON` in any case reads as `Beacon` in mail; other values are used as written, with control characters removed, spaces collapsed and the length capped at 60 characters. The server container must receive the variable too, which it does when it shares the web container's `.env`. |
 | `VITE_SKIP_SPLASH` | no | `true` skips the once-per-session loading splash. |
 | `VITE_BANNER` | no | Notice shown above the header on every page, for example on a test instance. `[label](url)` and bare URLs become links. |
 

@@ -60,6 +60,13 @@ Mail is sent in the background from a small queue. A request never waits for the
 failed send shows up only in the log (user id, kind of mail and the recipient's domain, never the
 address) and the user asks for another link. If the queue is full a mail is dropped and logged.
 
+Mail names the instance with the `VITE_APP_NAME` value, the same text as the web wordmark, for example
+`Confirm your email address for Beacon - Ottawa`. The server reads it from its own environment, so the
+variable must be visible to the server container as well as the web container (a shared `.env` does
+this). Unset, blank or `BEACON` gives `Beacon`. When `smtp.from` is a bare address, the name is also the
+sender's display name; an explicit display name in `smtp.from` is kept as it is. Alert mail uses the same
+name in its subject.
+
 The mailed links are `<public_url>/?view=verify#token=...` and `<public_url>/?view=reset#token=...`
 (an email-change link is a verify link). The token is in the URL fragment, which a browser never
 sends to a server, so no proxy or access log sees a live token. Links mailed before this change used
