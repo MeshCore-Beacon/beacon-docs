@@ -37,7 +37,7 @@ last 14 days; the user is told to request telemetry for it first (see
 | Kind | Radios | Threshold |
 |---|---|---|
 | `gone_quiet` | all | Hours: 12, 24 or 48. Also 3 and 6 for observers and polled repeaters. |
-| `back_online` | all | None. Needs a `gone_quiet` rule on the same radio. Notifies when that rule recovers. |
+| `back_online` | all | None. Needs an enabled `gone_quiet` rule on the same radio. Notifies when that rule recovers. |
 | `clock` | repeaters, room servers | Seconds of drift: 300, 3600 or 86400. Fires after two adverts in a row beyond it. |
 | `battery_low` | with a battery reading | Millivolts, 2500 to 5000. |
 | `battery_falling` | with a battery reading | Millivolts per day: 100, 200 or 300. |
@@ -52,7 +52,13 @@ recovers and fails again. It is sent whenever alerts are on.
 
 A rule is `ok`, `firing`, `inactive` (the data it needs is gone) or `unknown` (not enough data yet).
 Changing a threshold or turning a rule on resets it to `unknown` and starts from now, so there is
-no alert about the past. Taking a radio off the Atlas deletes its rules.
+no alert about the past. Taking a radio off the Atlas deletes its rules. A `back_online` rule whose
+`gone_quiet` rule is turned off or deleted reads `inactive` and sends nothing.
+
+The overview marks each radio `polled` when Beacon has trusted telemetry for it, which is what
+offers the 3 and 6 hour `gone_quiet` thresholds and the telemetry kinds. When a kind is not offered
+the overview gives the reason as an English sentence and as a stable code (`unavailableCodes`), so
+clients can translate it. The codes are listed in the [API contract](api-contract.md#alerts).
 
 ## How often, and the limits
 
@@ -100,7 +106,7 @@ startup, and the message names neither the path nor the content. Keep the file p
 
 Each live app session with a registered token gets one message per notice. The title is the
 radio's name and the body is one English sentence; the app opens the radio from the message data
-(`targetKind` and `publicKey`). A token Google reports as no longer registered is deleted. A user
+(`targetKind`, `publicKey` and, when the radio is known, its `id`). A token Google reports as no longer registered is deleted. A user
 with no app signed in gets no push alerts. Only an app session can register a token; a browser
 session gets `403 app_session_required`.
 

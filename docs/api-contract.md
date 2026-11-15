@@ -1369,24 +1369,44 @@ GET /api/v1/me/alerts
 ```json
 { "delivery": "push", "hasDevice": true,
   "targets": [
-    { "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop",
+    { "id": "uuid or null", "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop", "polled": true,
       "available": ["gone_quiet", "back_online", "clock", "battery_low"],
       "unavailable": { "temperature": "This repeater does not report a temperature." },
+      "unavailableCodes": { "temperature": "no_data" },
       "rules": [
         { "id": "uuid", "kind": "battery_low", "threshold": 3500, "thresholdHigh": null,
           "enabled": true, "state": "ok", "stateChangedAt": 1794700000000, "lastSentAt": null } ] } ] }
 ```
 
-One target per Atlas pin, in Atlas order. `available` is always an array and `unavailable` always an
-object of kind to reason. `delivery` is `push` or `email`. `hasDevice` says whether the user has a
+One target per Atlas pin, in Atlas order. `id` is the node's or observer's id as used by
+`/nodes/{id}` and `/observers/{id}`, or `null` when the radio no longer exists. `polled` is true when
+Beacon has trusted telemetry for the radio now (readings in the last 14 days for a repeater, telemetry
+for an observer); it is what offers the telemetry kinds and, for a repeater, the 3 and 6 hour
+`gone_quiet` thresholds. `available` is always an array and `unavailable` always an object of kind to
+English reason. `unavailableCodes` is always an object with the same keys, kind to a stable code a
+client can translate; fall back to the sentence for a code it does not know. `delivery` is `push` or
+`email`. `hasDevice` says whether the user has a
 push device registered; it is the only thing the API says about devices.
+
+Reason codes (`unavailableCodes`, and `reasonCode` in the `kind_unavailable` error):
+
+| Code | Meaning |
+|---|---|
+| `observer_no_data` | An observer does not report this value. |
+| `repeaters_only` | Only repeaters report this value; the radio is not one. |
+| `not_polled` | Beacon is not polling this repeater; request telemetry for it first. |
+| `no_data` | A polled repeater does not report this value. |
+| `observer_no_clock` | Observers have no clock drift value. |
+| `clock_repeaters_only` | Only repeaters and room servers report a clock. |
+| `needs_gone_quiet` | `back_online` needs an enabled `gone_quiet` rule (error only). |
+| `not_applicable` | The kind has nothing to do with this radio (error only). |
 
 Kinds, thresholds and ranges (`threshold` is null where none is taken):
 
 | `kind` | Unit | Accepted |
 |---|---|---|
 | `gone_quiet` | hours | 12, 24, 48; also 3 and 6 for observers and polled repeaters |
-| `back_online` | none | null. Needs a `gone_quiet` rule on the radio. |
+| `back_online` | none | null. Needs an enabled `gone_quiet` rule on the radio. |
 | `clock` | seconds | 300, 3600, 86400 |
 | `battery_low` | millivolts | 2500 to 5000 |
 | `battery_falling` | millivolts per day | 100, 200, 300 |
@@ -1407,7 +1427,9 @@ PUT /api/v1/me/alerts/rules
 
 Creates or updates the rule for that radio and kind. `enabled` defaults to `true`. Answers `200`
 with the rule. Changing a threshold or turning a rule on resets its state to `unknown`. A rule that
-is being turned off is checked for shape only.
+is being turned off is checked for shape only. Turning `back_online` on needs an enabled `gone_quiet`
+rule on the radio (`422 kind_unavailable`, `needs_gone_quiet`). If that rule is later turned off or
+deleted, the `back_online` rule reads `inactive` until one is enabled again.
 
 ```
 DELETE /api/v1/me/alerts/rules/{id}
@@ -1431,15 +1453,16 @@ user per 10 minutes. These routes need an app session: a cookie session gets
 |---|---|---|
 | 404 | `alerts_disabled` | Alerts are off. |
 | 409 | `not_on_atlas` | The radio is not pinned on the user's Atlas. |
-| 422 | `kind_unavailable` | The radio cannot have this kind; `message` is the reason. |
+| 422 | `kind_unavailable` | The radio cannot have this kind; `message` is the English reason and `error.reasonCode` its code (the only error with that extra field). |
 | 422 | `invalid_threshold` | The threshold is out of range or the wrong shape for the kind. |
 | 422 | `invalid_input` | A bad key or rule id, or a bad platform or token. |
 | 404 | `not_found` | Unknown or foreign rule id. |
 | 403 | `app_session_required` | A device route called with a cookie session. |
 
 **Push data.** A push message has a title (the radio's name) and a body (one English sentence). Its
-`data` is exactly `{"targetKind": "node" | "observer", "publicKey": "<64 hex>"}`, which the app
-uses to open the radio.
+`data` is `{"targetKind": "node" | "observer", "publicKey": "<64 hex>", "id": "uuid"}`, which the app
+uses to open the radio. `id` is the node's or observer's id and is left out when the radio is not
+known to Beacon; open by `id` when present, else look the radio up by key.
 
 
 ## Firmware polling
