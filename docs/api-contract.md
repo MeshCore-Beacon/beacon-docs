@@ -1176,7 +1176,7 @@ Notes:
   `/auth/app/code` is `401 not_signed_in`.
 - **Delete** removes the user and everything it owns in one transaction.
 
-Rate limits per client address, over the normal limit: register 5 / 5 min, login 10 / 1 min, verify 30 /
+Rate limits per client address, on top of the normal REST limit: register 5 / 5 min, login 10 / 1 min, verify 30 /
 1 min, resend and reset request 5 / 5 min, reset confirm 10 / 5 min, app token 10 / 1 min, every other
 `/auth` and `/me` write 60 / 1 min together. The answer is `429 rate_limited` with `Retry-After`.
 
