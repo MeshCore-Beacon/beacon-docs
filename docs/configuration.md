@@ -327,7 +327,7 @@ the key.
 | `direct_window` | `1h` | `30m` to `24h` | How old the newest reading may get before the poller asks again. |
 | `grace` | `30m` | `10m` to `2h` | The extra wait for each standby rank. |
 | `max_requests` | `2` | 1 to 3 | Poll starts per repeater per window, sent to observers. |
-| `reading_retention` | `744h` | at least `1h` | How long readings are kept. |
+| `reading_retention` | `744h` | at least `1h` | How long readings are kept, but never less than the freshness window of the working-poll check (4 hours by default, four times `direct_window`, at most 48 hours). A shorter value is raised to it. |
 | `min_client_version` | empty | `X.Y.Z` | The oldest observer firmware allowed to poll. Empty allows all. Observer firmware that sends no version fails the check when this is set. Any other value stops Beacon at startup. |
 | `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
 | `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |

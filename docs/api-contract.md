@@ -1602,7 +1602,9 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 - `accepts_requests` says the observer takes requested repeaters, and `request_slots` is how many
   free seats it has (clamped to 8). A node entry with `"requested": true` is one the observer was
   given by a request. A report of `admin_stop` or `login_failed` for a requested repeater counts only
-  from the observer that was assigned it. A claim and the state reports in it are stored in one
+  from the observer that was assigned it. A `login_failed` report does not count while that observer
+  has a trusted reading of the repeater stored after the current option became active and within the
+  last 4 hours (the default; four times `polling.direct_window`, at most 48 hours). A claim and the state reports in it are stored in one
   transaction, so a report that fails to store rolls the claim back and the device's next claim
   repeats it.
 - `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and

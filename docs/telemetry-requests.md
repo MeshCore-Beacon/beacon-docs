@@ -150,6 +150,12 @@ After the password changed, a `login_failed` report from an observer is ignored,
 old login does not mark the new password as failed. The grace ends after 30 minutes, or as soon as
 that observer has reported any other state since the change, whichever comes first.
 
+A `login_failed` report also does not count while that observer has a trusted reading stored after the
+current option became active and within the last 4 hours (the default; it is four times
+`polling.direct_window`, at most 48 hours). The repeater keeps reporting the failure of an old login
+even while the blank login works, so a request that is still being polled stays `active`. With no such
+reading the report counts.
+
 ## Guest passwords only
 
 A guest password is shared with the volunteer observer that polls the repeater, so it must never be
