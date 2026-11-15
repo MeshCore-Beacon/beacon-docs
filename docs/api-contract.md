@@ -426,7 +426,7 @@ The readings that observers took from a repeater or room server when [repeater p
 | `interval` | `1h`, `6h`, `24h` | `1h` for `24h`, `6h` for `168h`, `24h` for `720h` |
 | `include` | `untrusted` | none |
 
-Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a UUID, is a `400`. An unknown node is a `404`. A node with no readings is a `200` with `polled` false and `points` empty. This holds when polling is off on the server, so a client can ask without checking `features` first.
+Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a UUID, is a `400`. An unknown node is a `404`. A node with no readings is a `200` with `polled` false and `points` empty. With polling off on the server the route still checks the node, so an unknown node is a `404`, and otherwise answers as for a node with no readings: `{"range":"168h","interval":"6h","polled":false,"untrustedReadings":0,"points":[]}`, with `range` and `interval` as asked or defaulted. A client can ask without checking `features` first.
 
 ```json
 {
@@ -467,17 +467,23 @@ Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a
 
 Every field after `readings` is left out when no reading in the bucket carried it. Repeaters do not all report every field.
 
-The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases, and each point holds the increases from the readings that fell in its bucket. A reboot restarts the totals and Beacon accounts for it. A reading that cannot be right is dropped: a total that goes down without a reboot, or one that grows faster than the radio could produce (more than twice real time for airtime, 20 per second for receive errors, 100 per second for packets). Growth across a gap of more than 48 hours between two readings that carry the counter is also dropped, because it cannot be placed in a bucket. The first reading in a range is measured against the newest status reading before the range.
+The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases one pair at a time. A pair is two consecutive status readings, meaning readings that carry at least one counter. The increases of a pair are credited to the bucket of the later reading. A pair gives the same answer whatever `range` was asked for, so the first pair of a range uses the newest status reading before the range as its earlier half.
+
+A pair either contributes all of its counters or none of them. It contributes when all of these hold:
+
+- The later reading is after the earlier one and no more than 48 hours later. A longer gap cannot be placed in a bucket.
+- At least one counter is present in both readings.
+- The counters do not disagree. Either none went down, or the repeater rebooted and none went up. A reboot is seen when both readings carry uptime and the later uptime is lower than the earlier, or is shorter than the time between the two readings.
+- The span is at least one second.
+- No increase is faster than its cap: 1 second per second for `airtimeTxSecs` and `airtimeRxSecs`, 10 per second for `receiveErrors`, 50 per second for `packetsReceived` and `packetsSent`.
+
+The increase of a counter is the later total minus the earlier total. When the pair spans a reboot and every counter went down, the counters restarted from zero, so the increase is the later total, and the span is the later uptime if that is shorter than the time between the readings. A counter that is present in only one of the two readings is skipped for that pair. A pair that does not contribute adds nothing, so it never produces a zero.
 
 Counters only arrive on status readings, which are hours apart (6 hours by default, up to 24). An increase can therefore cover more time than the bucket it lands in, so it is not a rate per bucket. `counterSpanSecs` says how much time the increases in a point cover. Divide an increase by it to get a rate. For example, `airtimeRxSecs / counterSpanSecs` is the share of time the repeater spent receiving. Do not divide by the bucket length.
 
-`counterSpanSecs` is the sum, over the status readings in the bucket that added an increase, of the time since the previous status reading used as the baseline. Three cases change that:
+`counterSpanSecs` is the sum of the spans of the pairs that contributed to the bucket, so all the counters in a point share one span. A counter field is left out of a point when any contributing pair in that bucket lacked it, because its increase would cover less time than the span and understate the rate. When no pair contributed, `counterSpanSecs` and all five counters are left out. That includes a bucket that holds only telemetry readings, the first status reading Beacon has for a node, and a bucket whose pairs were all dropped. A client should treat such a point as having no value for the counters, not as zero.
 
-- After a reboot the counters count from boot, so the span added is the reading's uptime, capped at the time since the previous status reading.
-- After a gap of more than 48 hours the increase is dropped, and no span is added.
-- The first status reading Beacon has for a node (no earlier baseline) adds neither an increase nor a span.
-
-A point with no span has no counter fields either, since an increase without a span cannot become a rate. That includes a bucket that holds only telemetry readings. A client should treat such a point as having no value, not as zero.
+One case cannot be detected. A corrupt reading that is lower than the truth but passes the rate check can make the following pair read high.
 
 A reading is trusted when, at the moment it was stored, its observer was assigned to that repeater and Beacon had itself heard the repeater directly through that observer. The decision is made once, when the reading is stored, and does not change later, so a chart does not shift when assignments change. Readings stored before this was recorded were judged against the assignments as they stood when the server was upgraded. Only trusted readings are in `points` by default, so an observer that merely claims a repeater cannot put numbers on its chart. `include=untrusted` adds the rest and `untrustedReadings` tells a client how many it left out.
 
@@ -487,7 +493,7 @@ A reading is trusted when, at the moment it was stored, its observer was assigne
 GET /api/v1/nodes/{nodeId}/polling
 ```
 
-Who polls this node right now. A `400` for a `nodeId` that is not a UUID and a `404` for an unknown node. With polling off it answers as for a node nobody polls.
+Who polls this node right now. A `400` for a `nodeId` that is not a UUID and a `404` for an unknown node. With polling off it still checks the node (an unknown node is a `404`) and then answers `{"polled":false,"latestReadingAt":null,"poller":null,"standbys":[]}`, the same as for a node nobody polls.
 
 ```json
 {

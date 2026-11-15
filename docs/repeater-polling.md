@@ -119,7 +119,7 @@ Beacon accepts a reading only when all of these hold:
 ## Seeing the readings
 
 With polling enabled, a repeater's or room server's detail view in Beacon Web and in the mobile
-app shows charts of its readings, and so do Atlas cards. With polling off, none of them appear.
+app shows charts of its readings. Atlas cards show a one-line battery and temperature summary instead of charts, using the latest hourly average. With polling off, none of them appear.
 
 Only trusted readings are charted. A reading is trusted when its observer was assigned to the
 repeater and Beacon had itself heard the repeater directly through that observer when the reading
@@ -128,7 +128,7 @@ call the API with `include=untrusted`, for example
 `/api/v1/nodes/{nodeId}/telemetry?range=168h&include=untrusted`. The answer also says how many
 readings it left out. See the [API contract](api-contract.md#node-telemetry).
 
-A gap in a chart is a missed poll. It does not mean the repeater was down.
+A gap in a chart means there is no usable value for that series in that bucket. The cause can be the poll cadence (status values arrive every few hours), a field the repeater does not report, a counter that was inconsistent and was dropped, or a missed poll. It does not mean the repeater was down.
 
 ## Pause, exclude and block
 
