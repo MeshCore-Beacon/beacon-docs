@@ -12,7 +12,7 @@ This document describes the contract and the parts that need explaining. Every r
 
 ## Auth
 
-Everything under `/api/v1/` is public and read-only, except the `/api/v1/admin/` subtree.
+Everything under `/api/v1/` is public and read-only, except the `/api/v1/admin/` subtree and, when [user accounts](accounts.md) are on, the `/api/v1/auth` and `/api/v1/me` routes (see [User accounts](#user-accounts)).
 
 Admin routes need the operator key, set as `auth.api_key` in `config.yaml` or `BEACON_API_KEY` in the environment (the variable wins when set, even if empty). A key shorter than 16 characters or with whitespace inside it stops startup.
 
@@ -117,7 +117,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. The account routes add their own codes, listed under [User accounts](#user-accounts). Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
@@ -919,7 +919,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "telemetryRequests": false, "alerts": false }
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false }
 }
 ```
 
@@ -936,11 +936,12 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | Flag | Meaning |
 |---|---|
 | `polling` | True when [repeater polling](repeater-polling.md) is enabled on this server. Clients show the reading charts only when it is true. |
-| `accounts` | A string. `"off"` for now. |
+| `accounts` | A string: `"off"` or `"local"`. `"local"` means [user accounts](#user-accounts) are on. |
+| `registration` | True when new sign-ups are open. Only meaningful when `accounts` is `"local"`. |
 | `telemetryRequests` | `false` for now. |
 | `alerts` | `false` for now. |
 
-`accounts`, `telemetryRequests` and `alerts` are fixed values until later releases and nothing behind them exists yet. A client must treat a missing `features`, as sent by an older server, as all off.
+`telemetryRequests` and `alerts` are fixed values until later releases and nothing behind them exists yet. A client must treat a missing `features`, as sent by an older server, as all off, and a missing `registration` as `false`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -975,6 +976,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `PUT /admin/config` | Replaces `cors.allowed_origins`, `guards.enforce` or both until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/db/statements` | `pg_stat_statements` for this database, summed by statement name. `503` when the extension is missing or not preloaded. |
 | `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
+| `GET /admin/users`, `PUT /admin/users/{id}`, `DELETE /admin/users/{id}` | Manage [user accounts](#operator-user-routes). `503` unless `accounts.mode` is `local` and the server is not read-only. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
 | `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `503` unless `polling.enabled` is true and the server is not read-only. |
@@ -1076,6 +1078,137 @@ the `Authorization` and `Content-Type` headers, or preflight blocks requests tha
 curl. CORS controls browser access, not authentication.
 
 Backup details are in [Backup and export](backup-export.md).
+
+### User accounts
+
+Off unless `accounts.mode` is `local` ([User accounts](accounts.md)). With it off every route below,
+under `/api/v1/auth` and `/api/v1/me`, answers `404` with code `accounts_disabled`, and no cookie is set.
+These are separate from the operator records at `/admin/accounts`.
+
+A session is the `beacon_session` cookie or `Authorization: Bearer <token>`. A request that sends a
+bearer header never falls back to the cookie. The cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and
+`Secure` unless the `accounts.public_url` is `http://localhost...` or `http://127.0.0.1...`.
+
+Rules for every route here:
+
+- Bodies are one JSON object of at most 4 KiB with `Content-Type: application/json`, no unknown
+  fields: `415`, `413` and `400` otherwise.
+- Answers carry `Cache-Control: no-store`. On a read-only server every write answers `503` with code
+  `read_only`.
+- **Forgery check.** A `POST`, `PUT`, `PATCH` or `DELETE` authenticated by the cookie must send
+  `X-Beacon-CSRF: 1`, and an `Origin` header, if there is one, must be the origin of `public_url` or
+  one of `cors.allowed_origins` (`*` never counts), else `403 csrf_rejected`. Bearer requests and
+  signed-out requests skip it.
+- A web client on another origin needs `cors.allowed_methods`, `cors.allowed_headers` (with
+  `X-Beacon-CSRF`) and `cors.allow_credentials`. See [User accounts](accounts.md#same-site-and-a-web-app-on-another-origin).
+
+Shapes (times are epoch ms):
+
+```json
+{ "id": "uuid", "username": "ridgewalker", "displayName": "Ridge Walker", "email": "a@example.org",
+  "emailVerified": true, "pendingEmail": null, "provider": "local", "createdAt": 1794700000000 }
+```
+
+```json
+{ "id": "uuid", "kind": "web", "label": "Firefox on macOS", "current": true,
+  "createdAt": 1794700000000, "lastUsedAt": 1794703600000, "expiresAt": 1797292000000 }
+```
+
+The first is a user, the second a session (`kind` is `web` or `app`). No response ever carries a
+password hash.
+
+| Route | Needs | Body | Success |
+|---|---|---|---|
+| `POST /auth/register` | nothing | `{username, email, password}` | `202 {"status":"check_email"}` |
+| `POST /auth/verify` | nothing | `{token}` | `200 {"status":"verified"}` |
+| `POST /auth/verify/resend` | nothing | `{email}` | `202 {"status":"check_email"}` |
+| `POST /auth/login` | nothing | `{login, password}` | `200 {"user":{...}}`, sets the cookie |
+| `POST /auth/logout` | session | none | `204`, clears the cookie |
+| `POST /auth/reset/request` | nothing | `{email}` | `202 {"status":"check_email"}` |
+| `POST /auth/reset/confirm` | nothing | `{token, password}` | `200 {"status":"password_set"}` |
+| `POST /auth/app/code` | cookie session | `{codeChallenge, state, deviceLabel}` | `200 {"code","redirectUri"}` |
+| `POST /auth/app/token` | nothing | `{code, codeVerifier}` | `200 {"token","expiresAt","user"}` |
+| `GET /me` | session | | `200 {"user":{...}}` |
+| `PATCH /me` | session | `{displayName}` | `200 {"user":{...}}` |
+| `POST /me/password` | session | `{currentPassword, newPassword}` | `204`, ends every other session |
+| `POST /me/email` | session | `{email, currentPassword}` | `202 {"status":"check_email"}` |
+| `DELETE /me` | session | `{currentPassword}` | `204`, clears the cookie |
+| `GET /me/sessions` | session | | `200 {"sessions":[...]}` |
+| `DELETE /me/sessions/{id}` | session | | `204` |
+| `DELETE /me/sessions` | session | | `204`, ends every session but the current one |
+
+Notes:
+
+- **Register, resend and reset request** never reveal whether an address is registered: the same
+  status and body for a known and an unknown address. The mail is sent after the answer. A username that
+  is already used, whether by a verified account or a pending sign-up, is `409 username_taken` whatever
+  the address.
+- **Pending sign-ups.** Each sign-up against an unverified address gets its own verify link carrying
+  its own username and password. The link that is used decides which credentials the account gets, and
+  it ends every earlier session of the user. Resend mails the link of the newest pending sign-up.
+- **Verify** also finishes an email change: the stored email changes only when the link is used, and
+  fails as `token_invalid` if another user owns the address by then. It does not sign anyone in.
+- **Username** 3 to 30 of `A-Za-z0-9_.-`, unique ignoring case; `admin`, `root`, `beacon`, `system`,
+  `support`, `moderator` and `operator` are reserved. **Email** one address of at most 254 bytes,
+  stored lower case. **Display name** 1 to 40 characters after trimming. **Password** 12 to 128 bytes,
+  refused when it is one repeated character, contains the username or the email's local part (ignoring
+  case), or is on the common-password list. Refusals are `422 weak_password` with the reason in
+  `message`, or `422 invalid_input`.
+- **Login** `login` is a username or an email. An unknown name and a wrong password both give
+  `401 invalid_credentials`, so does a disabled user. `403 email_unverified` comes only after the
+  password was right.
+- **Throttle.** 10 wrong passwords within 15 minutes for one typed name or one account refuse further
+  checks for 15 minutes: `429 too_many_attempts` with `Retry-After`. A password reset clears it.
+- **Reset confirm** ends every session of the user. A password the policy refuses does not use up the
+  link.
+- **Links** in mail are `<public_url>/?view=verify&token=...` and `<public_url>/?view=reset&token=...`.
+  Verify and email-change links last 24 hours, reset links 1 hour. All are single use.
+- **Sessions.** Web: 30 days, rolling. App: 180 days, rolling, hard end 365 days after creation, at
+  most 10 per user (the oldest is ended). The rolling expiry is written at most once every 5 minutes.
+  `DELETE /me/sessions/{id}` with an id that is not the user's changes nothing; a bad id is
+  `422 invalid_input`; ending the current session also clears the cookie.
+- **App sign-in.** The user must be signed in on the web. `/auth/app/code` takes the base64url
+  SHA-256 of a random verifier as `codeChallenge` (S256 only), a `state` of at most 256 characters
+  and a `deviceLabel`, and returns a one-time `code` and `redirectUri`, always `meshcorebeacon://auth`.
+  The app sends `code` and `codeVerifier` to `/auth/app/token`. The code lasts 5 minutes and is used
+  up before the verifier is checked, so a wrong verifier needs a new code. The `token` goes in the
+  `Authorization: Bearer` header. Beacon mails the user when an app signs in. Without the cookie,
+  `/auth/app/code` is `401 not_signed_in`.
+- **Delete** removes the user and everything it owns in one transaction.
+
+Rate limits per client address, over the normal limit: register 5 / 5 min, login 10 / 1 min, verify 30 /
+1 min, resend and reset request 5 / 5 min, reset confirm 10 / 5 min, app token 10 / 1 min, every other
+`/auth` and `/me` write 60 / 1 min together. The answer is `429 rate_limited` with `Retry-After`.
+
+Error codes the account routes use:
+
+| Status | Code | When |
+|---|---|---|
+| 404 | `accounts_disabled` | Accounts are off. |
+| 401 | `not_signed_in` | No valid session. |
+| 401 | `invalid_credentials` | Wrong name, email or password, or a wrong current password. |
+| 403 | `email_unverified` | Right password, address not confirmed. |
+| 403 | `registration_closed` | `accounts.registration` is `closed`. |
+| 403 | `csrf_rejected` | The forgery check failed. |
+| 400 | `token_invalid` | A link or code is wrong, used or expired. |
+| 409 | `username_taken` | The username is in use. |
+| 422 | `weak_password` | The password breaks the rules; `message` says why. |
+| 422 | `invalid_input` | Another value is out of range. |
+| 429 | `rate_limited` | A per-address limit; `Retry-After` in seconds. |
+| 429 | `too_many_attempts` | The password throttle; `Retry-After` in seconds. |
+| 503 | `read_only` | The server is read-only. |
+
+#### Operator user routes
+
+Bearer admin key, see [Auth](#auth). `503` when accounts are off or the server is read-only.
+
+- `GET /admin/users?search=&cursor=&limit=` lists users newest first. `limit` is 1 to 200, default 50;
+  `search` is part of a username or email, at most 100 characters. Returns `{items, nextCursor}`;
+  `nextCursor` is missing on the last page. Each item is a user plus `disabled` and `lastLoginAt`
+  (epoch ms or `null`).
+- `PUT /admin/users/{id}` with `{"disabled": true}` ends every session of the user and refuses new
+  sign-ins; `false` lifts it. Returns `{user}`. `404` for an unknown id.
+- `DELETE /admin/users/{id}` removes the user and everything it owns: `204`, or `404`.
 
 ## Firmware polling
 

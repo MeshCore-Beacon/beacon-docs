@@ -1,0 +1,211 @@
+# User accounts
+
+Accounts let a person sign in to Beacon Web and BEACON Mobile with a username, an email address and
+a password. They are off by default. With `accounts.mode: off` every account route answers `404`
+with code `accounts_disabled`, no cookie is ever set, `features.accounts` in
+[`/api/v1/info`](api-contract.md#server-info) is `"off"`, and both clients show no sign-in entry.
+Nothing that works signed out changes either way. Everything public stays public.
+
+These are not the operator records behind `/api/v1/admin/accounts`. Those are named API keys for
+the operator. User accounts live in their own tables and routes, called `users`.
+
+## Turn them on
+
+Accounts need an SMTP server that can send mail, because sign-up, password reset and email changes
+all work by a mailed link. Add this to `config.yaml`:
+
+```yaml
+accounts:
+  mode: local
+  public_url: https://beacon.example.org
+  registration: open
+  smtp:
+    host: smtp.example.org
+    port: 587
+    username: beacon@example.org
+    from: "Beacon <no-reply@example.org>"
+    starttls: true
+```
+
+Put the SMTP password in the environment, never in the file:
+
+```
+BEACON_SMTP_PASSWORD=...
+```
+
+In the Docker stacks that is the `.env` of the host that runs the server. Then recreate the app container. `config.yaml` is read at startup only.
+
+| Key | Default | What it does |
+|---|---|---|
+| `mode` | `off` | `off` or `local`. Anything else stops startup. The rest of the block is not checked while this is `off`. |
+| `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
+| `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
+| `smtp.host` | none | Required. |
+| `smtp.port` | `587` | 1 to 65535. |
+| `smtp.username` | empty | Empty means no authentication. When set, Beacon uses AUTH PLAIN, and the server must offer AUTH. |
+| `smtp.from` | none | Required, one address, for example `"Beacon <no-reply@example.org>"`. |
+| `smtp.starttls` | `true` | When true the send fails if the server does not offer STARTTLS; Beacon never falls back to plain text. Set `false` only for a trusted local relay. |
+
+`BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment. A mistake in the
+block stops startup with an error naming the key. Port 465 (implicit TLS) is not supported; use a
+submission port that offers STARTTLS.
+
+Mail is sent in the background from a small queue. A request never waits for the mail server, so a
+failed send shows up only in the log (user id, kind of mail and the recipient's domain, never the
+address) and the user asks for another link. If the queue is full a mail is dropped and logged.
+
+The mailed links are `<public_url>/?view=verify&token=...` and `<public_url>/?view=reset&token=...`.
+They open the web app, so `public_url` must be where Beacon Web is served.
+
+On a read-only server (`server.read_only`) every account write answers `503 read_only`, sign-in
+included. The hourly cleanup and the operator user routes are off.
+
+## Same site, and a web app on another origin
+
+The session cookie is `beacon_session`. It is `HttpOnly`, `SameSite=Lax`, `Path=/`, has no `Domain`
+and is `Secure` unless `public_url` is `http://localhost...` or `http://127.0.0.1...`. A browser sends
+it only to the host that set it, and `SameSite=Lax` means only from a page on the same site.
+
+- **Same origin** (deployment type 1: the web app at `/` and the API at `/api/*` on one host):
+  nothing to configure.
+- **Another origin**, which includes deployment type 2 where the web app is on `WEB_DOMAIN` and the API on `DOMAIN`, such as the web app on `beacon.example.org` and the API on
+  `api.example.org`: the two must still be the same site (one registrable domain), or the browser
+  drops the cookie. Then set the CORS block for the web origin:
+
+```yaml
+cors:
+  allowed_origins: [https://beacon.example.org]
+  allowed_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
+  allowed_headers: [Accept, Authorization, Content-Type, X-Beacon-CSRF]
+  allow_credentials: true
+```
+
+`allowed_origins` must list the web origin, not `*`: a browser refuses credentials with a wildcard,
+and Beacon's forgery check never accepts `*`. The default methods are read-only and the default
+headers lack `X-Beacon-CSRF`, so without these keys the preflight for a sign-in fails. The web
+client also has to send its requests with credentials. See [Configuration](configuration.md#accounts)
+and [Reverse proxy](reverse-proxy.md).
+
+The app does not use the cookie. It holds a bearer token (see below), so CORS does not apply to it.
+
+## How people use it
+
+- **Sign up.** The person gives a username, an email and a password. Beacon always answers
+  `202 check_email`, whether or not the address is registered. A link is mailed and lasts 24 hours.
+  The account exists only after the link is used, and the mail names the username it activates.
+- **Several sign-ups for one address.** Each sign-up against an address that is not yet verified gets
+  its own link, carrying its own username and password. The link that is clicked decides which
+  credentials the account gets, so a stranger who typed someone else's address cannot set the
+  password the owner ends up with. A username that is already taken, verified or pending, is refused
+  with `username_taken` whatever the address. "Send the link again" repeats the newest pending
+  sign-up.
+- **Sign in.** With a username or an email and the password. A person whose email is not yet
+  confirmed gets `email_unverified`, only after the password was right.
+- **Reset a password.** A mailed link that lasts 1 hour. Using it ends every session of that user and
+  clears the sign-in throttle. A refused new password does not use up the link.
+- **Profile.** Change the display name, the password (ends every other session), the email (the new
+  address is held as `pendingEmail` and changes only when its mailed link is used), list and end
+  sessions, and delete the account with the current password.
+- **The app.** The person signs in on the web first. The web asks for a one-time code, bound to a
+  PKCE challenge (S256 only), and hands it to the app through `meshcorebeacon://auth`. The app swaps
+  code and verifier for a bearer token. Beacon mails the user whenever an app signs in, and the
+  Devices list shows it so it can be ended.
+
+## What Beacon stores about a user
+
+| Data | Detail |
+|---|---|
+| Username, display name | The display name starts as the username. Usernames are unique ignoring case. |
+| Email | One address, lower case, unique. A pending new address is held until confirmed. |
+| Password | Only an argon2id hash (19 MiB memory, 2 passes, 1 lane, random 16-byte salt). A hash made with older settings is upgraded at the next sign-in. |
+| Sessions | A SHA-256 hash of the token, kind (`web` or `app`), a label (such as "Firefox on macOS"), the IP address and User-Agent, and created, last used and expiry times. |
+| One-time tokens | SHA-256 hashes only. A pending sign-up's token also holds that sign-up's username and password hash until it expires or is used. |
+| Times | Created, last login, and whether the user is disabled. |
+
+Passwords, tokens and codes are never logged and never stored in clear text. Request bodies on the
+`/auth` and `/me` routes are never logged. Account responses carry `Cache-Control: no-store`.
+
+Session lengths:
+
+| Session | Lasts | Notes |
+|---|---|---|
+| Web | 30 days, rolling | Each use extends it, written at most once every 5 minutes. |
+| App | 180 days, rolling | Hard end 365 days after creation. At most 10 per user; a new one ends the oldest. |
+
+One-time lifetimes: verify and email-change links 24 hours, reset links 1 hour, app codes 5 minutes.
+All are single use.
+
+Passwords are 12 to 128 bytes. A password is refused when it is one repeated character, contains the
+username or the part of the email before the `@` (ignoring case), or is on the bundled list of
+common passwords. There are no other composition rules. Usernames are 3 to 30 of `A-Z a-z 0-9 _ . -`
+and `admin`, `root`, `beacon`, `system`, `support`, `moderator` and `operator` are reserved.
+
+## Limits and throttles
+
+Per client address, as `requests / window`:
+
+| Route | Limit |
+|---|---|
+| `POST /auth/register` | 5 / 5 min |
+| `POST /auth/login` | 10 / 1 min |
+| `POST /auth/verify` | 30 / 1 min |
+| `POST /auth/verify/resend`, `POST /auth/reset/request` | 5 / 5 min |
+| `POST /auth/reset/confirm` | 10 / 5 min |
+| `POST /auth/app/token` | 10 / 1 min |
+| Every other `/auth` and `/me` write | 60 / 1 min (one shared budget) |
+
+Over a limit the answer is `429 rate_limited` with `Retry-After`. These count the client address, so
+behind a proxy set `server.trusted_proxies` (see [Reverse proxy](reverse-proxy.md)) or every user
+shares one budget.
+
+Separately, 10 wrong passwords within 15 minutes, counted for the typed name and for the account it
+resolves to, refuse further password checks for 15 minutes with `429 too_many_attempts` and
+`Retry-After`. A username and an email for the same account share one budget. A successful password
+reset clears it. The counters are in memory, so a restart clears them. Because they also count
+against the account, someone who knows a username can keep that account locked out for 15 minutes at
+a time; the per-address limits bound how fast. If many addresses try made-up names the table can
+fill, and new names are then refused for a minute.
+
+## Managing users as the operator
+
+These routes need the [admin key](configuration.md#admin-api-key) and answer `503` when accounts are
+off or the server is read-only.
+
+```
+GET    /api/v1/admin/users?search=&cursor=&limit=
+PUT    /api/v1/admin/users/{id}      {"disabled": true}
+DELETE /api/v1/admin/users/{id}
+```
+
+- The list is newest first, 50 a page by default, up to 200. `search` matches part of the username
+  or email, ignoring case (up to 100 characters). Pass `nextCursor` as `cursor` for the next page; it
+  is missing on the last page. No password hash is ever returned.
+- `PUT` with `disabled: true` ends every session of the user at once and refuses new sign-ins.
+  `disabled: false` lifts it. The user is returned, with `disabled` and `lastLoginAt`.
+- `DELETE` removes the user and everything it owns in one transaction: `204`, or `404` if unknown.
+
+Example:
+
+```
+curl -H "Authorization: Bearer $BEACON_API_KEY" \
+  "https://beacon.example.org/api/v1/admin/users?search=ridge"
+```
+
+There is no operator route to set a password. A user who forgot theirs uses the reset link.
+
+## Cleanup
+
+An hourly task (`users_cleanup`) deletes, once they are more than a week past their end:
+
+- sessions that were ended or have expired (including past their hard end);
+- one-time tokens that were used or have expired;
+- sign-ups nobody confirmed: local users never verified, created more than a week ago, with no live
+  verify link left. This frees the username and address.
+
+A live session or token is never touched by it.
+
+## Disabling accounts again
+
+Set `accounts.mode: off` and restart. The routes answer `404 accounts_disabled` and clients hide
+sign-in. The stored users, sessions and tokens stay in the database and are used again if you turn
+accounts back on; the cleanup does not run while they are off.

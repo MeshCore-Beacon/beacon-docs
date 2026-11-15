@@ -6,7 +6,7 @@ channel messages.
 
 ## The admin key
 
-The `/api/v1/admin/*` endpoints are the only authenticated part of the API. Generate the key
+The `/api/v1/admin/*` endpoints are the only operator-authenticated part of the API. User accounts, when enabled, add signed-in `/api/v1/auth` and `/api/v1/me` routes. Generate the key
 with `openssl rand -hex 32`, set it as `BEACON_API_KEY`, and send it only in the
 `Authorization: Bearer` header over HTTPS, never in a URL or a request body. Keep it out of
 source control and logs. The rules Beacon enforces (16 characters minimum, no whitespace,
@@ -36,8 +36,28 @@ Only the page's own host may open `/ws` unless other origins are listed under
 `websocket.allowed_origins`. REST CORS allows any origin by default but only the read-only
 methods (`GET`, `HEAD`, `OPTIONS`). An admin UI on another origin needs `cors.allowed_origins`
 restricted to that UI, the write methods added, and the `Authorization` and `Content-Type`
-headers allowed, or its preflight requests fail. CORS controls what browsers may do, not who
+headers allowed, or its preflight requests fail. A web app that signs users in from another origin
+also needs `X-Beacon-CSRF` in `allowed_headers` and `allow_credentials: true`. CORS controls what browsers may do, not who
 is authenticated.
+
+## User accounts
+
+Accounts are off by default; see [User accounts](accounts.md). When they are on:
+
+- Passwords are stored only as argon2id hashes. Session tokens, mailed links and app codes are random
+  and stored only as SHA-256 hashes. None of them, and no request body on `/auth` or `/me`, is
+  logged.
+- The session cookie is `HttpOnly`, `SameSite=Lax` and `Secure` (except for a localhost `public_url`).
+  Sessions end on logout, password change or reset, disabling the user, and expiry.
+- A request authenticated by the cookie that writes (`POST`, `PUT`, `PATCH`, `DELETE`) must send
+  `X-Beacon-CSRF: 1`, and if it has an `Origin` header that must be the origin of
+  `accounts.public_url` or one of `cors.allowed_origins` (never `*`). Otherwise it gets `403
+  csrf_rejected`. Requests with a bearer token skip this check; only a cookie lets a foreign page act
+  for the user.
+- Sign-up, resend and reset never say whether an address is registered. Sign-in gives one failure for
+  an unknown name and a wrong password. Failed sign-ins are throttled per account and per address.
+- Set `server.trusted_proxies` behind a proxy, or the per-address limits count the proxy.
+- The SMTP password belongs in `BEACON_SMTP_PASSWORD`, not in `config.yaml`.
 
 ## Rate limits and bans
 

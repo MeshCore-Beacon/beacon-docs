@@ -24,6 +24,7 @@ to open).
 | `MQTT_BROKER_2_URL`, `_USERNAME`, `_PASSWORD` | unset | The same for an optional second broker. A packet heard through both brokers is stored once. |
 | `BEACON_API_KEY` | unset | Bearer key for `/api/v1/admin/*`. When set, even to an empty string, it replaces `auth.api_key` from the config file. See [Admin API key](#admin-api-key). |
 | `MESHMAPPER_API_KEY` | unset | Regional or grouped-region key for enabled MeshMapper imports. When set, even to an empty string, it replaces `meshmapper.api_key`. Missing keys leave imports unconfigured while Beacon keeps running. See [MeshMapper API key](#meshmapper-api-key). |
+| `BEACON_SMTP_PASSWORD` | unset | Password for `accounts.smtp.username`. Read only when `accounts.mode` is `local`; it has no YAML key. See [User accounts](#user-accounts). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Overrides `log.level`. Anything else stops startup. |
 | `LOG_FORMAT` | `text` | `text` or `json`. Overrides `log.format`. Anything else stops startup. |
 | `BEACON_CPU_PROFILE_DIR`, `BEACON_CPU_PROFILE_UNTIL` | unset | Enable a bounded CPU capture in production. See [Profiling](profiling.md). |
@@ -80,6 +81,7 @@ which ones to read.
 | `scopes` | Transport scope names for matching `TRANSPORT_FLOOD` packets. Each needs a `region`. | Your mesh uses transport scopes. |
 | `telemetry` | How long observer telemetry snapshots are kept and how often one is stored. | Disk is tight. |
 | `polling` | Repeater polling: whether Beacon coordinates observers polling repeaters, which broker hosts they publish to, and how long readings are kept. Off by default. | You want [Repeater polling](repeater-polling.md). See [Repeater polling](#repeater-polling). |
+| `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. Needs SMTP. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
 | `backup` | Turns on the admin backup download. Off by default. | You want [Backup and export](backup-export.md). |
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
@@ -90,7 +92,7 @@ which ones to read.
 | `observers` | Optional deletion of observers not seen for a long time. Off by default. | Rarely. |
 | `mobile` | `min_app_version`: the oldest BEACON Mobile release allowed to use this server. Older apps show an update screen. Unset by default. | You need users on a newer app release. |
 | `web` | `min_web_version`: the oldest Beacon Web release allowed to use this server. Older web builds show a blocking "reload" screen. The server has a built-in floor (2.0.3 today); this can raise it, not lower it. | Your web container lags the server and you want stale browsers to reload. |
-| `cors` | Browser cross-origin rules for REST. Default allows any origin, read-only methods. | You are building an admin UI on another origin. |
+| `cors` | Browser cross-origin rules for REST: `allowed_origins`, `allowed_methods`, `allowed_headers`, `allow_credentials`, `max_age`. Default allows any origin, read-only methods, no credentials. | You are building an admin UI on another origin, or the web app is on another origin than the API and uses accounts (see [Same site](accounts.md#same-site-and-a-web-app-on-another-origin)). |
 | `cache` | Redis TTLs per response category. | Rarely. |
 | `ingest` | Only store packets from observers in listed countries or continents. | You run a regional instance and want to ignore the rest of the world. |
 | `background` | How often cleanup, route retention and preset rebuilds run. `reconfirm` (default `1h`) sets the route retention run, which also clears stale neighbor edges; the route recheck itself always runs every 5 minutes at `routes.reconfirm_rows_per_hour`. | Rarely. |
@@ -337,6 +339,38 @@ Pause, exclusions and blocked observers can also change at runtime through
 `/api/v1/admin/polling`, with no restart. Config and runtime exclusions are added together and
 may name at most 16 different repeaters between them; the admin route refuses a list that would
 go over.
+
+## User accounts
+
+The `accounts` block turns on [User accounts](accounts.md). It is off by default. A value out of range
+stops startup with an error naming the key. With `mode: off` the rest of the block is not read.
+
+| Key | Default | What it does |
+|---|---|---|
+| `mode` | `off` | `off` or `local`. |
+| `public_url` | none | Required with `local`. The web app's address, `https` (plain `http` only for `localhost` and `127.0.0.1`), no path. Used for mailed links and the cookie's `Secure` flag. |
+| `registration` | `open` | `open` or `closed`. |
+| `smtp.host` | none | Required with `local`. |
+| `smtp.port` | `587` | 1 to 65535. |
+| `smtp.username` | empty | Empty means no authentication. |
+| `smtp.from` | none | Required with `local`. One address, for example `"Beacon <no-reply@example.org>"`. |
+| `smtp.starttls` | `true` | When true the send fails unless the server offers STARTTLS. |
+
+The SMTP password is `BEACON_SMTP_PASSWORD` in the environment, never in the file.
+
+```yaml
+accounts:
+  mode: local
+  public_url: https://beacon.example.org
+  smtp:
+    host: smtp.example.org
+    username: beacon@example.org
+    from: "Beacon <no-reply@example.org>"
+```
+
+A web app on another origin than the API also needs `cors.allowed_methods`, `cors.allowed_headers`
+(with `X-Beacon-CSRF`) and `cors.allow_credentials`. Same origin needs nothing. See
+[User accounts](accounts.md#same-site-and-a-web-app-on-another-origin).
 
 ## MeshMapper API key
 

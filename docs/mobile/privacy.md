@@ -1,6 +1,6 @@
 # BEACON Mobile Privacy Policy
 
-_Last updated: October 9, 2026_
+_Last updated: November 15, 2026_
 
 BEACON Mobile ("the app") is an open-source iOS and Android client for Beacon, a
 real-time analyzer for MeshCore radio mesh networks. This policy explains what
@@ -8,11 +8,28 @@ the app does and does not do with your information.
 
 ## The short version
 
-- No account, no sign-in.
+- An account is optional. The app works fully without one.
 - No analytics, advertising, tracking or crash-reporting SDKs.
 - The app does not access your location, contacts, photos, microphone or
   camera.
 - Your settings stay on your device.
+
+## Optional accounts
+
+Some Beacon servers offer accounts. You never need one to view packets, nodes, maps or statistics.
+If you choose to sign in, you do it on the server operator's web page, and the app then holds a sign-in
+token for that server.
+
+- **What the server stores about you:** your username, display name, email address, a hash of your
+  password (never the password itself), and your signed-in devices with a label, the IP address and
+  app or browser name they connected from, and when they were last used. This is held by the
+  operator of that server, under that operator's policies. The server sends you email to confirm your
+  address, reset a password, and tell you when a new app signs in.
+- **What the app stores:** the sign-in token, kept in the platform's secure storage (the iOS Keychain or
+  Android Keystore) and removed when you sign out. The app does not keep your password.
+- **Ending it:** you can sign out of any device and delete your account in the app's profile screen or on
+  the web. Deleting removes your user record, sessions and everything attached to the account from that
+  server. A sign-in lasts at most a year, and you can end it earlier from the devices list.
 
 ## What stays on your device
 
@@ -49,8 +66,8 @@ about it removed from a Beacon server, contact that server's operator.
 
 ## Children
 
-The app is not directed at children and collects no personal information from
-anyone.
+The app is not directed at children. It collects no personal information itself; an
+account, if you create one, is held by the server operator.
 
 ## Changes
 
