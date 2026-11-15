@@ -1310,13 +1310,31 @@ GET /api/v1/me/telemetry-requests
       "status": "waiting", "statusReason": "No observer can reach this repeater yet.",
       "statusReasonCode": "no_observer", "hasPassword": true,
       "createdAt": 1794700000000, "updatedAt": 1794700000000,
-      "poller": { "observerId": "uuid", "name": "North Ridge" },
+      "poller": { "observerId": "uuid", "name": "North Ridge", "state": "not_direct", "stateAt": 1794703500000 },
       "latestReadingAt": 1794703600000 } ] }
 ```
 
 Oldest first. `poller` and `latestReadingAt` are `null` when there is none; `latestReadingAt` is the
 newest trusted reading. `statusReasonDays` (integer) is present only with the `offline` code. A
 password is never returned, only `hasPassword`.
+
+`poller.state` is what the poller's own latest live claim says about this repeater, so a user can see
+why a poll is not working even while `status` is `active`. `poller.stateAt` is epoch ms when that claim
+was received, or `null` when the observer has no live claim (the same cutoff the polling service uses
+for a live claim). The same `poller` object is in the create and update answers.
+
+| `poller.state` | Meaning for the user |
+|---|---|
+| `pending` | The observer has the repeater but has not tried it yet (also shown when its claim sent no state). |
+| `ok` | The observer logged in and got a reading on its last try. |
+| `no_reply` | The observer tried and the repeater did not answer. It tries again later. |
+| `login_failed` | The repeater did not accept the guest password. |
+| `admin_stop` | The repeater answered with admin access, so the observer stopped. |
+| `not_direct` | The observer cannot hear the repeater directly (zero hops), so it cannot poll it. |
+| `not_claimed` | The observer's live claim does not list this repeater, or it has no live claim, for example after a reboot. |
+| other | Any other state the firmware sends, passed through in lower case and cut to 32 characters. |
+
+`status` and `statusReasonCode` do not change because of `poller.state`.
 
 `status` and `statusReasonCode`:
 

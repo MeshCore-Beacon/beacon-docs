@@ -139,7 +139,8 @@ seat a withdrawn target frees, in the same answer.
 | `admin_stopped` | The repeater answered with admin access. | `admin_stopped`, `blank_blocked` |
 | `disabled` | Nobody heard the repeater for `polling.offline_disable_days` days. | `offline` |
 
-The profile also shows the poller's name and when the newest trusted reading arrived. Only a new
+The profile also shows the poller's name, the state its own claim reports for the repeater
+(`poller.state`, or `not_claimed` when the claim does not list it) and when the newest trusted reading arrived. Only a new
 guest password restarts a `login_failed` or `admin_stopped` request. `enabled: true` changes
 nothing on them, and the offline sweep leaves their status alone. On an `admin_stopped` request
 removing the password (the blank login) is refused with `422 password_invalid`. The user restarts a
