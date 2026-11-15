@@ -103,8 +103,9 @@ fixes `login_failed` and `admin_stopped` by entering a new guest password, and r
 request with `enabled: true`. Removing a request deletes its password, and when it was the last
 request for the repeater observers stop polling it.
 
-A `login_failed` report from an observer is ignored for 30 minutes after the password changed, so
-the report of an old login does not mark the new password as failed.
+After the password changed, a `login_failed` report from an observer is ignored, so the report of an
+old login does not mark the new password as failed. The grace ends after 30 minutes, or as soon as
+that observer has reported any other state since the change, whichever comes first.
 
 ## Guest passwords only
 
