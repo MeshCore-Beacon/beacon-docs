@@ -31,6 +31,27 @@ token for that server.
   the web. Deleting removes your user record, sessions and everything attached to the account from that
   server. A sign-in lasts at most a year, and you can end it earlier from the devices list.
 
+### If the server turns on more features
+
+A server operator can add more features for signed-in users. Each one is held by the operator of
+that server, and deleting your account removes it.
+
+- **Synced Atlas.** Your Atlas (up to twelve pinned nodes and observers, their names, the tiles you
+  chose and the activity range) is stored on the server so your web and app lists match.
+- **Telemetry requests.** You can ask the server to have a repeater polled. The server stores which
+  repeater you asked for. If you enter a guest password, it is stored encrypted and shared, sealed,
+  with the observer that polls the repeater. Never enter an admin password.
+- **Alert rules.** The server stores the alerts you set for radios on your Atlas and when each last
+  fired.
+- **Push token.** If the server sends alerts by push, the app registers a push token with the server
+  and with Apple's or Google's notification service. The token is tied to your account and signed-in
+  device, is never shown back to you, stops being used when that app sign-in ends, and is deleted with your
+  account. Alerts can name a radio and carry only a short sentence about it. Alerts can instead
+  be sent by email to your account's address.
+- **Sign-in through a portal.** Some servers sign you in through the MeshMapper portal. The server
+  then stores only the username and display name the portal gives it, and no password or email
+  address.
+
 ## What stays on your device
 
 The app stores its settings locally, using the platform's standard app storage:

@@ -146,6 +146,9 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 - [Getting packets in](docs/getting-packets-in.md): brokers, the account Beacon needs, topics.
 - [Repeater polling](docs/repeater-polling.md): observers asking repeaters for telemetry, and how Beacon coordinates them.
 - [User accounts](docs/accounts.md): optional sign-in, SMTP, CORS for a split deployment, limits and the operator user routes.
+- [Sign-in through the MeshMapper portal](docs/portal-sign-in.md): accounts through the portal instead of email and password.
+- [Requested telemetry](docs/telemetry-requests.md): users asking for a repeater to be polled, approving observers, guest passwords.
+- [Alerts](docs/alerts.md): rules on Atlas radios, email and push delivery.
 - [Configuration](docs/configuration.md): every environment variable and a map of `config.yaml`.
 - [Reverse proxy](docs/reverse-proxy.md): Caddy, nginx, Apache, rate limits, split origins.
 - [Securing a deployment](docs/security.md): the admin key, the listener, origins, bans.
@@ -158,7 +161,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 - [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
-- [Atlas](docs/atlas.md): the per-browser watchlist of nodes and observers, what its cards mean, and its export file.
+- [Atlas](docs/atlas.md): the watchlist of nodes and observers (per browser, or synced to an account), what its cards mean, and its export file.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
 **Change it**

@@ -936,12 +936,14 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | Flag | Meaning |
 |---|---|
 | `polling` | True when [repeater polling](repeater-polling.md) is enabled on this server. Clients show the reading charts only when it is true. |
-| `accounts` | A string: `"off"` or `"local"`. `"local"` means [user accounts](#user-accounts) are on. |
-| `registration` | True when new sign-ups are open. Only meaningful when `accounts` is `"local"`. |
-| `telemetryRequests` | `false` for now. |
-| `alerts` | `false` for now. |
+| `accounts` | A string: `"off"`, `"local"` or `"portal"`. `"local"` and `"portal"` mean [user accounts](#user-accounts) are on; `"portal"` is sign-in through the MeshMapper portal. |
+| `registration` | True when new sign-ups are open. Only meaningful when `accounts` is `"local"`; always `false` for `"portal"`. |
+| `portalUrl` | The portal's base address. Present only when `accounts` is `"portal"`. |
+| `telemetryRequests` | True when [telemetry requests](#telemetry-requests) are on: polling and accounts are on, `BEACON_SECRET_KEY` is set and `polling.requests_per_user` is not 0. |
+| `alerts` | True when [alerts](#alerts) are on: accounts are on and `alerts.delivery` is not `off`. |
+| `alertDelivery` | `"push"` or `"email"`. Present only when `alerts` is true. |
 
-`telemetryRequests` and `alerts` are fixed values until later releases and nothing behind them exists yet. A client must treat a missing `features`, as sent by an older server, as all off, and a missing `registration` as `false`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -976,11 +978,13 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `PUT /admin/config` | Replaces `cors.allowed_origins`, `guards.enforce` or both until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/db/statements` | `pg_stat_statements` for this database, summed by statement name. `503` when the extension is missing or not preloaded. |
 | `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
-| `GET /admin/users`, `PUT /admin/users/{id}`, `DELETE /admin/users/{id}` | Manage [user accounts](#operator-user-routes). `503` unless `accounts.mode` is `local` and the server is not read-only. |
+| `GET /admin/users`, `PUT /admin/users/{id}`, `DELETE /admin/users/{id}` | Manage [user accounts](#operator-user-routes). `503` while accounts are off or the server is read-only. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
-| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `503` unless `polling.enabled` is true and the server is not read-only. |
-| `GET /admin/polling/targets` | Who polls what. `{targets: [...]}`, at most 500 repeaters with a live claim or an assignment, newest claim first. Each is `{publicKey, latestTrustedReading, latestReading, candidates}`; the two times are epoch ms or `null`, `latestTrustedReading` follows the same rule as `latest_ts` in [Owners](#owners) and `latestReading` counts every observer. Each candidate is `{observerPublicKey, rank, evidenceSnr, evidenceCount, keyMode, state, misses, lastOk, approved}`: `rank` is `0` for the poller, `1` and up for standbys and `null` when unassigned; `evidenceSnr` and `evidenceCount` come from the last election; `keyMode`, `state`, `misses` and `lastOk` come from the observer's live claim and are empty, `0` or `null` when it has none; `lastOk` is epoch ms or `null`; `approved` is the operator's flag for the observer. Same `503` rule as above. |
+| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `noPasswordBlocked` is a list of repeater keys (64 hex) that gave admin access to a blank login, and `adminStops` lists `{targetPublicKey, observerPublicKey, reportedAt}`. `503` unless `polling.enabled` is true and the server is not read-only. |
+| `GET /admin/polling/targets` | Who polls what. `{targets: [...]}`, at most 500 repeaters with a live claim or an assignment, newest claim first. Each is `{publicKey, latestTrustedReading, latestReading, candidates}`; the two times are epoch ms or `null`, `latestTrustedReading` follows the same rule as `latest_ts` in [Owners](#owners) and `latestReading` counts every observer. Each candidate is `{observerPublicKey, rank, evidenceSnr, evidenceCount, keyMode, state, misses, lastOk, approved}`: `rank` is `0` for the poller, `1` and up for standbys and `null` when unassigned; `evidenceSnr` and `evidenceCount` come from the last election; `keyMode`, `state`, `misses` and `lastOk` come from the observer's live claim and are empty, `0` or `null` when it has none; `lastOk` is epoch ms or `null`; `approved` is the operator's flag for the observer. Each target also has `requested` (a telemetry request is in use for it) and `requests` (how many requests name it). Same `503` rule as above. |
+| `PUT /admin/polling/targets/{target}` | `{"noPasswordBlocked": false}` lifts the block on passwordless [telemetry requests](#telemetry-requests) for one repeater (64 hex characters in the path). Only `false` is accepted (`400` otherwise). Returns the body, or `404` for a repeater Beacon has no record of. Body up to 4 KiB. |
+| `DELETE /admin/polling/admin-stops/{target}/{observer}` | Clears one admin stop so the observer can be offered the requested repeater again. `204`, or `404`. Both keys are 64 hex characters. |
 | `PUT /admin/polling/state` | Replaces `{paused, pausedUntil, excludedNodes}`. `pausedUntil` is epoch ms in the future or `null`; excluded keys are 64 hex characters (repeats count once), and together with `configExcludedNodes` they may name at most 16 distinct repeaters. Otherwise `400` with a message giving the counts, and nothing changes. Body up to 4 KiB, `application/json`, unknown fields rejected. Returns the full state. |
 | `PUT /admin/polling/observers/{publicKey}` | Replaces one observer's `{blocked, approved, note}` (note up to 200 characters). The key is 64 hex characters in either case. Returns the observer. |
 | `GET /admin/backup` | Streams a private `.tar.gz` of the database and saved config. Off unless `backup.enabled: true`; needs `pg_dump` in the server's runtime. One export at a time (`409`), `504` on timeout, `507` over the size limit. Contains secrets. |
@@ -1081,7 +1085,7 @@ Backup details are in [Backup and export](backup-export.md).
 
 ### User accounts
 
-Off unless `accounts.mode` is `local` ([User accounts](accounts.md)). With it off every route below,
+Off unless `accounts.mode` is `local` ([User accounts](accounts.md)) or `portal` ([portal sign-in](portal-sign-in.md)). With it off every route below,
 under `/api/v1/auth` and `/api/v1/me`, answers `404` with code `accounts_disabled`, and no cookie is set.
 These are separate from the operator records at `/admin/accounts`.
 
@@ -1115,7 +1119,7 @@ Shapes (times are epoch ms):
 ```
 
 The first is a user, the second a session (`kind` is `web` or `app`). No response ever carries a
-password hash.
+password hash. `provider` is `local` or `portal`; a portal user has an empty `email`.
 
 | Route | Needs | Body | Success |
 |---|---|---|---|
@@ -1132,7 +1136,9 @@ password hash.
 | `PATCH /me` | session | `{displayName}` | `200 {"user":{...}}` |
 | `POST /me/password` | session | `{currentPassword, newPassword}` | `204`, ends every other session |
 | `POST /me/email` | session | `{email, currentPassword}` | `202 {"status":"check_email"}` |
-| `DELETE /me` | session | `{currentPassword}` | `204`, clears the cookie |
+| `DELETE /me` | session | `{currentPassword}`, or `{confirmUsername}` for a portal user | `204`, clears the cookie |
+| `GET /auth/portal/start?return=<path>` | nothing | | `302` to the portal; portal mode only |
+| `GET /auth/portal/callback?code=&state=` | the `beacon_portal` cookie | | `302` into the web app with the session cookie set; portal mode only |
 | `GET /me/sessions` | session | | `200 {"sessions":[...]}` |
 | `DELETE /me/sessions/{id}` | session | | `204` |
 | `DELETE /me/sessions` | session | | `204`, ends every session but the current one |
@@ -1174,7 +1180,23 @@ Notes:
   up before the verifier is checked, so a wrong verifier needs a new code. The `token` goes in the
   `Authorization: Bearer` header. Beacon mails the user when an app signs in. Without the cookie,
   `/auth/app/code` is `401 not_signed_in`.
-- **Delete** removes the user and everything it owns in one transaction.
+- **Delete** removes the user and everything it owns in one transaction. A portal user sends
+  `confirmUsername` (their own username) instead of a password; a wrong one, or a `currentPassword`,
+  is `422 invalid_input`.
+- **Portal mode.** `start` stores a state for 10 minutes against the `beacon_portal` cookie and
+  redirects to the portal; `callback` always redirects, to `<public_url><return>` with
+  `beacon_session` set, or to `<public_url>/?view=signin&error=portal` on any failure including a
+  cancel. Both answer `503 read_only` on a read-only server. In portal mode `register`, `verify`,
+  `verify/resend`, `login`, `reset/request`, `reset/confirm`, `/me/password` and `/me/email` answer
+  `404 portal_managed`. See [Sign-in through the MeshMapper portal](portal-sign-in.md).
+- **Mail.** Beacon mails the account address when a password is changed (by reset or from the
+  profile), mails the old address when an email change is applied, and when an app signs in.
+- **Reset links** are bound to the address they were mailed to: after the address changes, an
+  earlier reset link is `token_invalid`.
+- **Resend** repeats the newest pending sign-up even if its link has expired.
+- **Credential races.** Sign-in, password and email changes, reset, delete and the app code exchange
+  are serialised per user. An app code minted before a reset or password change is `token_invalid`
+  at exchange.
 
 Rate limits per client address, on top of the normal REST limit: register 5 / 5 min, login 10 / 1 min, verify 30 /
 1 min, resend and reset request 5 / 5 min, reset confirm 10 / 5 min, app token 10 / 1 min, every other
@@ -1197,10 +1219,12 @@ Error codes the account routes use:
 | 429 | `rate_limited` | A per-address limit; `Retry-After` in seconds. |
 | 429 | `too_many_attempts` | The password throttle; `Retry-After` in seconds. |
 | 503 | `read_only` | The server is read-only. |
+| 503 | `service_unavailable` | The session could not be looked up. Sent with `Retry-After: 5`. Not a sign-out: keep the token and retry. |
+| 404 | `portal_managed` | A local sign-up or password route in portal mode. |
 
 #### Operator user routes
 
-Bearer admin key, see [Auth](#auth). `503` when accounts are off or the server is read-only.
+Bearer admin key, see [Auth](#auth). `503` while accounts are off or the server is read-only.
 
 - `GET /admin/users?search=&cursor=&limit=` lists users newest first. `limit` is 1 to 200, default 50;
   `search` is part of a username or email, at most 100 characters. Returns `{items, nextCursor}`;
@@ -1209,6 +1233,214 @@ Bearer admin key, see [Auth](#auth). `503` when accounts are off or the server i
 - `PUT /admin/users/{id}` with `{"disabled": true}` ends every session of the user and refuses new
   sign-ins; `false` lifts it. Returns `{user}`. `404` for an unknown id.
 - `DELETE /admin/users/{id}` removes the user and everything it owns: `204`, or `404`.
+
+### Atlas sync
+
+A signed-in user's [Atlas](atlas.md#sync-to-an-account), twelve pins at most. Both routes need a
+session (`401 not_signed_in`) and follow the [rules for account routes](#user-accounts) above. `PUT`
+takes a body of at most 32 KiB, passes the forgery check and answers `503 read_only` on a read-only
+server. Atlas sync is on whenever accounts are.
+
+```
+GET /api/v1/me/atlas
+```
+
+```json
+{ "revision": 7, "range": "24h", "limit": 12,
+  "pins": [
+    { "kind": "node", "publicKey": "<64 hex>", "id": "uuid or null", "observerId": "uuid or null",
+      "name": "Hilltop", "tiles": ["packets", "snr", "rssi", "noise"], "view": "heard" },
+    { "kind": "observer", "observerPublicKey": "<64 hex>", "observerId": "uuid or null", "name": "Roof listener" }
+  ] }
+```
+
+`range` is `24h` or `3d`. A node pin has `publicKey` and `id`; an observer pin has
+`observerPublicKey`. `observerId` is the observer record with that key, or `null`. `tiles` (exactly
+four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard` or
+`observer`, node pins only) are left out when not set. An observer pin whose key now has a node
+record comes back as a node pin.
+
+```
+PUT /api/v1/me/atlas
+{ "baseRevision": 7, "range": "24h",
+  "pins": [ { "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop", "tiles": [...], "view": "heard" },
+            { "kind": "observer", "observerId": "uuid", "observerPublicKey": "<64 hex>", "name": "..." } ] }
+```
+
+Replaces every pin. A node pin needs `publicKey`. An observer pin needs `observerId` or
+`observerPublicKey`, and if it sends both they must name the same observer. A `name` is at most 160
+characters. Answers `200` with the new Atlas, `revision` plus one.
+
+| Status | Code | When |
+|---|---|---|
+| 409 | `atlas_conflict` | `baseRevision` is not the stored revision. The body is the usual error plus the stored Atlas as `current`, at the top level: `{"error":{"code":"atlas_conflict","message":"..."},"current":{...}}`. |
+| 422 | `invalid_input` | Bad range, more than 12 pins, a bad key, id, tiles or view, or the same radio pinned twice. `message` names the pin. |
+| 400, 413, 415, 429 | | As for other account routes. |
+
+Removing a radio from the Atlas deletes its alert rules in the same transaction.
+
+### Telemetry requests
+
+A user asks for a repeater or room server to be polled. See [Requested telemetry](telemetry-requests.md).
+With requests off (`features.telemetryRequests` is false) every route here answers
+`404 requests_disabled`. All need a session, are cookie writes that pass the forgery check, and
+answer `503 read_only` on a read-only server.
+
+```
+GET /api/v1/me/telemetry-requests
+```
+
+```json
+{ "limit": 3,
+  "requests": [
+    { "id": "uuid",
+      "node": { "id": "uuid or null", "publicKey": "<64 hex>", "name": "Hilltop" },
+      "status": "waiting", "statusReason": "No observer can reach this repeater yet.",
+      "statusReasonCode": "no_observer", "hasPassword": true,
+      "createdAt": 1794700000000, "updatedAt": 1794700000000,
+      "poller": { "observerId": "uuid", "name": "North Ridge" },
+      "latestReadingAt": 1794703600000 } ] }
+```
+
+Oldest first. `poller` and `latestReadingAt` are `null` when there is none; `latestReadingAt` is the
+newest trusted reading. `statusReasonDays` (integer) is present only with the `offline` code. A
+password is never returned, only `hasPassword`.
+
+`status` and `statusReasonCode`:
+
+| `status` | `statusReasonCode` | Meaning |
+|---|---|---|
+| `active` | empty | An observer polls it, or the requests ride on a poll already set. |
+| `waiting` | `no_observer` | No observer can reach the repeater yet (none approved, none with evidence or request support). |
+| `waiting` | `no_seat` | Every observer that can reach it is at its polling maximum. |
+| `login_failed` | `login_failed` | The repeater did not accept the guest password. |
+| `login_failed` | `blank_login_failed` | The repeater did not accept a blank or hello login. |
+| `admin_stopped` | `admin_stopped` | The password gave admin access and Beacon deleted it. |
+| `admin_stopped` | `blank_blocked` | The repeater gives admin access to a blank login; a guest password is needed. |
+| `disabled` | `offline` | No observer heard the repeater for `statusReasonDays` days. |
+| any | `other` | A reason the server has no code for. Show `statusReason`. |
+
+`statusReason` is the English sentence for the same reason.
+
+```
+POST /api/v1/me/telemetry-requests
+{ "nodeId": "uuid", "password": "optional" }
+```
+
+`password` is optional, 1 to 15 bytes with no zero byte, and must be a guest password, never an
+admin password. Absent, `null` or empty means the blank or hello login. Body at most 4 KiB. Answers
+`201` with the single request object.
+
+```
+PATCH /api/v1/me/telemetry-requests/{id}
+{ "password": "new" }        or  { "password": null }   or  { "enabled": true }
+```
+
+At least one field. `enabled` can only be `true`, and restarts a disabled request. A new password
+clears a `login_failed` or `admin_stopped` state. `null` removes the password. Answers `200` with
+the request.
+
+```
+DELETE /api/v1/me/telemetry-requests/{id}
+```
+
+`204`; deletes the stored password too.
+
+| Status | Code | When |
+|---|---|---|
+| 404 | `requests_disabled` | Requests are off. |
+| 404 | `not_found` | Unknown node, or an unknown or foreign request id. |
+| 409 | `already_requested` | The user already has a request for this repeater (wins over the limit). |
+| 409 | `request_limit` | The user holds `limit` requests. |
+| 409 | `no_password_blocked` | The repeater gives admin to a blank login, so a request needs a guest password. Also when removing the password on such a repeater. |
+| 422 | `not_a_repeater` | The node is not a repeater or room server. |
+| 422 | `password_invalid` | The password is not 1 to 15 bytes without a zero byte. |
+| 422 | `invalid_input` | Another value is out of range, or `enabled` is `false`. |
+
+### Alerts
+
+Rules on radios in the user's Atlas. See [Alerts](alerts.md). With alerts off every route here
+answers `404 alerts_disabled`. All need a session and follow the account route rules.
+
+```
+GET /api/v1/me/alerts
+```
+
+```json
+{ "delivery": "push", "hasDevice": true,
+  "targets": [
+    { "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop",
+      "available": ["gone_quiet", "back_online", "clock", "battery_low"],
+      "unavailable": { "temperature": "This repeater does not report a temperature." },
+      "rules": [
+        { "id": "uuid", "kind": "battery_low", "threshold": 3500, "thresholdHigh": null,
+          "enabled": true, "state": "ok", "stateChangedAt": 1794700000000, "lastSentAt": null } ] } ] }
+```
+
+One target per Atlas pin, in Atlas order. `available` is always an array and `unavailable` always an
+object of kind to reason. `delivery` is `push` or `email`. `hasDevice` says whether the user has a
+push device registered; it is the only thing the API says about devices.
+
+Kinds, thresholds and ranges (`threshold` is null where none is taken):
+
+| `kind` | Unit | Accepted |
+|---|---|---|
+| `gone_quiet` | hours | 12, 24, 48; also 3 and 6 for observers and polled repeaters |
+| `back_online` | none | null. Needs a `gone_quiet` rule on the radio. |
+| `clock` | seconds | 300, 3600, 86400 |
+| `battery_low` | millivolts | 2500 to 5000 |
+| `battery_falling` | millivolts per day | 100, 200, 300 |
+| `rebooted` | none | null |
+| `temperature` | tenths of a degree C | `threshold` is the low limit, `thresholdHigh` the high limit, -500 to 1500; at least one, low below high |
+| `noise_high` | dBm | -130 to -50 |
+| `observer_offline` | minutes | 30, 60, 180, 360 (observers only) |
+
+`state` is `ok`, `firing`, `inactive` (the data is gone) or `unknown` (not enough data yet).
+`request_attention` is announced to users with telemetry requests but is not a stored rule and never
+appears here.
+
+```
+PUT /api/v1/me/alerts/rules
+{ "target": { "kind": "node", "publicKey": "<64 hex>" }, "kind": "battery_low",
+  "threshold": 3500, "thresholdHigh": null, "enabled": true }
+```
+
+Creates or updates the rule for that radio and kind. `enabled` defaults to `true`. Answers `200`
+with the rule. Changing a threshold or turning a rule on resets its state to `unknown`. A rule that
+is being turned off is checked for shape only.
+
+```
+DELETE /api/v1/me/alerts/rules/{id}
+```
+
+`204`.
+
+```
+POST /api/v1/me/devices
+{ "platform": "ios", "pushToken": "..." }
+DELETE /api/v1/me/devices
+```
+
+Register or remove the push token of the calling app session. `POST` answers `204`, `DELETE` `204`
+even when there was none. A token has no whitespace or control characters and at most 4096
+characters. A token another session or user held moves to this session. `POST` is limited to 10 per
+user per 10 minutes. These routes need an app session: a cookie session gets
+`403 app_session_required`. No route returns a token.
+
+| Status | Code | When |
+|---|---|---|
+| 404 | `alerts_disabled` | Alerts are off. |
+| 409 | `not_on_atlas` | The radio is not pinned on the user's Atlas. |
+| 422 | `kind_unavailable` | The radio cannot have this kind; `message` is the reason. |
+| 422 | `invalid_threshold` | The threshold is out of range or the wrong shape for the kind. |
+| 422 | `invalid_input` | A bad key or rule id, or a bad platform or token. |
+| 404 | `not_found` | Unknown or foreign rule id. |
+| 403 | `app_session_required` | A device route called with a cookie session. |
+
+**Push data.** A push message has a title (the radio's name) and a body (one English sentence). Its
+`data` is exactly `{"targetKind": "node" | "observer", "publicKey": "<64 hex>"}`, which the app
+uses to open the radio.
+
 
 ## Firmware polling
 
@@ -1233,7 +1465,7 @@ in the Swagger UI.
 | `POST /api/guest-keys` | `404`, always. The body is never read or logged. |
 | `GET /api/shared-guest/key` | `404`, always. |
 
-Beacon never accepts polling keys, so the two key routes always answer `404`, even to a client
+Beacon never accepts polling keys, so the two key routes always answer `404`. (Guest passwords for [telemetry requests](telemetry-requests.md) go the other way: Beacon sends them, sealed, in the owners answer.) They answer `404` even to a client
 that has used up the policy and owners rate limit. The firmware
 reads a `404` on the policy route as "upload keys instead", so the policy route never answers
 `404`. With `polling.enabled: false` the policy and owners routes still answer `200`, with
@@ -1289,6 +1521,8 @@ Every answer carries every field.
 | `excluded` | bool | True when `role` is `excluded`. |
 | `standby_rank` | int | 1 and up for a standby. The poller and excluded repeaters send 1. |
 | `owner_hops` | int | `0`. |
+| `requested` | bool | Present and `true` only for a repeater given to this observer by a [telemetry request](telemetry-requests.md). |
+| `pw` | object | Only on a requested entry that has a guest password in use: `{"epk","ct","tag","ver"}`, lower hex, `ver` an integer. The password sealed to this observer's public key. Sent fresh on every answer; `ver` changes when the password in use changes. An entry whose password cannot be sealed is left out of the answer. |
 | `latest_ts` | string or `null` | `sampled_at` of the newest trusted reading for the repeater. A reading is trusted when its observer is ranked for the repeater (poller or standby) and Beacon saw it hear the repeater's own adverts directly (zero hops) in the day before the last election. Other readings, including a poller's without that evidence, are stored but do not count here, so claiming a repeater alone does not hold anyone back. Advert evidence comes from the observer's own packet uplink, so it is not proof; with `polling.authority: approved` only approved observers are ranked. |
 
 ### Claim message
@@ -1312,6 +1546,10 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 - `misses` is the count of failed polls in a row. At 3 or more the observer ranks as failing,
   below healthy observers with the same kind of evidence. An observer with advert evidence ranks
   above one without, failing or not.
+- `accepts_requests` says the observer takes requested repeaters, and `request_slots` is how many
+  free seats it has (clamped to 8). A node entry with `"requested": true` is one the observer was
+  given by a request. A report of `admin_stop` or `login_failed` for a requested repeater counts only
+  from the observer that was assigned it.
 - `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and
   `last_ok` are absent from claims sent by clients without request support. Those still send
   `"v": 2`; there is no v1 claim.

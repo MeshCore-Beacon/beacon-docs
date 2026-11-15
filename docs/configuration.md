@@ -24,6 +24,9 @@ to open).
 | `MQTT_BROKER_2_URL`, `_USERNAME`, `_PASSWORD` | unset | The same for an optional second broker. A packet heard through both brokers is stored once. |
 | `BEACON_API_KEY` | unset | Bearer key for `/api/v1/admin/*`. When set, even to an empty string, it replaces `auth.api_key` from the config file. See [Admin API key](#admin-api-key). |
 | `MESHMAPPER_API_KEY` | unset | Regional or grouped-region key for enabled MeshMapper imports. When set, even to an empty string, it replaces `meshmapper.api_key`. Missing keys leave imports unconfigured while Beacon keeps running. See [MeshMapper API key](#meshmapper-api-key). |
+| `BEACON_SECRET_KEY` | unset | 32 random bytes in base64. Seals the guest passwords of [telemetry requests](telemetry-requests.md). See [BEACON_SECRET_KEY](#beacon_secret_key). |
+| `BEACON_PORTAL_SECRET` | unset | The client secret for sign-in through the MeshMapper portal. Required when `accounts.mode` is `portal`; has no YAML key. See [Sign-in through the MeshMapper portal](portal-sign-in.md). |
+| `BEACON_PUSH_CREDENTIALS` | unset | Path to a Google service account key file for push alerts. Required when `alerts.delivery` is `push`. See [Alerts](alerts.md#push). |
 | `BEACON_SMTP_PASSWORD` | unset | Password for `accounts.smtp.username`. Read only when `accounts.mode` is `local`; it has no YAML key. See [User accounts](#user-accounts). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Overrides `log.level`. Anything else stops startup. |
 | `LOG_FORMAT` | `text` | `text` or `json`. Overrides `log.format`. Anything else stops startup. |
@@ -81,7 +84,8 @@ which ones to read.
 | `scopes` | Transport scope names for matching `TRANSPORT_FLOOD` packets. Each needs a `region`. | Your mesh uses transport scopes. |
 | `telemetry` | How long observer telemetry snapshots are kept and how often one is stored. | Disk is tight. |
 | `polling` | Repeater polling: whether Beacon coordinates observers polling repeaters, which broker hosts they publish to, and how long readings are kept. Off by default. | You want [Repeater polling](repeater-polling.md). See [Repeater polling](#repeater-polling). |
-| `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. Needs SMTP. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
+| `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. `local` needs SMTP; `portal` signs in through the MeshMapper portal. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
+| `alerts` | `delivery`: `off`, `push` or `email`. Off by default. Needs accounts. | You want [Alerts](alerts.md). See [Alerts](#alerts). |
 | `backup` | Turns on the admin backup download. Off by default. | You want [Backup and export](backup-export.md). |
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
@@ -328,6 +332,12 @@ the key.
 | `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
 | `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |
 | `authority` | `evidence` | `evidence` or `approved` | Who can be elected to poll. `evidence`: any observer, ranked on the advert evidence it reports. `approved`: only observers approved through the admin route. See [Trust](repeater-polling.md#trust). |
+| `requests_per_user` | `3` | 0 to 20 | How many [telemetry requests](telemetry-requests.md) one user may hold. `0` turns requests off. |
+| `offline_disable_days` | `7` | 1 to 365 | Days no observer hears a repeater before its requests are turned off. |
+| `request_observers` | `approved` | `approved` or `all` | Which observers may be handed a requested repeater and its guest password. `approved`: only observers you approved. `all`: any observer with advert evidence, which lets anyone who runs an observer present evidence and be handed a guest password. Use `all` only where you know every observer. |
+
+Telemetry requests also need accounts on and `BEACON_SECRET_KEY`; see
+[Requested telemetry](telemetry-requests.md#turn-it-on).
 
 ```yaml
 polling:
@@ -347,14 +357,19 @@ stops startup with an error naming the key. With `mode: off` the rest of the blo
 
 | Key | Default | What it does |
 |---|---|---|
-| `mode` | `off` | `off` or `local`. |
-| `public_url` | none | Required with `local`. The web app's address, `https` (plain `http` only for `localhost` and `127.0.0.1`), no path. Used for mailed links and the cookie's `Secure` flag. |
+| `mode` | `off` | `off`, `local` or `portal`. |
+| `public_url` | none | Required with `local` and `portal`. The web app's address, `https` (plain `http` only for `localhost` and `127.0.0.1`), no path. Used for mailed links and the cookie's `Secure` flag. |
 | `registration` | `open` | `open` or `closed`. |
 | `smtp.host` | none | Required with `local`. |
 | `smtp.port` | `587` | 1 to 65535. |
 | `smtp.username` | empty | Empty means no authentication. |
 | `smtp.from` | none | Required with `local`. One address, for example `"Beacon <no-reply@example.org>"`. |
 | `smtp.starttls` | `true` | When true the send fails unless the server offers STARTTLS. |
+| `portal.url` | none | Required with `portal`. The portal's `https` base address, with no credentials, query or fragment. |
+| `portal.client_id` | none | Required with `portal`. The id the portal knows this instance by. |
+
+With `portal`, the `smtp` block is not used and registration is always closed. The client secret is
+`BEACON_PORTAL_SECRET`, never in the file. See [Sign-in through the MeshMapper portal](portal-sign-in.md).
 
 The SMTP password is `BEACON_SMTP_PASSWORD` in the environment, never in the file.
 
@@ -371,6 +386,42 @@ accounts:
 A web app on another origin than the API also needs `cors.allowed_methods`, `cors.allowed_headers`
 (with `X-Beacon-CSRF`) and `cors.allow_credentials`. Same origin needs nothing. See
 [User accounts](accounts.md#same-site-and-a-web-app-on-another-origin).
+
+## Alerts
+
+The `alerts` block turns on [Alerts](alerts.md). It needs [User accounts](accounts.md).
+
+| Key | Default | What it does |
+|---|---|---|
+| `delivery` | `off` | `off`, `push` or `email`. `email` needs `accounts.mode: local`; with `portal` startup fails. `push` needs `BEACON_PUSH_CREDENTIALS` in the environment, and startup fails without it. Anything else stops startup. |
+
+```yaml
+alerts:
+  delivery: email
+```
+
+`BEACON_PUSH_CREDENTIALS` is the path, inside the container, of a Google service account key file
+(JSON with `project_id`, `client_email` and `private_key`). Mount the file read-only and keep it out
+of source control. See [Push](alerts.md#push).
+
+## BEACON_SECRET_KEY
+
+`BEACON_SECRET_KEY` seals the guest passwords users enter for [telemetry requests](telemetry-requests.md)
+before they are stored (AES-256-GCM). Generate it once:
+
+```bash
+openssl rand -base64 32
+```
+
+Put it in `.env` as `BEACON_SECRET_KEY=...`. It must decode to exactly 32 bytes (standard or URL
+base64, padded or not). A value that does not stops startup. When it is unset, Beacon starts with
+telemetry requests off and logs why.
+
+Back it up with your other secrets. If you lose it or change it, stored passwords cannot be opened:
+Beacon stops sending those repeaters' passwords to observers and logs "requested password does not
+open". Users enter their guest passwords again, which seals them under the new key. Requests that
+use no password are not affected. Nothing else Beacon stores is sealed with it, so it does not
+protect or affect accounts, sessions or any other data.
 
 ## MeshMapper API key
 

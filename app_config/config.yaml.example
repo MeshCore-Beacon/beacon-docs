@@ -422,13 +422,19 @@ cache:
 #  excluded_nodes: []          # up to 16 public keys, 64 hex characters each
 #  paused: false
 #  authority: evidence         # evidence or approved; approved elects only observers you approve
+#  # Telemetry requests also need accounts on and BEACON_SECRET_KEY (32 random bytes in base64,
+#  # from: openssl rand -base64 32). Losing or changing the key makes stored guest passwords unreadable.
+#  requests_per_user: 3        # 0 to 20; 0 turns requests off; default: 3
+#  offline_disable_days: 7     # 1 to 365; days unheard before a repeater's requests are turned off; default: 7
+#  request_observers: approved # approved or all; who may be handed a requested repeater and its guest password.
+#                              # all lets anyone who runs an observer present advert evidence and receive one
 
 # User accounts: sign-in for the web app and the mobile app. Off by default; with it off
 # no account route is served. The SMTP password comes from BEACON_SMTP_PASSWORD, never from here.
 # A web app on another origin than the API also needs cors.allowed_methods, cors.allowed_headers
 # (with X-Beacon-CSRF) and cors.allow_credentials; same origin needs nothing.
 #accounts:
-#  mode: off                   # off or local
+#  mode: off                   # off, local or portal
 #  public_url: ""              # https URL of the web app, no path; used in mailed links
 #  registration: open          # open or closed
 #  smtp:
@@ -437,3 +443,14 @@ cache:
 #    username: ""              # empty means no auth
 #    from: ""                  # required, e.g. "Beacon <no-reply@example.org>"
 #    starttls: true            # default: true; the send fails if the server lacks STARTTLS
+#  # mode: portal signs people in through the MeshMapper portal: no SMTP, no registration.
+#  # The client secret comes from BEACON_PORTAL_SECRET, never from here.
+#  portal:
+#    url: ""                   # https base address of the portal; required when mode is portal
+#    client_id: ""             # required when mode is portal
+
+# Alerts: tell users when a radio on their Atlas needs attention. Needs accounts. Off by default.
+# email needs accounts.mode local and SMTP. push needs BEACON_PUSH_CREDENTIALS, the in-container path of a
+# Google service account key file; startup fails without it.
+#alerts:
+#  delivery: off               # off, push or email

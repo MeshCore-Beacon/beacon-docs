@@ -57,7 +57,74 @@ Accounts are off by default; see [User accounts](accounts.md). When they are on:
 - Sign-up, resend and reset never say whether an address is registered. Sign-in gives one failure for
   an unknown name and a wrong password. Failed sign-ins are throttled per account and per address.
 - Set `server.trusted_proxies` behind a proxy, or the per-address limits count the proxy.
+- Every password check, reset, password change, email change, delete and app code exchange runs
+  under a per-user lock, so a sign-in racing a reset cannot leave a session behind. A reset link is
+  bound to the address it was mailed to. Beacon mails the account address when the password changes
+  and the old address when the email changes.
+- When a session cannot be looked up, signed-in routes answer `503` rather than `401`, so a client
+  does not discard a good token.
 - The SMTP password belongs in `BEACON_SMTP_PASSWORD`, not in `config.yaml`.
+
+### Portal sign-in
+
+With `accounts.mode: portal` (see [Sign-in through the MeshMapper portal](portal-sign-in.md)):
+
+- The client secret belongs in `BEACON_PORTAL_SECRET`, not in `config.yaml`. Startup stops without
+  it. Beacon sends it only to the portal's token call. It is never logged, and neither are the
+  code, the PKCE verifier or the portal's answer; failures log a fixed reason.
+- The sign-in uses PKCE (S256) and a state that is stored in the database for 10 minutes, tied to a
+  `beacon_portal` cookie, and used up on the first callback whatever its outcome. A callback without
+  the cookie, with the wrong state or with no code fails.
+- The token call has a 10 second timeout, follows no redirect, accepts only a `200` and reads at
+  most 64 KiB. The portal's `https` address is checked at startup.
+- The `return` path of a sign-in must be a relative path on the same site, so it cannot send people
+  to another host.
+- Portal users have no password and no email in Beacon. The portal's username and display name are
+  stripped of control characters and cut to length before they are stored.
+
+## Guest passwords
+
+[Requested telemetry](telemetry-requests.md) lets a user give Beacon a guest password for a
+repeater, which an observer then uses to log in.
+
+- **At rest.** Passwords are encrypted with AES-256-GCM under `BEACON_SECRET_KEY` before they are
+  stored. Each row is bound to its request id and repeater key, so a copied row does not open for
+  another request. No route, log line, error, metric or cache holds a password; the API says only
+  whether one is set. Whoever has the database and the key has the passwords, so keep the key out of
+  the database backup and the repo. Losing or changing the key makes the stored passwords
+  unreadable (see [BEACON_SECRET_KEY](configuration.md#beacon_secret_key)).
+- **To an observer.** Beacon does not send the password itself. It sends an envelope: the password
+  sealed to the public key of the one observer that asked, with a fresh key and tag on every owners
+  answer. The owners route has no login, so anyone can ask for an answer in an observer's name, but
+  only the holder of that observer's private key can open the envelope. The route is on the
+  observers' own `https` link, so keep the proxy on `https`.
+- **Who can receive one.** By default only observers you approved (`polling.request_observers:
+  approved`). Beacon also requires that the observer's claim accepts requests, that it has a free
+  seat, that Beacon holds advert evidence that it hears the repeater directly, and that it has no
+  admin stop for that repeater. Advert evidence comes from packets the observer uploads itself, so it
+  is not proof. With `request_observers: all` anyone who runs an observer could present evidence and
+  be handed a password. Withdrawing approval stops the password going out at the next answer.
+- **Guest only, never admin.** A password given to Beacon is shared with a volunteer's observer, so
+  it must be a guest password. Beacon cannot tell an admin password from a guest one when it is
+  entered, and says so on the form. When a repeater answers a login with admin access, the observer
+  reports `admin_stop`; Beacon deletes the password, marks the request `admin_stopped`, records that
+  observer as stopped for that repeater, and, if the login had no password, blocks passwordless
+  requests for the repeater until you lift it. An admin password is never stored after that and never
+  forwarded again.
+- **Who is believed.** A state report for a requested repeater counts only from the observer that
+  holds that assignment, and `login_failed` only from its poller.
+
+## Alerts and push
+
+- Alert text holds only a radio's name, a figure and fixed words. Radio names come from adverts and
+  are untrusted, so Beacon removes control and formatting characters and line breaks, collapses
+  whitespace and cuts the name to 40 characters before it goes into a mail subject, a mail body or a
+  push title.
+- A push token is a possession secret. A token belongs to one account: registering it removes it
+  from every other session and user. No route returns it and it is never logged.
+- `BEACON_PUSH_CREDENTIALS` points to a service account key that can send push messages. Mount it
+  read-only, keep it out of the repo, and give it only the send permission. Errors and logs carry
+  neither its path nor its content.
 
 ## Rate limits and bans
 
@@ -78,6 +145,7 @@ if you enable it, contains everything the database holds, so keep archives priva
 
 ## Secrets in files
 
-`.env` holds the database password, broker credentials, admin key, and MeshMapper API key. It is gitignored in
+`.env` holds the database password, broker credentials, admin key, MeshMapper API key, and, when those
+features are on, `BEACON_SECRET_KEY`, `BEACON_PORTAL_SECRET` and `BEACON_SMTP_PASSWORD`. It is gitignored in
 the deployment folders; keep it that way, and keep its permissions tight on the host.
 `data/app/config.yaml` holds channel keys. Neither belongs in a public backup.
