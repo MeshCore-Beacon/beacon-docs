@@ -6,7 +6,8 @@ observers that both hear a repeater do not both spend airtime on it, and stores 
 Polling is off by default.
 
 This page is for an operator who runs Beacon and for someone who owns an observer. Beacon only
-coordinates and stores. It does not talk to repeaters itself. See [Seeing the readings](#seeing-the-readings)
+coordinates and stores. It does not talk to repeaters itself. Users can also ask for a repeater to be polled that no owner set up, see
+[Requested telemetry](telemetry-requests.md). See [Seeing the readings](#seeing-the-readings)
 for where the readings show up.
 
 ## How it works
@@ -196,6 +197,11 @@ has succeeded. Devices that already fetched an answer keep acting on it until th
 refresh, which can be ten minutes or more. Until its old assignment is replaced, that observer's
 readings can still count toward the newest reading time. Blocking an observer takes effect on its
 next message, and is the faster remedy.
+
+`polling.authority` governs observers polling their own targets. Requested repeaters have their own
+setting, `polling.request_observers`, which defaults to `approved`: only observers you approved are
+handed a requested repeater and its guest password. See
+[Approve observers](telemetry-requests.md#approve-observers).
 
 In both modes:
 

@@ -15,9 +15,11 @@ A card whose Observer view tiles were changed also keeps its four tiles (see
 **Heard by** or **Observer** keeps that tab (see
 [The tab a card opens on](#the-tab-a-card-opens-on)).
 
-There is no account and no sync between browsers or devices; use
+Signed out, there is no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
-storage is unavailable, the page says so and edits last for the visit.
+storage is unavailable, the page says so and edits last for the visit. On a server with
+[accounts](accounts.md), a signed-in user's Atlas is kept on the account instead, see
+[Sync to an account](#sync-to-an-account).
 
 Node cards are keyed by the full public key. If a server reset changes a node's ID, the page looks
 the key up again before loading anything and saves the new ID; it never adopts a different node at
@@ -174,6 +176,30 @@ refused, malformed or duplicate cards are dropped, at most twelve are kept, and 
 many were skipped. Files over 256 KB are refused. Node cards work on another Beacon server,
 because the public key finds the node there. Observer IDs belong to one server, so an observer
 card imported elsewhere shows as no longer known.
+
+## Sync to an account
+
+On a server with accounts on, a signed-in user's Atlas is stored on the server, so the web and the
+mobile app show the same cards. Signed out, nothing changes and the local copy is used as above.
+
+- The server keeps the range (24h or 3d) and up to twelve ordered pins. Each pin is stored by public
+  key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
+  observer pin whose key now has a node record is returned as a node pin; if that node is already
+  pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
+  tiles and, for a node pin, the tab it opens on.
+- The Atlas is replaced as a whole, guarded by a revision number. A write that carries an older
+  revision is refused with `409 atlas_conflict` and the stored Atlas. The client then adopts the
+  server's copy, drops its own change and says so; it does not retry by itself.
+- On first sign-in the client merges the local cards into the account: the server's pins come first,
+  then local pins the server does not hold, up to twelve, and the page says how many did not fit.
+  The local copy remembers which user it was last synced to. If that is a different user, it is not
+  merged and the account's Atlas replaces it, so one person's cards never move into another
+  account on a shared device. Edits made while signed out keep that owner mark, so they are
+  replaced too when someone else signs in.
+- Taking a radio off the Atlas also deletes its [alert](alerts.md) rules.
+- Deleting the account deletes its Atlas.
+
+The routes are in the [API contract](api-contract.md#atlas-sync).
 
 ## Polling
 

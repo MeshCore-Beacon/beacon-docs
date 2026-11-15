@@ -6,6 +6,12 @@ with code `accounts_disabled`, no cookie is ever set, `features.accounts` in
 [`/api/v1/info`](api-contract.md#server-info) is `"off"`, and both clients show no sign-in entry.
 Nothing that works signed out changes either way. Everything public stays public.
 
+There are two ways to turn them on. `local` is this page: username, email and password, with mail.
+`portal` lets people sign in with their MeshMapper portal account instead, see
+[Sign-in through the MeshMapper portal](portal-sign-in.md). Signed-in users also get the synced
+[Atlas](atlas.md), and, when the operator turns them on, [requested telemetry](telemetry-requests.md)
+and [alerts](alerts.md).
+
 These are not the operator records behind `/api/v1/admin/accounts`. Those are named API keys for
 the operator. User accounts live in their own tables and routes, called `users`.
 
@@ -37,7 +43,7 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 
 | Key | Default | What it does |
 |---|---|---|
-| `mode` | `off` | `off` or `local`. Anything else stops startup. The rest of the block is not checked while this is `off`. |
+| `mode` | `off` | `off`, `local` or `portal`. Anything else stops startup. The rest of the block is not checked while this is `off`. The rest of this page is about `local`; see [portal sign-in](portal-sign-in.md) for `portal`. |
 | `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
 | `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
 | `smtp.host` | none | Required. |
@@ -98,14 +104,18 @@ The app does not use the cookie. It holds a bearer token (see below), so CORS do
   credentials the account gets, so a stranger who typed someone else's address cannot set the
   password the owner ends up with. A username that is already taken, verified or pending, is refused
   with `username_taken` whatever the address. "Send the link again" repeats the newest pending
-  sign-up.
+  sign-up, even after its link expired, as long as the cleanup has not yet removed the unconfirmed
+  sign-up (a week after it was made). It never builds a link from the user row.
 - **Sign in.** With a username or an email and the password. A person whose email is not yet
   confirmed gets `email_unverified`, only after the password was right.
 - **Reset a password.** A mailed link that lasts 1 hour. Using it ends every session of that user and
-  clears the sign-in throttle. A refused new password does not use up the link.
+  clears the sign-in throttle. A refused new password does not use up the link. The link is bound to
+  the address it was mailed to: if the account's address changes first, the link stops working.
+  Beacon mails the account address when a password was changed, by reset or from the profile.
 - **Profile.** Change the display name, the password (ends every other session), the email (the new
-  address is held as `pendingEmail` and changes only when its mailed link is used), list and end
-  sessions, and delete the account with the current password.
+  address is held as `pendingEmail` and changes only when its mailed link is used; the old address is
+  mailed that it changed, and outstanding reset links are removed), list and end sessions, and delete
+  the account with the current password.
 - **The app.** The person signs in on the web first. The web asks for a one-time code, bound to a
   PKCE challenge (S256 only), and hands it to the app through `meshcorebeacon://auth`. The app swaps
   code and verifier for a bearer token. Beacon mails the user whenever an app signs in, and the
@@ -121,6 +131,10 @@ The app does not use the cookie. It holds a bearer token (see below), so CORS do
 | Sessions | A SHA-256 hash of the token, kind (`web` or `app`), a label (such as "Firefox on macOS"), the IP address and User-Agent, and created, last used and expiry times. |
 | One-time tokens | SHA-256 hashes only. A pending sign-up's token also holds that sign-up's username and password hash until it expires or is used. |
 | Times | Created, last login, and whether the user is disabled. |
+
+A user also owns, when those features are on, an Atlas (range and up to twelve pins), telemetry
+requests with their sealed guest passwords, alert rules and registered push tokens. Deleting the
+user removes all of them in the same transaction.
 
 Passwords, tokens and codes are never logged and never stored in clear text. Request bodies on the
 `/auth` and `/me` routes are never logged. Account responses carry `Cache-Control: no-store`.
@@ -139,6 +153,17 @@ Passwords are 12 to 128 bytes. A password is refused when it is one repeated cha
 username or the part of the email before the `@` (ignoring case), or is on the bundled list of
 common passwords. There are no other composition rules. Usernames are 3 to 30 of `A-Z a-z 0-9 _ . -`
 and `admin`, `root`, `beacon`, `system`, `support`, `moderator` and `operator` are reserved.
+
+## Credential changes and sign-in
+
+Sign-in, a password reset, a password change, an email change, deleting the account and the app
+code exchange each run under a per-user lock and check that the password they verified is still the
+current one. A sign-in that races a reset therefore never leaves a live session behind, an app code
+minted before a reset or password change no longer exchanges (`token_invalid`), and a user never
+holds more than ten app sessions. When Beacon cannot look a session up (the database is busy), the
+`/me` and other signed-in routes answer `503 service_unavailable` with `Retry-After: 5` instead of
+`401`, so a client does not throw away a token that is still good. Public routes carry on as signed
+out.
 
 ## Limits and throttles
 
@@ -182,7 +207,8 @@ DELETE /api/v1/admin/users/{id}
   is missing on the last page. No password hash is ever returned.
 - `PUT` with `disabled: true` ends every session of the user at once and refuses new sign-ins.
   `disabled: false` lifts it. The user is returned, with `disabled` and `lastLoginAt`.
-- `DELETE` removes the user and everything it owns in one transaction: `204`, or `404` if unknown.
+- `DELETE` removes the user and everything it owns (Atlas, telemetry requests, alert rules, devices)
+  in one transaction: `204`, or `404` if unknown.
 
 Example:
 
@@ -200,7 +226,8 @@ An hourly task (`users_cleanup`) deletes, once they are more than a week past th
 - sessions that were ended or have expired (including past their hard end);
 - one-time tokens that were used or have expired;
 - sign-ups nobody confirmed: local users never verified, created more than a week ago, with no live
-  verify link left. This frees the username and address.
+  verify link left. This frees the username and address;
+- stale portal sign-in states, in portal mode.
 
 A live session or token is never touched by it.
 
