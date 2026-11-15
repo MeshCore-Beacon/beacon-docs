@@ -60,8 +60,11 @@ Mail is sent in the background from a small queue. A request never waits for the
 failed send shows up only in the log (user id, kind of mail and the recipient's domain, never the
 address) and the user asks for another link. If the queue is full a mail is dropped and logged.
 
-The mailed links are `<public_url>/?view=verify&token=...` and `<public_url>/?view=reset&token=...`.
-They open the web app, so `public_url` must be where Beacon Web is served.
+The mailed links are `<public_url>/?view=verify#token=...` and `<public_url>/?view=reset#token=...`
+(an email-change link is a verify link). The token is in the URL fragment, which a browser never
+sends to a server, so no proxy or access log sees a live token. Links mailed before this change used
+`?token=...` and Beacon Web still accepts them. The links open the web app, so `public_url` must be
+where Beacon Web is served.
 
 On a read-only server (`server.read_only`) every account write answers `503 read_only`, sign-in
 included. The hourly cleanup and the operator user routes are off.
@@ -149,11 +152,19 @@ Session lengths:
 | App | 180 days, rolling | Hard end 365 days after creation. At most 10 per user; a new one ends the oldest. |
 
 One-time lifetimes: verify and email-change links 24 hours, reset links 1 hour, app codes 5 minutes.
-All are single use.
+All are single use. An email-change link is replaced when the user asks for another change, and the
+older link then fails as `token_invalid`. A link whose address another user has taken meanwhile also
+fails, and it is not used up.
 
-Passwords are 12 to 128 bytes. A password is refused when it is one repeated character, contains the
-username or the part of the email before the `@` (ignoring case), or is on the bundled list of
-common passwords. There are no other composition rules. Usernames are 3 to 30 of `A-Z a-z 0-9 _ . -`
+Passwords are 12 or more characters and at most 128 bytes. Beacon converts a password to Unicode
+normal form NFC before it checks or hashes it, on every path (sign-up, sign-in, change, reset and the
+current-password checks), so a password typed with a combined or a separate accent is one password.
+The 12 characters are counted after that conversion, so an emoji or an accented letter counts as one
+character; the 128 bytes are the UTF-8 length of the converted password. A password is refused when it
+is one repeated character, contains the username or the part of the email before the `@` (ignoring
+case), or is on the bundled list of common passwords. The email check is skipped when that part is
+shorter than 3 characters: a name such as `al` would otherwise refuse a large share of ordinary
+passwords. This exemption is deliberate. There are no other composition rules. Usernames are 3 to 30 of `A-Z a-z 0-9 _ . -`
 and `admin`, `root`, `beacon`, `system`, `support`, `moderator` and `operator` are reserved.
 
 ## Credential changes and sign-in
@@ -166,6 +177,16 @@ holds more than ten app sessions. When Beacon cannot look a session up (the data
 `/me` and other signed-in routes answer `503 service_unavailable` with `Retry-After: 5` instead of
 `401`, so a client does not throw away a token that is still good. Public routes carry on as signed
 out.
+
+## Busy hashing
+
+Checking or hashing a password uses about 19 MiB of memory and real CPU time, so Beacon runs at most
+4 of them at once, for sign-up, sign-in, reset confirm, password change, email change and
+account delete. (The app code exchange checks no password, so it never waits for a turn.) A request that cannot get a turn within 5 seconds answers
+`503 service_unavailable` with `Retry-After: 5` and the message "The server is busy. Try again in a
+moment.". It is not a wrong password and counts nothing against the password throttle below. The
+user (or the client) tries again; nobody is signed out by it. A sign-in for a name that does not
+exist takes a turn too, so the answer does not reveal whether the name exists.
 
 ## Limits and throttles
 
@@ -208,9 +229,14 @@ DELETE /api/v1/admin/users/{id}
   or email, ignoring case (up to 100 characters). Pass `nextCursor` as `cursor` for the next page; it
   is missing on the last page. No password hash is ever returned.
 - `PUT` with `disabled: true` ends every session of the user at once and refuses new sign-ins.
-  `disabled: false` lifts it. The user is returned, with `disabled` and `lastLoginAt`.
+  `disabled: false` lifts it. The user is returned, with `disabled` and `lastLoginAt`. While a user
+  is disabled, a password reset link or an email-change link for it is refused as `token_invalid`
+  and its credentials do not change.
 - `DELETE` removes the user and everything it owns (Atlas, telemetry requests, alert rules, devices)
-  in one transaction: `204`, or `404` if unknown.
+  in one transaction: `204`, or `404` if unknown. The transaction takes the same locks as a
+  telemetry request change (the user's targets first, then the user) and removes the user's requests
+  through the same state rules as a request deleted by the user, so no request is left half
+  removed. A disabled user can still be deleted.
 
 Example:
 

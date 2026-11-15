@@ -13,15 +13,26 @@ those first. The routes and shapes are in the [API contract](api-contract.md#tel
 Requests run only when all of these hold:
 
 - `polling.enabled` is `true`.
-- User accounts are on, in `local` or `portal` mode.
-- `BEACON_SECRET_KEY` is set. It seals the guest passwords. See
-  [Configuration](configuration.md#beacon_secret_key).
 - `polling.requests_per_user` is not `0`.
+- User accounts are on, in `local` or `portal` mode.
+- `BEACON_SECRET_KEY` is set and valid. It seals the guest passwords. See
+  [Configuration](configuration.md#beacon_secret_key).
 
-If one of these is missing Beacon still starts, logs one line saying why requests are off, and
-`features.telemetryRequests` in [`/api/v1/info`](api-contract.md#server-info) is `false`. Every
-request route then answers `404 requests_disabled`, and both clients hide the section. A
-`BEACON_SECRET_KEY` that is set but is not 32 bytes of base64 stops startup.
+Beacon checks them in that order, at startup, and stops at the first that fails. If one is missing
+Beacon still starts and `features.telemetryRequests` in [`/api/v1/info`](api-contract.md#server-info)
+is `false`. What it logs and answers depends on which one failed first:
+
+| First failed gate | Log line (`telemetry requests are off`, with `reason`) | Request routes |
+|---|---|---|
+| Polling is off | None. The operator never asked for requests. | `404 requests_disabled` |
+| `requests_per_user` is `0` | `polling.requests_per_user is 0` | `404 requests_disabled` |
+| Accounts are off | `accounts are off` | `404 accounts_disabled`, like every account route |
+| `BEACON_SECRET_KEY` is not set | `BEACON_SECRET_KEY is not set` | `404 requests_disabled` |
+
+Both clients hide the section in every case. Only when the first three gates pass is the key
+parsed: a `BEACON_SECRET_KEY` that is set but is not 32 bytes of base64 stops startup then, and not
+before. With polling off, a request limit of `0` or accounts off, a malformed key is never looked at
+and Beacon starts.
 
 | Key | Default | What it does |
 |---|---|---|
@@ -68,7 +79,11 @@ observer is faster still.
 3. Observers are ranked as for any polled repeater. At most one poller and two standbys are chosen.
    Seats are reserved in request age order: when two repeaters compete for the same observer's
    seats, the repeater with the older request keeps its seat and the younger one loses it, even if
-   the younger one is elected first. A repeater left with no observer goes back to `waiting` with
+   the younger one is elected first (equal ages go by repeater key). Every election that touches
+   requested seats takes its locks in one fixed order (observers' seats, then repeaters, then the
+   user), so two elections, a claim arriving mid-election, a preemption and the hourly cleanup
+   cannot deadlock or hand out one seat twice. When a poller loses its seat, the standby behind it
+   moves up and becomes the poller. A repeater left with no observer goes back to `waiting` with
    `no_seat`.
 4. If an observer already polls the repeater because its owner set it as a target, it keeps the job
    and the requests ride on its readings. No password is sent.
@@ -90,6 +105,17 @@ a password to an observer in clear: only the envelope, which only that observer'
 
 An observer that holds a requested repeater it is not assigned any more is left out of the next
 owners answer for it, and the device drops it.
+
+A requested assignment is made before the device lists the repeater in its claim, so the hourly
+cleanup keeps it for as long as that observer's live claim accepts requests, even though no claim
+row names the repeater yet. Once the claim expires or stops accepting requests, the assignment is
+cleaned up as any other.
+
+When Beacon cannot record which password version it served in an owners answer that carries a
+requested repeater (the instance is read-only, or the store fails), or cannot read the password in
+use, the owners route answers `503` with `Retry-After: 60` instead of a `200` without the requested
+entries. The device would read an omitted entry as withdrawn and drop it, so it keeps what it has
+and asks again. See [Firmware polling](api-contract.md#firmware-polling).
 
 ## What the user sees
 

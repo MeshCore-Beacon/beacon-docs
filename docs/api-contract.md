@@ -467,12 +467,13 @@ Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a
 
 Every field after `readings` is left out when no reading in the bucket carried it. Repeaters do not all report every field.
 
-The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases one pair at a time. A pair is two consecutive status readings, meaning readings that carry at least one counter. The increases of a pair are credited to the bucket of the later reading. A pair gives the same answer whatever `range` was asked for, so the first pair of a range uses the newest status reading before the range as its earlier half.
+The five counters (`airtimeTxSecs`, `airtimeRxSecs`, `packetsReceived`, `packetsSent`, `receiveErrors`) are running totals on the repeater. Beacon turns them into increases one pair at a time. A status reading is a reading whose stored `method` is `status`, whether or not it carries any counter: a status reply too short to carry counters is still a status reading. A pair is two consecutive status readings. A status reading without counters therefore takes part in a pair and breaks it (the pair adds nothing), and the next pair starts from that reading, not from the last one that had counters. Telemetry readings (`method` `telemetry`) are never part of a pair. The increases of a pair are credited to the bucket of the later reading. A pair gives the same answer whatever `range` was asked for, so the first pair of a range uses the newest status reading (by `method`) before the range as its earlier half.
 
 A pair either contributes all of its counters or none of them. It contributes when all of these hold:
 
 - The later reading is after the earlier one and no more than 48 hours later. A longer gap cannot be placed in a bucket.
 - At least one counter is present in both readings.
+- No counter is negative, in either reading. A negative value cannot be a running total, so the whole pair is refused.
 - The counters do not disagree. Either none went down, or the repeater rebooted and none went up. A reboot is seen when both readings carry uptime and the later uptime is lower than the earlier, or is shorter than the time between the two readings.
 - The span is at least one second.
 - No increase is faster than its cap: 1 second per second for `airtimeTxSecs` and `airtimeRxSecs`, 10 per second for `receiveErrors`, 50 per second for `packetsReceived` and `packetsSent`.
@@ -1156,9 +1157,15 @@ Notes:
   fails as `token_invalid` if another user owns the address by then. It does not sign anyone in.
 - **Username** 3 to 30 of `A-Za-z0-9_.-`, unique ignoring case; `admin`, `root`, `beacon`, `system`,
   `support`, `moderator` and `operator` are reserved. **Email** one address of at most 254 bytes,
-  stored lower case. **Display name** 1 to 40 characters after trimming. **Password** 12 to 128 bytes,
-  refused when it is one repeated character, contains the username or the email's local part (ignoring
-  case), or is on the common-password list. Refusals are `422 weak_password` with the reason in
+  stored lower case. **Display name** 1 to 40 characters after trimming. **Password** at least 12
+  characters and at most 128 bytes. It is converted to Unicode NFC first, on every route that takes a
+  password, and the 12 characters (runes, not UTF-16 units or bytes) and the 128 bytes (UTF-8) are
+  counted after that. It is refused when it is one repeated character, contains the username or the
+  email's local part (ignoring case), or is on the common-password list. The local-part check is
+  skipped when the local part is shorter than 3 characters; that is deliberate, because a name such as
+  `al` would refuse a large share of ordinary passwords. The messages are "Password must be at least
+  12 characters." and "Password must be at most 128 bytes." A client should count characters, not
+  bytes, for its own check of the minimum. Refusals are `422 weak_password` with the reason in
   `message`, or `422 invalid_input`.
 - **Login** `login` is a username or an email. An unknown name and a wrong password both give
   `401 invalid_credentials`, so does a disabled user. `403 email_unverified` comes only after the
@@ -1167,8 +1174,13 @@ Notes:
   checks for 15 minutes: `429 too_many_attempts` with `Retry-After`. A password reset clears it.
 - **Reset confirm** ends every session of the user. A password the policy refuses does not use up the
   link.
-- **Links** in mail are `<public_url>/?view=verify&token=...` and `<public_url>/?view=reset&token=...`.
-  Verify and email-change links last 24 hours, reset links 1 hour. All are single use.
+- **Links** in mail are `<public_url>/?view=verify#token=...` and `<public_url>/?view=reset#token=...`
+  (an email-change link is a verify link). The token is in the URL fragment so that a browser never
+  sends it to a server and no proxy or access log sees it. The web app also still accepts
+  `?token=...`, for links mailed before the change. Verify and email-change links last 24 hours,
+  reset links 1 hour. All are single use. While a user is disabled, a reset link or an
+  email-change link for it fails as `token_invalid`; an email-change link whose address was taken
+  meanwhile also fails as `token_invalid` and is not used up.
 - **Sessions.** Web: 30 days, rolling. App: 180 days, rolling, hard end 365 days after creation, at
   most 10 per user (the oldest is ended). The rolling expiry is written at most once every 5 minutes.
   `DELETE /me/sessions/{id}` with an id that is not the user's changes nothing; a bad id is
@@ -1219,7 +1231,7 @@ Error codes the account routes use:
 | 429 | `rate_limited` | A per-address limit; `Retry-After` in seconds. |
 | 429 | `too_many_attempts` | The password throttle; `Retry-After` in seconds. |
 | 503 | `read_only` | The server is read-only. |
-| 503 | `service_unavailable` | The session could not be looked up. Sent with `Retry-After: 5`. Not a sign-out: keep the token and retry. |
+| 503 | `service_unavailable` | Sent with `Retry-After: 5`, never a sign-out or a wrong password: keep the token and what was typed and retry. Two causes: the session could not be looked up, or, on a route that hashes or checks a password (sign-up, sign-in, reset confirm, password change, email change, account delete), the request waited more than 5 seconds for a turn (at most 4 password hashes run at once). The second has the message "The server is busy. Try again in a moment." |
 | 404 | `portal_managed` | A local sign-up or password route in portal mode. |
 
 #### Operator user routes
@@ -1232,7 +1244,7 @@ Bearer admin key, see [Auth](#auth). `503` while accounts are off or the server 
   (epoch ms or `null`).
 - `PUT /admin/users/{id}` with `{"disabled": true}` ends every session of the user and refuses new
   sign-ins; `false` lifts it. Returns `{user}`. `404` for an unknown id.
-- `DELETE /admin/users/{id}` removes the user and everything it owns: `204`, or `404`.
+- `DELETE /admin/users/{id}` removes the user and everything it owns in one transaction, taking the same locks as a telemetry request change: `204`, or `404`.
 
 ### Atlas sync
 
@@ -1269,7 +1281,7 @@ PUT /api/v1/me/atlas
 
 Replaces every pin. A node pin needs `publicKey`. An observer pin needs `observerId` or
 `observerPublicKey`, and if it sends both they must name the same observer. A `name` is at most 160
-characters. Answers `200` with the new Atlas, `revision` plus one.
+characters. Answers `200` with the Atlas that this save committed, `revision` plus one. The body is read inside the same transaction, so a save from another device that lands right afterwards does not change what this answer says.
 
 | Status | Code | When |
 |---|---|---|
@@ -1487,7 +1499,7 @@ in the Swagger UI.
 | Route | Answer |
 |---|---|
 | `GET /api/guest-polling/policy` | `200`, the policy. `503` when the polling state cannot be read. |
-| `GET /api/guest-polling/owners` | `200`, `{"nodes": {...}, "policy": {...}}`. `503` when the polling state cannot be read. |
+| `GET /api/guest-polling/owners` | `200`, `{"nodes": {...}, "policy": {...}}`. `503` when the polling state cannot be read, or when the answer lists a requested repeater and Beacon cannot record what it served (see below). |
 | `POST /api/guest-keys` | `404`, always. The body is never read or logged. |
 | `GET /api/shared-guest/key` | `404`, always. |
 
@@ -1495,7 +1507,13 @@ Beacon never accepts polling keys, so the two key routes always answer `404`. (G
 that has used up the policy and owners rate limit. The firmware
 reads a `404` on the policy route as "upload keys instead", so the policy route never answers
 `404`. With `polling.enabled: false` the policy and owners routes still answer `200`, with
-`paused: true`, no hosts and no nodes. A read-only server answers them normally.
+`paused: true`, no hosts and no nodes. A read-only server answers the policy route normally, and the
+owners route too unless the answer would carry a requested repeater: Beacon has to record which
+password version each requested entry was served with, and a read-only instance cannot write it.
+Whenever the owners answer cannot record that (a read-only instance, a store error) or cannot read
+the password in use, it is `503` with `Retry-After: 60`, never a `200` that leaves the requested
+entries out, because the device would read an omitted entry as withdrawn and drop it. Owners
+answers with no requested repeater are unaffected.
 
 When Beacon cannot read the pause state, the caller's blocked flag or the caller's roles, both
 routes answer `503` with the standard error body, an exact `Content-Length` and

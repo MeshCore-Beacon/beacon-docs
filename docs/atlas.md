@@ -187,7 +187,8 @@ mobile app show the same cards. Signed out, nothing changes and the local copy i
   observer pin whose key now has a node record is returned as a node pin; if that node is already
   pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
   tiles and, for a node pin, the tab it opens on.
-- The Atlas is replaced as a whole, guarded by a revision number. A write that carries an older
+- The Atlas is replaced as a whole, guarded by a revision number. The `200` answer to a save is the
+  document that save committed. A write that carries an older
   revision is refused with `409 atlas_conflict` and the stored Atlas. The client then adopts the
   server's copy, drops its own change and says so; it does not retry by itself.
 - On first sign-in the client merges the local cards into the account: the server's pins come first,

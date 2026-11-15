@@ -337,7 +337,10 @@ the key.
 | `request_observers` | `approved` | `approved` or `all` | Which observers may be handed a requested repeater and its guest password. `approved`: only observers you approved. `all`: any observer with advert evidence, which lets anyone who runs an observer present evidence and be handed a guest password. Use `all` only where you know every observer. |
 
 Telemetry requests also need accounts on and `BEACON_SECRET_KEY`; see
-[Requested telemetry](telemetry-requests.md#turn-it-on).
+[Requested telemetry](telemetry-requests.md#turn-it-on). The gates are checked in this order:
+polling on, `requests_per_user` above `0`, accounts on, then the key. The first one that fails turns
+requests off (with accounts off the request routes answer `accounts_disabled`); polling off logs no
+reason, the others log one line.
 
 ```yaml
 polling:
@@ -414,8 +417,11 @@ openssl rand -base64 32
 ```
 
 Put it in `.env` as `BEACON_SECRET_KEY=...`. It must decode to exactly 32 bytes (standard or URL
-base64, padded or not). A value that does not stops startup. When it is unset, Beacon starts with
-telemetry requests off and logs why.
+base64, padded or not). The key is read only after the other gates pass (`polling.enabled` on,
+`polling.requests_per_user` above `0`, accounts on). Then a value that is not valid stops startup;
+when any of those gates fails, a malformed key is ignored and Beacon starts. When the key is unset,
+Beacon starts with telemetry requests off and logs why (except with polling off, which logs no
+reason). See [Requested telemetry](telemetry-requests.md#turn-it-on).
 
 Back it up with your other secrets. If you lose it or change it, stored passwords cannot be opened:
 Beacon stops sending those repeaters' passwords to observers and logs "requested password does not

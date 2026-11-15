@@ -38,10 +38,10 @@ assignment right now; the user is told to request telemetry for it first (see
 |---|---|---|
 | `gone_quiet` | all | Hours: 12, 24 or 48. Also 3 and 6 for observers and polled repeaters. |
 | `back_online` | all | None. Needs an enabled `gone_quiet` rule on the same radio. Notifies when that rule recovers. |
-| `clock` | repeaters, room servers | Seconds of drift: 300, 3600 or 86400. Fires after two adverts in a row beyond it. |
+| `clock` | repeaters, room servers | Seconds of drift: 300, 3600 or 86400. Fires after two adverts in a row beyond it. Beacon keeps the drift of each repeater's last 16 adverts, so a breach that came and went between two passes still fires once. |
 | `battery_low` | with a battery reading | Millivolts, 2500 to 5000. |
 | `battery_falling` | with a battery reading | Millivolts per day: 100, 200 or 300. |
-| `rebooted` | with an uptime reading | None. Notifies on each new reboot seen. |
+| `rebooted` | with an uptime reading | None. Notifies on each new reboot seen. Every reading since the rule's last pass is examined, not only the newest few. |
 | `temperature` | with a temperature reading | Tenths of a degree C, -500 to 1500. A low limit (`threshold`), a high limit (`thresholdHigh`) or both; low must be below high. With both set on a rule that is on, the high limit must be at least 20 tenths (2.0 degrees C) above the low one, or the change is refused with `422 invalid_threshold`; a rule being turned off is not held to it. |
 | `noise_high` | with a noise floor reading | dBm, -130 to -50. |
 | `observer_offline` | observers | Minutes without a status report: 30, 60, 180 or 360. |
@@ -61,7 +61,10 @@ offers the 3 and 6 hour `gone_quiet` thresholds and the telemetry kinds. A repea
 an observer holds it as a polling assignment (a standby counts). An observer is polled only if it
 sent status telemetry in the last 24 hours. Old readings alone do not count, so a radio that was
 polled can turn `polled: false`; its telemetry kinds then move to `unavailable` with code
-`not_polled` (repeater) or `observer_no_data` (observer), and its telemetry rules read `inactive`. When a kind is not offered
+`not_polled` (repeater) or `observer_no_data` (observer), and its telemetry rules read `inactive`.
+With `polling.enabled: false` no repeater is polled: every repeater reads `polled: false`, its
+telemetry kinds are `unavailable` with `not_polled` and its telemetry rules read `inactive`. Observer
+status alerts do not depend on polling and carry on. When a kind is not offered
 the overview gives the reason as an English sentence and as a stable code (`unavailableCodes`), so
 clients can translate it. The codes are listed in the [API contract](api-contract.md#alerts).
 
@@ -75,9 +78,17 @@ clients can translate it. The codes are listed in the [API contract](api-contrac
 - A rule goes back to `ok` only when the reading is clear of the threshold by some margin: 100 mV
   for battery, 3 dB for noise, 1 degree for temperature. This stops a value at the edge from
   flapping.
-- Notices are sent every minute. A notice not delivered within 2 hours is dropped, and a notice
-  that failed 5 times is dropped. Delivered notices are kept a day.
-- Evaluation reads at most the newest 12 readings per radio within 14 days.
+- Notices are sent every minute, and only for an evaluation pass that has finished, so the notices
+  of one pass reach a user together. Notices of a pass that never finished (the process stopped) are
+  sent once that pass is 15 minutes old. A notice not delivered within 2 hours is dropped, and a
+  notice that failed 5 times is dropped. Delivered notices are kept a day.
+- Evaluation reads at most the newest 12 readings per radio within 14 days, except for `rebooted`:
+  that rule starts from the last reading it has seen and reads forward in pages of 200 readings per
+  pass, so every reading counts. A backlog longer than 200 readings takes several 5 minute passes
+  (the notice comes late, not never).
+- Each advert's clock drift is kept for the radio's last 16 adverts. The `clock` rule judges every
+  pair of adverts since its last pass, so a drift past the limit that was back inside it by the next
+  pass still fires once, and then recovers.
 
 ## Email
 

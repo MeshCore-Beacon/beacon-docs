@@ -44,7 +44,16 @@ is authenticated.
 
 Accounts are off by default; see [User accounts](accounts.md). When they are on:
 
-- Passwords are stored only as argon2id hashes. Session tokens, mailed links and app codes are random
+- Passwords are converted to Unicode NFC and stored only as argon2id hashes. A password is 12 or
+  more characters (counted after the conversion) and at most 128 bytes. The rule that refuses a
+  password containing the first part of the email address is skipped when that part is shorter than
+  3 characters; this is deliberate, since a name such as `al` would refuse a large share of ordinary
+  passwords.
+- At most 4 password hashes or checks run at once, each holding about 19 MiB. A request that waits
+  more than 5 seconds for a turn answers `503 service_unavailable` with `Retry-After: 5`, so a flood
+  of sign-in attempts cannot exhaust the memory of the server; it only makes some of them wait or
+  fail. The 503 is not a wrong password and is not counted by the throttle.
+- Session tokens, mailed links and app codes are random
   and stored only as SHA-256 hashes. None of them, and no request body on `/auth` or `/me`, is
   logged.
 - The session cookie is `HttpOnly`, `SameSite=Lax` and `Secure` (except for a localhost `public_url`).
@@ -54,6 +63,9 @@ Accounts are off by default; see [User accounts](accounts.md). When they are on:
   `accounts.public_url` or one of `cors.allowed_origins` (never `*`). Otherwise it gets `403
   csrf_rejected`. Requests with a bearer token skip this check; only a cookie lets a foreign page act
   for the user.
+- Mailed links carry their token in the URL fragment (`/?view=reset#token=...`). A browser does not
+  send the fragment to the server, so the token stays out of proxy and access logs, and the web app
+  removes it from the address bar as soon as it has read it.
 - Sign-up, resend and reset never say whether an address is registered. Sign-in gives one failure for
   an unknown name and a wrong password. Failed sign-ins are throttled per account and per address.
 - Set `server.trusted_proxies` behind a proxy, or the per-address limits count the proxy.
