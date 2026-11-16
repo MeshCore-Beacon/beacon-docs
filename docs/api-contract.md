@@ -497,7 +497,7 @@ GET /api/v1/nodes/telemetry/latest?iata=YOW
 
 The newest battery and temperature of every polled node, in one answer, so a map can label its pins. The location filters `iata`, `iatas`, `regionId` and `region` work as on the node list. There are no other parameters.
 
-The answer has one item for each node that has a trusted reading in the last 7 days carrying a battery or temperature value. Untrusted readings are never used. A node with no such reading is not listed. With polling off on the server the answer is `{"generatedAt": ..., "items": []}`, so a client can ask without checking `features` first. The server caches the answer for about 60 seconds.
+The answer has one item for each node that has a trusted reading in the last 7 days carrying a battery or temperature value. Untrusted readings are never used. A node with no such reading is not listed. With polling off on the server the answer is `{"generatedAt": ..., "items": []}`, so a client can ask without checking `features` first. With Redis configured the server caches the answer for about 60 seconds; without it every request is computed.
 
 ```json
 {
@@ -976,7 +976,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `alerts` | True when [alerts](#alerts) are on: accounts are on and `alerts.delivery` is not `off`. |
 | `alertDelivery` | `"push"` or `"email"`. Present only when `alerts` is true. |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
-| `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. A client shows its map telemetry toggle only when it is true. |
+| `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
 
 `display` holds the instance's display units, set by the operator in [`display`](configuration.md#display-units):
 

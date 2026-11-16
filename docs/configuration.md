@@ -423,7 +423,7 @@ display:
   distance_unit: imperial
 ```
 
-Clients read both from `display` in [Server info](api-contract.md#server-info). On `f`, the web and the app show temperatures in degrees F, and [alert](alerts.md) mail and push text give temperatures in F. Users also type and see temperature alert limits in whole degrees F. On `imperial`, clients show distances in miles and feet. The API does not change: it still stores and sends Celsius and metric.
+Clients read both from `display` in [Server info](api-contract.md#server-info). On `f`, the web and the app show temperatures in degrees F, and [alert](alerts.md) mail and push text give temperatures in F. Users also type and see temperature alert limits in whole degrees F. On `imperial`, the web map's scale bar shows miles and feet; the app shows no distances yet. The API does not change: it still stores and sends Celsius and metric.
 
 ## BEACON_SECRET_KEY
 
