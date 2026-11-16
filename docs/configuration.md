@@ -335,7 +335,7 @@ the key.
 | `authority` | `evidence` | `evidence` or `approved` | Who can be elected to poll. `evidence`: any observer, ranked on the advert evidence it reports. `approved`: only observers approved through the admin route. See [Trust](repeater-polling.md#trust). |
 | `requests_per_user` | `3` | 0 to 20 | How many [telemetry requests](telemetry-requests.md) one user may hold. `0` turns requests off. |
 | `offline_disable_days` | `7` | 1 to 365 | Days no observer hears a repeater before its requests are turned off. |
-| `request_observers` | `approved` | `approved` or `all` | Which observers may be handed a requested repeater and its guest password. `approved`: only observers you approved. `all`: any observer with advert evidence, which lets anyone who runs an observer present evidence and be handed a guest password. Use `all` only where you know every observer. |
+| `request_observers` | `all` | `all` or `approved` | Which observers may be handed a requested repeater and its guest password. `all`: any observer with advert evidence for the repeater. `approved`: only observers you approved. Advert evidence is required in both modes. Set `approved` if you want to vet observers first. See [Approve observers](telemetry-requests.md#approve-observers). |
 
 Telemetry requests also need accounts on and `BEACON_SECRET_KEY`; see
 [Requested telemetry](telemetry-requests.md#turn-it-on). The gates are checked in this order:

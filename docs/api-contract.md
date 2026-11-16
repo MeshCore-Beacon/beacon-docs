@@ -1388,7 +1388,7 @@ for a live claim). The same `poller` object is in the create and update answers.
 | `status` | `statusReasonCode` | Meaning |
 |---|---|---|
 | `active` | empty | An observer polls it, or the requests ride on a poll already set. |
-| `waiting` | `no_observer` | No observer can reach the repeater yet (none approved, none with evidence or request support). |
+| `waiting` | `no_observer` | No observer can reach the repeater yet (none approved in `approved` mode, none with evidence or request support). |
 | `waiting` | `no_seat` | Every observer that can reach it is at its polling maximum. |
 | `login_failed` | `login_failed` | The repeater did not accept the guest password. |
 | `login_failed` | `blank_login_failed` | The repeater did not accept a blank or hello login. |

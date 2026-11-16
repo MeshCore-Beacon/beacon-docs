@@ -154,6 +154,38 @@ shows how to check it. If you enforce the [fail2ban jails](../app_config/fail2ba
 add `protocol="tcp,udp"` to the ban action as shown there: the default bans TCP only, so a
 banned address could still reach the site over HTTP/3.
 
+## Upgrading from 2.2.0: accounts, telemetry requests, alerts and portal sign-in
+
+This release adds migrations `064` to `083` (polling, user accounts, telemetry requests, the portal
+sign-in state, alert rules and their outbox, and an Atlas telemetry view). They run at startup and
+are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
+`081`, `082`) on tables this release creates, so they start empty. On the project's test server the
+whole set took seconds. The only data migrations are `065`, which marks readings of the empty
+`repeater_readings` table, and `078`, which copies one drift row per node into a new table.
+
+Every new feature is off by default, so an upgrade with no config change behaves as before:
+
+| Feature | Turn it on with | Secret |
+|---|---|---|
+| Repeater polling | `polling.enabled: true` and `polling.mqtt_hosts` | none |
+| Accounts | `accounts.mode: local` (needs `accounts.public_url` and `accounts.smtp.host` and `from`) | `BEACON_SMTP_PASSWORD` if the mail server wants a login |
+| Portal sign-in | `accounts.mode: portal` (needs `accounts.public_url`, `accounts.portal.url` and `client_id`) | `BEACON_PORTAL_SECRET` |
+| Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `3`) | `BEACON_SECRET_KEY` |
+| Alerts | `alerts.delivery: push` or `email`, with accounts on (`email` needs `local` mode) | `BEACON_PUSH_CREDENTIALS` for `push` |
+
+Telemetry requests hand guest passwords to observers. By default any observer with advert evidence
+for the repeater can receive one; set `polling.request_observers: approved` to choose who does
+(see [Approve observers](telemetry-requests.md#approve-observers)). Secrets go in `.env`; see
+[`.env.example`](../app_config/.env.example). The full settings are in
+[Configuration](configuration.md), and each feature has its own page:
+[Repeater polling](repeater-polling.md), [User accounts](accounts.md),
+[Sign-in through the MeshMapper portal](portal-sign-in.md),
+[Telemetry requests](telemetry-requests.md) and [Alerts](alerts.md).
+
+No client version floor changed: `minWebVersion` and `minAppVersion` stay at 2.1.0, so installed
+web and app builds keep working. Beacon Web and BEACON Mobile need the matching release only to
+show the new screens.
+
 ## Upgrading to 2.1
 
 Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `061` at startup,
