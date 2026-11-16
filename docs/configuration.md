@@ -115,6 +115,7 @@ cannot honour. These are the ones people hit:
   `channels.refresh_interval` 24h to 168h.
 - A `borderFile` that is missing or not a valid GeoJSON Polygon or MultiPolygon Feature, or
   `nodes.mark_foreign: true` with no border source at all.
+- `display.temperature_unit` other than `c` or `f`, or `display.distance_unit` other than `metric` or `imperial`.
 - `log.level` or `log.format` set to anything other than the listed values.
 - `mobile.min_app_version` or `web.min_web_version` that is not a plain `X.Y.Z` release (`v1.2.3` and `1.2.3-beta` are rejected).
 - An admin key under 16 characters or containing whitespace.
@@ -406,6 +407,23 @@ alerts:
 `BEACON_PUSH_CREDENTIALS` is the path, inside the container, of a Google service account key file
 (JSON with `project_id`, `client_email` and `private_key`). Mount the file read-only and keep it out
 of source control. See [Push](alerts.md#push).
+
+## Display units
+
+The `display` block sets the units this instance shows. It is optional and the same for every user.
+
+| Key | Default | What it does |
+|---|---|---|
+| `temperature_unit` | `c` | `c` or `f`. Case does not matter. Anything else stops startup. |
+| `distance_unit` | `metric` | `metric` or `imperial`. Case does not matter. Anything else stops startup. |
+
+```yaml
+display:
+  temperature_unit: f
+  distance_unit: imperial
+```
+
+Clients read both from `display` in [Server info](api-contract.md#server-info). On `f`, the web and the app show temperatures in degrees F, and [alert](alerts.md) mail and push text give temperatures in F. Users also type and see temperature alert limits in whole degrees F. On `imperial`, clients show distances in miles and feet. The API does not change: it still stores and sends Celsius and metric.
 
 ## BEACON_SECRET_KEY
 
