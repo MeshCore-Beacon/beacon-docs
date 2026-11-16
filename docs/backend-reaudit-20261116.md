@@ -116,15 +116,55 @@ not globally unique node identities.
 ## Qualification and handoff
 
 Focused package tests, build/vet and red-to-green evidence are recorded locally.
-The final preview composition and exact Actions build will be identified in the
-backend delivery receipt after all CI gates pass. Final candidate is
-`4f4f833f7e50d3776041ccd27234f7645632f2d3`, fork PR #26, CI run 43826594411,
-ARM64 artifact run 43826594379. The earlier two-fix candidate `ec2c1f8` passed CI
-but was not deployed; its proof is retained separately. No deployment is claimed by
-this preliminary report section. Do not publish private runtime JSON wholesale;
-the parent audit should use the sanitized facts above.
+The exact final Actions builds and deployment are identified in the receipt below.
+The earlier two-fix candidate `ec2c1f8` passed CI but was not deployed; its proof is
+retained separately. Private runtime JSON should not be published wholesale;
+the sanitized findings and delivery receipt provide the public evidence summary.
 
 Private evidence: `backend-runtime-current.json`, `dev-runtime-current.json`,
 `public-runtime-current.json`, `polling-presence-red.log`,
 `polling-presence-green.log`, `strict-filters-red.log`, and
 `strict-filters-green.log` under `evidence/parity-audit-20261116`.
+
+## Qualified backend delivery receipt
+
+The backend-only Canadaverse cutover completed at checkpoint
+**`parity-server-20261116T081228Z`**. Deployed backend:
+**`4f4f833f7e50d3776041ccd27234f7645632f2d3`**. The frontend at this backend
+cutover was **`4ee1fc304411`** and its files and build fields were preserved;
+the system audit's subsequent frontend receipt identifies any later web revision.
+
+- [Final full CI](https://github.com/n30nex/beacon-server-contributions/actions/runs/43826594411)
+  passed, including PostgreSQL integration/plan, backup/recovery, build/vet,
+  Swagger and vulnerability checks.
+- [Exact ARM64 artifact](https://github.com/n30nex/beacon-server-contributions/actions/runs/43826594379)
+  passed. Revision/tree/source archive/binary hashes were verified; the executable
+  reports Go 1.26.11, GOARCH arm64 and a clean VCS revision matching the candidate.
+- Org PRs #313, #314 and #322 remain independent drafts with passing current-head
+  checks, closing issues #324, #325 and #326 respectively. Release classes are
+  minor, patch and minor because the polling module is not in current main.
+- Fork [server #26](https://github.com/n30nex/beacon-server-contributions/pull/26)
+  is incorporated by fast-forward into `n30nex-test`; no org dev/main merge occurred.
+- Public `/info` and build metadata identify the new backend; the corresponding
+  source archive hash matches. Both brokers connected, five invalid numeric
+  filter checks return 400, five ordinary read checks return 200, and the retired
+  independent intake route remains 404.
+- The prior backend stopped with exit code 0. The 86-entry migration ledger,
+  configuration/secret hashes, radio-service state and unrelated containers were
+  preserved. No schema, retention, observer-enrollment, RF or account-policy change
+  was made. Normal ingestion can continue changing data; this is not a claim of
+  universal MQTT losslessness during process replacement.
+
+The old backend container, binary and startup script are retained. Recovery from
+the existing Pi preview root is:
+
+```sh
+sudo python3 evidence/parity-audit-20261116/backend/deploy-server.py rollback
+```
+
+This restores backend `6292a743aaeb`, keeps the current frontend fields/files,
+and does not downgrade the database. It refuses an unrelated newer backend.
+The system audit documents the ordering with any subsequent frontend rollback
+guard. A live rollback rehearsal was not performed; exact recovery copies and
+no-schema-change boundaries were verified. Private receipts are under
+`evidence/parity-audit-20261116/backend/` and should not be published wholesale.

@@ -24,6 +24,11 @@ LiveConnection path and is patch-class. Flutter #22 mixes public HTTP work with
 unreleased account code; its whole proposal belongs in the minor lane unless a
 separate public-HTTP-only backport is prepared.
 
+The complete [server #307 TRACE quality/wire contract](https://github.com/MeshCore-Beacon/beacon-server/pull/307) is also minor-class; the
+web #199 and mobile warning/exact-wire-byte consumers (#28/#30) ship with that additive
+contract. Do not call the whole contract a released-main patch solely because it
+corrects misleading evidence.
+
 ## Current small proposals
 
 | Component | Proposal | Class | Acceptance boundary |
@@ -34,12 +39,14 @@ separate public-HTTP-only backport is prepared.
 | Web | [#210 loaded Nodes CSV](https://github.com/MeshCore-Beacon/beacon-web/pull/210) | Minor feature | Current loaded/filtered rows only, formula-safe cells, no hidden full crawl |
 | Web | [#219 contact-file JSON](https://github.com/MeshCore-Beacon/beacon-web/pull/219) | Minor feature | Eligible full-key contacts, no private data/routes or invented advert times; physical importer still a gate |
 | Flutter | [#26 handshake cancellation](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/26) | Patch | Stop/timeout closes the underlying attempt; late generations cannot replace the current socket |
+| Flutter | [#28 TRACE evidence warnings](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/28) | Minor | Show backend uncertainty/reasons; retain legacy-server behavior and raw records; default hiding remains a follow-up |
+| Flutter | [#30 original TRACE wire bytes](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/30) | Minor | Preserve received wire bytes and correct raw-highlight offsets instead of reconstructing evidence |
 
 These are independent dev drafts, not a combined org implementation PR. Existing
 audit/browser fixes keep their original review entries rather than being duplicated.
 An export button or a debug APK does not establish physical-device acceptance.
 
-## Backlog with concrete issue owners
+## Backlog with tracked acceptance criteria
 
 | Issue | Next slice | Shipping class |
 | --- | --- | --- |
@@ -59,6 +66,9 @@ An export button or a debug APK does not establish physical-device acceptance.
 | [beacon-web #217](https://github.com/MeshCore-Beacon/beacon-web/issues/217) | Export and import validated theme presets | `release:minor` |
 | [beacon-web #220](https://github.com/MeshCore-Beacon/beacon-web/issues/220) | Investigate cancellation of obsolete shared paged reads | `release:backlog` |
 | [beacon-server #323](https://github.com/MeshCore-Beacon/beacon-server/issues/323) | Expose bounded native telemetry channels and environmental measurements | `release:minor` |
+| [beacon-flutter-app #31](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/31) | Qualify monotonic elapsed-time map animations against clock changes and lifecycle transitions | `release:backlog` |
+| [beacon-flutter-app #32](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/32) | Profile path-resolution cost and identify which live consumers need it | `release:backlog` |
+| [beacon-flutter-app #33](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/33) | Agree a preview package, signing and version-code upgrade policy | `release:backlog` |
 
 Sequence the inexpensive, existing-data improvements first: exports, bounded
 search, public identity links and operator freshness/coverage visibility. Then
@@ -103,5 +113,5 @@ bridge shares the native coordinator rather than reintroducing a second schedule
 The label reconciliation is additive and preserves existing owner labels and
 milestones. It classifies current open issues/PRs across all twelve Beacon org/fork
 repositories; closed historical discussions are not rewritten as a new roadmap.
-Final reconciliation counts and late-created items are recorded in the parent
+Final reconciliation counts and late-created items are recorded in the system audit
 delivery receipt rather than treated as a fixed count throughout ongoing work.

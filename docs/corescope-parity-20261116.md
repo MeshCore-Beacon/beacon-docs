@@ -36,8 +36,8 @@ The CoreScope fork versus current upstream diff spans 919 files. It is not a saf
 | Live geographic packet animation | `public/live.js`, route renderer | Present in native Map; preview enforces bounded work | Preserve unknown-hop rejection and elapsed-time motion; measure representative scenes |
 | VCR historical replay/scrubbing/speed | `public/live.js:147+`, `/api/packets/timestamps` | Gap: native play/stop exists, historical VCR equivalent not found | Cursor-bound replay API and bounded client buffer before timeline UI |
 | Node directory and neighbors | `/api/nodes/*`, `public/nodes.js` | Present: node filters/sorting, neighbor evidence, detail panels | Keep loaded-view completeness explicit and missingness visible |
-| Nodes export to companion contacts | `public/nodes-export.js:1–91`; `nodes.js:764/794/1671` | Gap; new focused contact-file proposal being prepared | Loaded rows only; full public keys, supported roles, valid coordinates, no private keys or fabricated route |
-| CSV analysis export | CoreScope's node export is JSON, not CSV | Gap being addressed by root agent | Formula-safe CSV of loaded/filtered rows; do not call this companion-export parity |
+| Nodes export to companion contacts | `public/nodes-export.js:1–91`; `nodes.js:764/794/1671` | Baseline gap; focused contact-file draft PR #219 supplies a bounded increment | Loaded rows only; full public keys, supported roles, valid coordinates, no private keys or fabricated route |
+| CSV analysis export | CoreScope's node export is JSON, not CSV | Baseline gap; focused draft PR #210 supplies a separate analysis export | Formula-safe CSV of loaded/filtered rows; do not call this companion-export parity |
 | Node/contact QR sharing | Node QR tests and node detail UI | Gap in inspected Beacon node UI | First agree signed advert vs public identity/link semantics; never synthesize a signed `meshcore://` advert |
 | Channel QR/key sharing | `public/channel-qr.js` | Gap in inspected Beacon channel UI | Separate opt-in key-sharing contract; keys must not leak through ordinary copied links |
 | Channel message viewing/decryption | `public/channels.js`, `channel-decrypt.js` | Present for backend-known channels; browser BYOK differs | Compare named/default/hashtag/private-key workflows separately |
@@ -92,8 +92,9 @@ major/minor schedule and the `release:minor` / bug-fix labels consistently.
 ### Safe next minor features
 
 1. **Loaded Nodes CSV** — bounded, no new API, no extra requests, formula-safe cells.
-   Explicitly report that only loaded filtered rows are exported. Root owns this
-   change. It is an analysis enhancement, not companion-import equivalence.
+   Explicitly report that only loaded filtered rows are exported. See
+   [draft PR #210](https://github.com/MeshCore-Beacon/beacon-web/pull/210).
+   It is an analysis enhancement, not companion-import equivalence.
 2. **Contacts JSON export** — independent serializer and action; skip invalid
    identities/locations and duplicate full keys; do not synthesize learned routes,
    private credentials or signed adverts. List hearing time is not advert time.
@@ -101,8 +102,8 @@ major/minor schedule and the `release:minor` / bug-fix labels consistently.
    Prepared as [issue #218](https://github.com/MeshCore-Beacon/beacon-web/issues/218)
    and [draft PR #219](https://github.com/MeshCore-Beacon/beacon-web/pull/219), commit
    `324123dee83da17c7050742d0bf9ffe80219c3f6`. Forty-two focused tests, build/lint and
-   isolated desktop/390px touch browser downloads passed; combined-preview
-   integration/deployment belongs to the root audit task.
+   isolated desktop/390px touch browser downloads passed. Combined-preview
+   qualification is recorded separately in the system audit delivery receipt.
 3. **Read-only global search palette** — shared existing endpoint adapters,
    cancellable requests, request limits, keyboard access and empty/error states.
 4. **Public node/share links and QR** — begin with Beacon URLs/full public-key

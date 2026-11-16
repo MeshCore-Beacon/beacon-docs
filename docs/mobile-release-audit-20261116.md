@@ -17,7 +17,7 @@ PRs, labels, milestones, branches and release metadata across seven org repos an
 five related forks/intake repositories. No device was installed, no RF command
 was sent, and no signing credential was created or changed.
 
-## Confirmed fix
+## Confirmed fixes
 
 [Issue #25](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/25) and
 [draft dev PR #26](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/26)
@@ -39,8 +39,8 @@ the fix. Eleven transport/ticket/User-Agent tests pass, including a real unanswe
 explicitly opt into real HTTP because the widget test binding otherwise supplies
 a fake 400 response; this is test setup, not a production-network override.
 
-The final org/fork head, full CI and Android artifact receipt are recorded in
-`flutter-qualified.json` when qualification finishes. Initial CI caught a
+The final org/fork heads, full CI and Android artifact receipt are recorded in
+`flutter-qualified.json`. Initial CI caught a
 test-only `final` versus `const` lint; it was corrected without changing runtime
 logic. No failed or superseded run is presented as a green final candidate.
 
@@ -51,6 +51,33 @@ Primary API references checked:
 - The installed Dart SDK's `_http/websocket_impl.dart` detaches the successful
   upgraded socket before completing the connection future. Existing transport
   regressions prove that the new cleanup does not close that usable socket.
+
+### Trace quality warnings and original wire evidence
+
+[Issue #27](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/27) / [draft PR #28](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/28)
+add the optional server-provided suspect/ambiguous assessment to the native trace
+directory, per-packet trace detail and selected-observation analyzer. The warning
+retains raw evidence and explicitly avoids asserting that a real route or an RF
+collision is established. Older-server responses without metadata and supported
+assessments gain no authenticity badge. Five widget tests cover all three views,
+legacy behavior and selected-observation precedence. English, French and Swedish
+keys have passing key/placeholder coverage (13 warning/localization tests).
+Full CI caught missing Swedish keys on the initial candidate; those were fixed
+rather than weakening the locale contract. Default filtering remains a separate
+pagination/count requirement in issue #27, not an implemented feature.
+
+[Issue #29](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/29) / [draft PR #30](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/30)
+correct raw/copyable frames and byte highlighting to prefer original `wirePathBytes`
+over display `pathBytes`. TRACE display hashes can differ from original SNR bytes;
+using display hashes corrupts the shown raw frame and payload offsets. Two tests
+fail against dev before the fix; 16 wire-path/payload-view tests then pass, including
+explicit empty original paths and older-server fallback. Analyzer is clean.
+
+The whole optional quality/wire contract in server #307, web #199 and mobile
+#28/#30 is in the **minor** lane. An inference-only backport of the released
+server bug could be split into a separate patch; the entire paired contract is
+not being silently designated a patch backport. No schema or RF behavior changes
+are required by the client fixes.
 
 ## Existing fixes retained, not duplicated
 
@@ -81,13 +108,13 @@ Primary API references checked:
    updates at 50 ms intervals, clearing work on background/navigation. Map pages
    share a budget, detect repeated/broken cursors and expose an incomplete-map
    error rather than silently truncating the catalogue.
-2. **Expensive live-path resolution is currently connection-wide.**
+2. **Expensive live-path resolution is currently connection-wide.** [Follow-up #32](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/32).
    `lib/core/live.dart` requests `resolvePath: true` on every connection, regardless
    of the active screen. A future focused performance change could request this
    only for consumers that need it. First inventory packet-row/path consumers and
    measure backend query/CPU cost; do not reduce detail on a screen that needs it
    merely to achieve an attractive number.
-3. **Animation uses wall-clock time.** `map_screen.dart` timestamps flow starts and
+3. **Animation uses wall-clock time.** [Follow-up #31](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/31). `map_screen.dart` timestamps flow starts and
    ticks with `DateTime.now()`, unlike the web's elapsed-time animation. A backwards
    clock correction could prolong an animation and its timer. A monotonic elapsed
    clock is a sensible follow-up with controlled clock/lifecycle tests. This is a
@@ -98,7 +125,7 @@ Primary API references checked:
    second scheduler. [Issue #10](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/10)
    retains that deferred design. API flags/configuration are separate from the
    app's version number and from proof of live RF acceptance.
-5. **Debug APKs are not an upgrade contract.** `android.yml` builds a debug APK
+5. **Debug APKs are not an upgrade contract.** [Policy issue #33](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/33). `android.yml` builds a debug APK
    using the pubspec build number (`2.2.0+2` at this snapshot), without a provisioned
    persistent signing key in that workflow. `Build.sh` instead makes signed APK,
    AAB and IPA releases using one epoch build number. The Gradle package ID is the
@@ -161,8 +188,34 @@ Receipts:
 - `release-lane-corrections.json`: explicit corrections for server #313 and Flutter #22.
 - `release-label-final.json`: final open-item coverage, late additions and preservation checks.
 
-The final pass must include root/peer-created issues and PRs that appeared after the
+The final pass includes audit issues and PRs that appeared after the
 initial snapshot. Items that already have a complete classification are preserved;
 unclassified additions are assigned explicitly, not guessed from title keywords.
 Private source, signing secrets, provider keys and user/account contents are not
 included in this report or public label receipts.
+
+## Final mobile qualification and fork maintenance
+
+The maintained fork `dev` is now **458bcf80e1054dd2f348db1e81fe36630cec479c**,
+fast-forwarded from `54c13652bcbc` only after exact-source qualification.
+[Fork PR #3](https://github.com/n30nex/beacon-flutter-app/pull/3) is incorporated.
+The repository default branch is now `dev`; the historical
+`codex/flutter-telemetry-sharing-20261020` branch remains intact. No org default
+branch/protection or release tag changed. Org dev PRs #26, #28 and #30 remain
+open drafts with passing final CI, independently reviewable.
+
+- [Exact final CI](https://github.com/n30nex/beacon-flutter-app/actions/runs/43830774216): **880 tests passed**, **16 optional screenshot previews skipped**; formatting and analysis pass.
+- [Exact Android build](https://github.com/n30nex/beacon-flutter-app/actions/runs/43830768689): success; downloaded `commit.txt` and checksum match final source and APK bytes.
+- APK SHA-256: `59be0b030bc0c9e2be63aa96e85302b7acfe2f4e4ffcfe6d77ad44aea2bf621b`.
+- Package/version: `meshcorebeacon.app`, `2.2.0`, versionCode `2`.
+- The verified signing certificate differs from the earlier `54c13652bcbc`
+  artifact, so these debug artifacts do **not** provide an in-place upgrade path.
+  This concrete distribution finding is recorded in issue #33. No device was
+  installed, uninstalled or downgraded, and no signing key was changed.
+- No new RF, BLE/Wi-Fi companion collection, production account, push/mail or
+  physical background behavior acceptance is claimed. Default trace filtering
+  is still the bounded follow-up in #27; warnings/raw-wire display are implemented.
+
+The canceled/failed intermediate candidates are not the delivered source. The
+final guard checks are ready with clean worktrees and exact-head CI. Artifacts
+and machine-readable receipts stay in `evidence/parity-audit-20261116`.
