@@ -91,7 +91,8 @@ remain distinct.
 
 Flutter #28 adds the backend's TRACE uncertainty reasons to the directory,
 packet detail and selected-observation views while preserving legacy-server
-behavior and raw records. It does not implement default filtering. Flutter #30
+behavior and raw records. It does not implement default filtering, tracked in
+[Flutter #34](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/34). Flutter #30
 uses the original TRACE wire bytes and correct raw-byte highlight offsets;
 reconstructed values are not substituted for received evidence. Both depend on
 the new server #307 quality/wire contract and belong to the minor release lane.
@@ -174,7 +175,7 @@ No phone was installed, uninstalled or downgraded.
 
 ### Classification and recovery
 
-At **08:28:59 UTC**, the reconciled open queue contains **97 issues/PRs across
+At **08:33:10 UTC**, the reconciled open queue contains **97 issues/PRs across
 12 repositories**: **45 patch**, **31 minor**, **21 backlog**, **0 major**.
 Every open item has a type, priority and release class; existing milestones were
 preserved. Later fork-integration closures can change the open count without

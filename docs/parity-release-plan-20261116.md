@@ -69,6 +69,7 @@ An export button or a debug APK does not establish physical-device acceptance.
 | [beacon-flutter-app #31](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/31) | Qualify monotonic elapsed-time map animations against clock changes and lifecycle transitions | `release:backlog` |
 | [beacon-flutter-app #32](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/32) | Profile path-resolution cost and identify which live consumers need it | `release:backlog` |
 | [beacon-flutter-app #33](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/33) | Agree a preview package, signing and version-code upgrade policy | `release:backlog` |
+| [beacon-flutter-app #34](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/34) | Add bounded default hiding and raw opt-in for questionable TRACE groups without silently losing valid rows | `release:minor` |
 
 Sequence the inexpensive, existing-data improvements first: exports, bounded
 search, public identity links and operator freshness/coverage visibility. Then

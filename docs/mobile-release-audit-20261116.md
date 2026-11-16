@@ -64,7 +64,7 @@ legacy behavior and selected-observation precedence. English, French and Swedish
 keys have passing key/placeholder coverage (13 warning/localization tests).
 Full CI caught missing Swedish keys on the initial candidate; those were fixed
 rather than weakening the locale contract. Default filtering remains a separate
-pagination/count requirement in issue #27, not an implemented feature.
+pagination/count requirement in [issue #34](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/34), not an implemented feature.
 
 [Issue #29](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/29) / [draft PR #30](https://github.com/MeshCore-Beacon/beacon-flutter-app/pull/30)
 correct raw/copyable frames and byte highlighting to prefer original `wirePathBytes`
@@ -214,8 +214,15 @@ open drafts with passing final CI, independently reviewable.
   installed, uninstalled or downgraded, and no signing key was changed.
 - No new RF, BLE/Wi-Fi companion collection, production account, push/mail or
   physical background behavior acceptance is claimed. Default trace filtering
-  is still the bounded follow-up in #27; warnings/raw-wire display are implemented.
+  is still the bounded follow-up in [#34](https://github.com/MeshCore-Beacon/beacon-flutter-app/issues/34); warnings/raw-wire display are implemented.
 
 The canceled/failed intermediate candidates are not the delivered source. The
 final guard checks are ready with clean worktrees and exact-head CI. Artifacts
 and machine-readable receipts stay in `evidence/parity-audit-20261116`.
+
+The final label snapshot at **08:33:10 UTC** contains **97 open items across
+12 repositories**: **45 patch**, **31 minor**, **21 backlog**, **0 major**.
+No open item is missing type, priority or release class, and all four release
+labels are defined on every repository. Incorporated fork PRs are excluded from
+the open count; the explicit mobile filtering follow-up #34 is included.
+Existing milestones remain unchanged.
