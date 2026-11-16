@@ -199,8 +199,9 @@ readings can still count toward the newest reading time. Blocking an observer ta
 next message, and is the faster remedy.
 
 `polling.authority` governs observers polling their own targets. Requested repeaters have their own
-setting, `polling.request_observers`, which defaults to `approved`: only observers you approved are
-handed a requested repeater and its guest password. See
+setting, `polling.request_observers`, which defaults to `all`: any observer with advert evidence for
+the repeater can be handed it and its guest password. Set it to `approved` and only observers you
+approved are. See
 [Approve observers](telemetry-requests.md#approve-observers).
 
 In both modes:
