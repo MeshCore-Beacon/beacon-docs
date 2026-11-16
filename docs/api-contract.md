@@ -422,8 +422,8 @@ The readings that observers took from a repeater or room server when [repeater p
 
 | Param | Values | Default |
 |---|---|---|
-| `range` | `24h`, `168h`, `720h` | `168h` |
-| `interval` | `1h`, `6h`, `24h` | `1h` for `24h`, `6h` for `168h`, `24h` for `720h` |
+| `range` | `24h`, `72h`, `168h`, `720h` | `168h` |
+| `interval` | `1h`, `6h`, `24h` | `1h` for `24h` and `72h`, `6h` for `168h`, `24h` for `720h` |
 | `include` | `untrusted` | none |
 
 Any other value of `range`, `interval` or `include`, or a `nodeId` that is not a UUID, is a `400`. An unknown node is a `404`. A node with no readings is a `200` with `polled` false and `points` empty. With polling off on the server the route still checks the node, so an unknown node is a `404`, and otherwise answers as for a node with no readings: `{"range":"168h","interval":"6h","polled":false,"untrustedReadings":0,"points":[]}`, with `range` and `interval` as asked or defaulted. A client can ask without checking `features` first.
@@ -920,7 +920,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false }
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "atlasTelemetry": true }
 }
 ```
 
@@ -943,8 +943,9 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `telemetryRequests` | True when [telemetry requests](#telemetry-requests) are on: polling and accounts are on, `BEACON_SECRET_KEY` is set and `polling.requests_per_user` is not 0. |
 | `alerts` | True when [alerts](#alerts) are on: accounts are on and `alerts.delivery` is not `off`. |
 | `alertDelivery` | `"push"` or `"email"`. Present only when `alerts` is true. |
+| `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, and a missing `atlasTelemetry` as `false`. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1261,21 +1262,25 @@ GET /api/v1/me/atlas
 { "revision": 7, "range": "24h", "limit": 12,
   "pins": [
     { "kind": "node", "publicKey": "<64 hex>", "id": "uuid or null", "observerId": "uuid or null",
-      "name": "Hilltop", "tiles": ["packets", "snr", "rssi", "noise"], "view": "heard" },
+      "name": "Hilltop", "tiles": ["packets", "snr", "rssi", "noise"], "view": "telemetry",
+      "telemetryTiles": ["battery", "noise", "uptime", "packets"] },
     { "kind": "observer", "observerPublicKey": "<64 hex>", "observerId": "uuid or null", "name": "Roof listener" }
   ] }
 ```
 
 `range` is `24h` or `3d`. A node pin has `publicKey` and `id`; an observer pin has
 `observerPublicKey`. `observerId` is the observer record with that key, or `null`. `tiles` (exactly
-four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard` or
-`observer`, node pins only) are left out when not set. An observer pin whose key now has a node
+four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard`, `observer` or `telemetry`, node pins only) are left out when not set.
+`telemetryTiles` (node pins only) is exactly four distinct ids from `battery`, `noise`, `uptime`,
+`airtime`, `temperature`, `packets`, `signal` and `errors`; it holds the Telemetry view's tiles,
+apart from `tiles`, which stay the Observer view's. It is left out when the default applies. A client
+ignores a `view` or field it does not know. An observer pin whose key now has a node
 record comes back as a node pin.
 
 ```
 PUT /api/v1/me/atlas
 { "baseRevision": 7, "range": "24h",
-  "pins": [ { "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop", "tiles": [...], "view": "heard" },
+  "pins": [ { "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop", "tiles": [...], "view": "telemetry", "telemetryTiles": [...] },
             { "kind": "observer", "observerId": "uuid", "observerPublicKey": "<64 hex>", "name": "..." } ] }
 ```
 
@@ -1286,7 +1291,7 @@ characters. Answers `200` with the Atlas that this save committed, `revision` pl
 | Status | Code | When |
 |---|---|---|
 | 409 | `atlas_conflict` | `baseRevision` is not the stored revision. The body is the usual error plus the stored Atlas as `current`, at the top level: `{"error":{"code":"atlas_conflict","message":"..."},"current":{...}}`. |
-| 422 | `invalid_input` | Bad range, more than 12 pins, a bad key, id, tiles or view, or the same radio pinned twice. `message` names the pin. |
+| 422 | `invalid_input` | Bad range, more than 12 pins, a bad key, id, tiles, telemetryTiles or view, `telemetryTiles` on an observer pin, or the same radio pinned twice. `message` names the pin. |
 | 400, 413, 415, 429 | | As for other account routes. |
 
 Removing a radio from the Atlas deletes its alert rules in the same transaction.

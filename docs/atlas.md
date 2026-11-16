@@ -122,6 +122,11 @@ the info tip says so.
 
 ### The tab a card opens on
 
+On a server that reports `features.atlasTelemetry`, a node card can also open on its **Telemetry**
+tab. The tab keeps its own four tiles, chosen from battery, noise floor, uptime, airtime,
+temperature, packets, signal and errors, separate from the Observer view's tiles. Both the tab and
+the tiles are saved with the card as `view: "telemetry"` and `telemetryTiles`.
+
 A card with more than one view has a pin button in its header. The pin is pressed while the card
 shows the tab it opens on. Pressing it on another tab
 makes that the tab the card opens on, and the choice is saved with the card.
