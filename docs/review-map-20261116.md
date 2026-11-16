@@ -53,6 +53,35 @@ Topology remains a future feature under web #163. Scope/profile extensions and a
 
 Flutter #15 addresses the portrait/large-text region selector. Its check state and maintainer workflow approval must be resolved before acceptance; no approval is inferred from source review. Flutter #20 is the existing fl_chart patch update, with CI and Android checks on its recorded head. Avoid opening duplicate dependency or portrait fixes.
 
+## Issue disposition and next action
+
+| Repository / issue | Current disposition | Concrete next action |
+| --- | --- | --- |
+| server #254 / #258 / #252 | Focused fixes #297 / #298 / #306 | Review independently; keep error/outage/timeout regressions |
+| server #223 | TRACE fix #307, web #199 | Review wire-width/consumed-hop rules together; preserve raw history |
+| server #231 | Web #201 and Flutter #24 | Accept receipt ordering; do not delete future-dated evidence |
+| server #224 | Old timeout coupling changed upstream | Soak paced reconfirm progress and separate neighbour task on intended release host |
+| server #270 | Replay policy unresolved | Specify age/rate/idempotency/acceptance contract before enabling producer replay |
+| server #72 | Backup capability partly implemented; restore UI is not | Design authenticated import/off-site retention; prove recovery separately |
+| server #60 | Older proposal overlaps new native accounts | Reconcile with current auth model; allowlisted operator controls only |
+| server #265 | Updated audit tracker | Use independent fixes; no combined Topology dependency |
+| web #96 / #161 / #162 | Closed: Atlas, sparse samples and pointer cleanup are in dev | Preserve their current regressions; #195 remains a separate compatibility fix |
+| web #170 | Existing overscroll report not freshly reproduced | Recheck channel sidebar at phone height/large text with long lists; no speculative patch |
+| web #150 | Configurable map defaults enhancement | Agree operator defaults versus per-viewer preferences; retain explicit URL overrides |
+| web #163 | Deferred Topology proposal | Follow the bounded snapshot/renderer acceptance plan in the roadmap |
+| web #181 | Updated native Atlas/web tracker | Review #195 and #197–#203 |
+| docs #13 | Focused log-bound fix #63 | Verify all deployment templates; existing containers need planned recreation |
+| docs #45 | Updated central queue | Keep one independent dev PR per fix and dated delivery receipts |
+| Flutter #4 / PR #15 | Existing portrait/large-text contribution retained | Maintainer enables checks, refreshes against dev, then physical acceptance |
+| Flutter #10 | Deferred native-coordinator bridge | Agree credential/lease/report contract before companion RF work |
+| Flutter PR #20 | Existing dependency patch, CI/Android green on recorded head | Refresh/check against accepted dev; no duplicate dependency proposal |
+| Legacy app archive's four bot PRs | Not the canonical app; repo is not GitHub-archived | Owner decides archive/maintenance policy; no automatic merge or archive |
+| beacon-agent / beacon-scratch | Scaffold / notes, not runtime implementations | Keep one canonical polling contract; do not build a second unneeded service |
+| Private independent intake | Stopped on preview, history preserved | Keep recovery/export access; future migration must retain provenance/channels |
+
+Issues listed as future design, existing unreproduced reports or operator gates are
+not silently called fixed. The broad superseded PRs were closed, not merged.
+
 ## Verification status
 
-Final head/check, preview deployment and recovery evidence is linked from the delivery receipt. Initial snapshots and historical green runs are not substituted for final-candidate checks.
+All 30 org drafts target dev and were mergeable at the final check. Current-head code checks passed. Exact runtime/artifact/backup proof and visual limitations are in the [delivery receipt](audit-20261116.md#delivery-receipt--qualified-preview). No org merge or dev/dev1/live deployment was performed.

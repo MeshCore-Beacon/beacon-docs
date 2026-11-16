@@ -219,3 +219,7 @@ The Canadaverse audit preview follows upstream dev plus audited fixes. Experimen
 Topology, scope extensions and the independent companion collector are separate
 proposals, not part of that running baseline. Native upstream telemetry remains an
 operator-configured feature.
+
+## Maintainer handoff
+
+[Current audit handoff](docs/handoff-20261116.md) identifies the qualified preview, focused dev PRs, recovery boundary and remaining release gates.
