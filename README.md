@@ -163,6 +163,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
 - [Atlas](docs/atlas.md): the watchlist of nodes and observers (per browser, or synced to an account), what its cards mean, and its export file.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
+- [Cancellation and animation lifetime fixes](docs/performance-followup-20261116.md): focused audit follow-ups, validation and preview recovery.
 
 **Change it**
 
