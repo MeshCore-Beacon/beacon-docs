@@ -46,6 +46,8 @@ assignment right now; the user is told to request telemetry for it first (see
 | `noise_high` | with a noise floor reading | dBm, -130 to -50. |
 | `observer_offline` | observers | Minutes without a status report: 30, 60, 180 or 360. |
 
+On an instance with `display.temperature_unit: f` ([Display units](configuration.md#display-units)), alert mail and push text give temperatures in F, and clients take and show the temperature limits in whole degrees F. The API still stores and sends tenths of a degree C.
+
 A sixth announcement, `request_attention`, is not a rule. Every user who has a telemetry request
 gets one notice when it moves to `login_failed`, `admin_stopped` or `disabled`, and another if it
 recovers and fails again. It is sent whenever alerts are on.

@@ -38,12 +38,16 @@ and Beacon starts.
 |---|---|---|
 | `polling.requests_per_user` | `3` | How many requests one user may hold, 0 to 20. `0` turns requests off. |
 | `polling.offline_disable_days` | `7` | Days without any observer hearing a repeater before its requests are turned off, 1 to 365. |
-| `polling.request_observers` | `approved` | `approved` or `all`. Which observers may be handed a requested repeater. See below. |
+| `polling.request_observers` | `all` | `all` or `approved`. Which observers may be handed a requested repeater. See below. |
 
 ## Approve observers
 
-By default only observers you approved are given a requested repeater, and only they receive a
-guest password. Approve one with the same route polling already uses:
+By default (`request_observers: all`) any observer that Beacon holds advert evidence for can be
+given a requested repeater and receive its guest password, with no approval step. Set
+`request_observers: approved` when you want to choose who receives passwords: then only observers
+you approved are given a requested repeater. Approve one with the same route polling already uses.
+The body takes `approved`, `blocked` and `note` (up to 200 characters), and replaces all three, so
+send the current value of any flag you want to keep:
 
 ```bash
 curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: application/json" \
@@ -51,16 +55,16 @@ curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: applica
   https://beacon.example.com/api/v1/admin/polling/observers/<observer public key>
 ```
 
-On a fresh instance requests therefore wait until you approve at least one observer. A request that
-no approved observer can take shows as `waiting` with the reason "No observer can reach this
-repeater yet."
+In `approved` mode a fresh instance's requests wait until you approve at least one observer. A
+request that no approved observer can take shows as `waiting` with the reason "No observer can
+reach this repeater yet."
 
-The reason for the default: Beacon decides an observer can reach a repeater from advert evidence,
-and that evidence is built from packets the observer itself uploads. With `request_observers: all`,
-anyone who runs an observer could present evidence for a repeater and be handed its guest password.
-Set `all` only where you know who runs every observer. Approval is checked each time an owners
-answer is built, so withdrawing it stops the password going out within a minute, and blocking the
-observer is faster still.
+Why you might choose `approved`: Beacon decides an observer can reach a repeater from advert
+evidence, and that evidence is built from packets the observer itself uploads. In the default mode
+anyone who runs an observer could present evidence for a repeater and be handed its guest
+password, sealed to that observer's key. Set `approved` where you do not know who runs every
+observer. Approval is checked each time an owners answer is built, so withdrawing it stops the
+password going out within a minute, and blocking the observer is faster still.
 
 `polling.authority: approved` also applies to requests, whatever `request_observers` says.
 
@@ -73,8 +77,8 @@ observer is faster still.
    observer takes the job only when all of these hold:
    - its claim says `accepts_requests` and has a free `request_slots` seat;
    - Beacon holds advert evidence that this observer hears the repeater directly;
-   - the observer is not blocked, has no admin stop for the repeater, and is approved (unless
-     `request_observers` is `all`);
+   - the observer is not blocked, has no admin stop for the repeater, and, when
+     `request_observers` is `approved`, is approved;
    - the repeater is not in `admin_stop` or `not_direct` state for it.
 3. Observers are ranked as for any polled repeater. At most one poller and two standbys are chosen.
    Seats are reserved in request age order: when two repeaters compete for the same observer's
@@ -212,7 +216,7 @@ blank or hello login are not affected. See [Configuration](configuration.md#beac
 
 ## Troubleshooting
 
-- **Every request stays `waiting`.** In `approved` mode, approve an observer that hears the
+- **Every request stays `waiting`.** If `request_observers` is `approved`, approve an observer that hears the
   repeater. Check `GET /admin/polling/targets` for the candidates, their evidence and whether each
   is approved. Check the observer's firmware supports requests and has free seats.
 - **`no_seat`.** Every observer that can reach the repeater already polls as many requested

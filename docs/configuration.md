@@ -115,6 +115,7 @@ cannot honour. These are the ones people hit:
   `channels.refresh_interval` 24h to 168h.
 - A `borderFile` that is missing or not a valid GeoJSON Polygon or MultiPolygon Feature, or
   `nodes.mark_foreign: true` with no border source at all.
+- `display.temperature_unit` other than `c` or `f`, or `display.distance_unit` other than `metric` or `imperial`.
 - `log.level` or `log.format` set to anything other than the listed values.
 - `mobile.min_app_version` or `web.min_web_version` that is not a plain `X.Y.Z` release (`v1.2.3` and `1.2.3-beta` are rejected).
 - An admin key under 16 characters or containing whitespace.
@@ -334,7 +335,7 @@ the key.
 | `authority` | `evidence` | `evidence` or `approved` | Who can be elected to poll. `evidence`: any observer, ranked on the advert evidence it reports. `approved`: only observers approved through the admin route. See [Trust](repeater-polling.md#trust). |
 | `requests_per_user` | `3` | 0 to 20 | How many [telemetry requests](telemetry-requests.md) one user may hold. `0` turns requests off. |
 | `offline_disable_days` | `7` | 1 to 365 | Days no observer hears a repeater before its requests are turned off. |
-| `request_observers` | `approved` | `approved` or `all` | Which observers may be handed a requested repeater and its guest password. `approved`: only observers you approved. `all`: any observer with advert evidence, which lets anyone who runs an observer present evidence and be handed a guest password. Use `all` only where you know every observer. |
+| `request_observers` | `all` | `all` or `approved` | Which observers may be handed a requested repeater and its guest password. `all`: any observer with advert evidence for the repeater. `approved`: only observers you approved. Advert evidence is required in both modes. Set `approved` if you want to vet observers first. See [Approve observers](telemetry-requests.md#approve-observers). |
 
 Telemetry requests also need accounts on and `BEACON_SECRET_KEY`; see
 [Requested telemetry](telemetry-requests.md#turn-it-on). The gates are checked in this order:
@@ -406,6 +407,23 @@ alerts:
 `BEACON_PUSH_CREDENTIALS` is the path, inside the container, of a Google service account key file
 (JSON with `project_id`, `client_email` and `private_key`). Mount the file read-only and keep it out
 of source control. See [Push](alerts.md#push).
+
+## Display units
+
+The `display` block sets the units this instance shows. It is optional and the same for every user.
+
+| Key | Default | What it does |
+|---|---|---|
+| `temperature_unit` | `c` | `c` or `f`. Case does not matter. Anything else stops startup. |
+| `distance_unit` | `metric` | `metric` or `imperial`. Case does not matter. Anything else stops startup. |
+
+```yaml
+display:
+  temperature_unit: f
+  distance_unit: imperial
+```
+
+Clients read both from `display` in [Server info](api-contract.md#server-info). On `f`, the web and the app show temperatures in degrees F, and [alert](alerts.md) mail and push text give temperatures in F. Users also type and see temperature alert limits in whole degrees F. On `imperial`, the web map's scale bar shows miles and feet; the app shows no distances yet. The API does not change: it still stores and sends Celsius and metric.
 
 ## BEACON_SECRET_KEY
 

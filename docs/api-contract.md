@@ -358,6 +358,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/{nodeId}/activity?range=24h` | Hourly totals of those observations, with signal averages. See [Node activity](#node-activity). |
 | `GET /nodes/{nodeId}/neighbors` | Plain array of neighbours: `{ id, name, publicKey, nodeType, nodeTypeName, lat, lng, iata, observationCount, firstSeen, lastSeen, snr }`. |
 | `GET /nodes/{nodeId}/telemetry?range=168h&interval=6h` | Repeater readings of a polled node, bucketed for charts. See [Node telemetry](#node-telemetry). |
+| `GET /nodes/telemetry/latest` | The newest battery and temperature of every polled node, for map labels. See [Latest node telemetry](#latest-node-telemetry). |
 | `GET /nodes/{nodeId}/polling` | Which observer polls the node and when it last got a trusted reading. See [Node polling](#node-polling). |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
@@ -487,6 +488,36 @@ Counters only arrive on status readings, which are hours apart (6 hours by defau
 One case cannot be detected. A corrupt reading that is lower than the truth but passes the rate check can make the following pair read high.
 
 A reading is trusted when, at the moment it was stored, its observer was assigned to that repeater and Beacon had itself heard the repeater directly through that observer. The decision is made once, when the reading is stored, and does not change later, so a chart does not shift when assignments change. Readings stored before this was recorded were judged against the assignments as they stood when the server was upgraded. Only trusted readings are in `points` by default, so an observer that merely claims a repeater cannot put numbers on its chart. `include=untrusted` adds the rest and `untrustedReadings` tells a client how many it left out.
+
+#### Latest node telemetry
+
+```
+GET /api/v1/nodes/telemetry/latest?iata=YOW
+```
+
+The newest battery and temperature of every polled node, in one answer, so a map can label its pins. The location filters `iata`, `iatas`, `regionId` and `region` work as on the node list. There are no other parameters.
+
+The answer has one item for each node that has a trusted reading in the last 7 days carrying a battery or temperature value. Untrusted readings are never used. A node with no such reading is not listed. With polling off on the server the answer is `{"generatedAt": ..., "items": []}`, so a client can ask without checking `features` first. With Redis configured the server caches the answer for about 60 seconds; without it every request is computed.
+
+```json
+{
+  "generatedAt": 1794700800000,
+  "items": [
+    { "nodeId": "7c1f0e9a-3b52-4d8e-9a61-2f4b8c0d5e17", "sampledAt": 1794697200000, "batteryMv": 4080, "temperatureC": 1.5 }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `generatedAt` | When the server built the answer, epoch ms. |
+| `items` | One item per node. `[]` when there are none, never `null`. |
+| `nodeId` | The node's ID, as on the node list. |
+| `batteryMv` | Battery, millivolts. The newest trusted battery value in the last 7 days. Left out when there is none. |
+| `temperatureC` | Degrees Celsius. The newest trusted temperature value in the last 7 days. Left out when there is none. |
+| `sampledAt` | Epoch ms. The newer of the two readings that gave `batteryMv` and `temperatureC`. |
+
+`batteryMv` and `temperatureC` are picked one by one, so they can come from different readings. Temperatures are always Celsius, whatever `display.temperatureUnit` in [Server info](#server-info) says. That key only tells a client which unit to show.
 
 #### Node polling
 
@@ -920,7 +951,8 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "atlasTelemetry": true }
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "atlasTelemetry": true, "mapTelemetry": true },
+  "display": { "temperatureUnit": "c", "distanceUnit": "metric" }
 }
 ```
 
@@ -944,8 +976,18 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `alerts` | True when [alerts](#alerts) are on: accounts are on and `alerts.delivery` is not `off`. |
 | `alertDelivery` | `"push"` or `"email"`. Present only when `alerts` is true. |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
+| `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, and a missing `atlasTelemetry` as `false`. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+`display` holds the instance's display units, set by the operator in [`display`](configuration.md#display-units):
+
+| Field | Values | Meaning |
+|---|---|---|
+| `temperatureUnit` | `c` or `f` | The unit clients show temperatures in, and the unit [alert](alerts.md) text and temperature limits use. |
+| `distanceUnit` | `metric` or `imperial` | The unit clients show distances in. |
+
+The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
+
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), and a missing `display` as `c` and `metric`. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1346,7 +1388,7 @@ for a live claim). The same `poller` object is in the create and update answers.
 | `status` | `statusReasonCode` | Meaning |
 |---|---|---|
 | `active` | empty | An observer polls it, or the requests ride on a poll already set. |
-| `waiting` | `no_observer` | No observer can reach the repeater yet (none approved, none with evidence or request support). |
+| `waiting` | `no_observer` | No observer can reach the repeater yet (none approved in `approved` mode, none with evidence or request support). |
 | `waiting` | `no_seat` | Every observer that can reach it is at its polling maximum. |
 | `login_failed` | `login_failed` | The repeater did not accept the guest password. |
 | `login_failed` | `blank_login_failed` | The repeater did not accept a blank or hello login. |
