@@ -208,3 +208,7 @@ Security reports go through [SECURITY.md](SECURITY.md), not public channels.
 Beacon is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0), the
 same license as [beacon-server](https://github.com/MeshCore-Beacon/beacon-server) and
 [beacon-web](https://github.com/MeshCore-Beacon/beacon-web).
+
+## Audit and parity roadmap
+
+[System audit and CoreScope parity roadmap](docs/system-parity-audit-20261116.md) records source/runtime differences, focused proposals, release classes and acceptance gates.
