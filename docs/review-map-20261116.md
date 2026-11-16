@@ -35,6 +35,16 @@ Every bug fix below is an independent PR to `dev`. The current preview is a sepa
 | web | Atlas rename compatibility, refreshed for native telemetry pins | [#195](https://github.com/MeshCore-Beacon/beacon-web/pull/195) |
 | docs | Full audit, roadmap and delivery receipt | [#62](https://github.com/MeshCore-Beacon/beacon-docs/pull/62) |
 
+## Browser follow-up fixes
+
+- [Keep Atlas last-seen times visible in narrow translated cards](https://github.com/MeshCore-Beacon/beacon-web/pull/204)
+- [Keep channel names readable above phone filter controls](https://github.com/MeshCore-Beacon/beacon-web/pull/205)
+- [Refresh mounted map labels when the language changes](https://github.com/MeshCore-Beacon/beacon-web/pull/206)
+- [Preserve the reading position until older channel history arrives](https://github.com/MeshCore-Beacon/beacon-web/pull/207)
+- [Keep hidden channel labels inside the message scroll area](https://github.com/MeshCore-Beacon/beacon-web/pull/208)
+
+All five are small independent drafts to dev. The combined preview passes current-head CI and the [completed browser qualification](browser-qualification-20261116.md).
+
 ## Review order
 
 1. JSON response correctness, cache outage handling, input/stream bounds and signal presence.
@@ -66,7 +76,7 @@ Flutter #15 addresses the portrait/large-text region selector. Its check state a
 | server #60 | Older proposal overlaps new native accounts | Reconcile with current auth model; allowlisted operator controls only |
 | server #265 | Updated audit tracker | Use independent fixes; no combined Topology dependency |
 | web #96 / #161 / #162 | Closed: Atlas, sparse samples and pointer cleanup are in dev | Preserve their current regressions; #195 remains a separate compatibility fix |
-| web #170 | Existing overscroll report not freshly reproduced | Recheck channel sidebar at phone height/large text with long lists; no speculative patch |
+| web #170 | Reproduced; focused fix #208, separate history-anchor fix #207 | Final preview document bounds and scrolling pass; upstream acceptance remains in the drafts |
 | web #150 | Configurable map defaults enhancement | Agree operator defaults versus per-viewer preferences; retain explicit URL overrides |
 | web #163 | Deferred Topology proposal | Follow the bounded snapshot/renderer acceptance plan in the roadmap |
 | web #181 | Updated native Atlas/web tracker | Review #195 and #197–#203 |
@@ -84,4 +94,4 @@ not silently called fixed. The broad superseded PRs were closed, not merged.
 
 ## Verification status
 
-All 30 org drafts target dev and were mergeable at the final check. Current-head code checks passed. Exact runtime/artifact/backup proof and visual limitations are in the [delivery receipt](audit-20261116.md#delivery-receipt--qualified-preview). No org merge or dev/dev1/live deployment was performed.
+The original audit recorded 30 org drafts; this browser follow-up adds five independently checked drafts. All five target dev and have successful current-head checks. Current-head code checks passed. Exact runtime/artifact/backup proof and visual limitations are in the [delivery receipt](audit-20261116.md#delivery-receipt--qualified-preview). No org merge or dev/dev1/live deployment was performed.

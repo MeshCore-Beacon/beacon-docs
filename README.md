@@ -223,3 +223,5 @@ operator-configured feature.
 ## Maintainer handoff
 
 [Current audit handoff](docs/handoff-20261116.md) identifies the qualified preview, focused dev PRs, recovery boundary and remaining release gates.
+
+[Completed mobile/French/map browser qualification](docs/browser-qualification-20261116.md) covers the five focused follow-up fixes and final deployed verification.
