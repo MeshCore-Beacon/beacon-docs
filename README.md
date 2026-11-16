@@ -208,3 +208,14 @@ Security reports go through [SECURITY.md](SECURITY.md), not public channels.
 Beacon is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0), the
 same license as [beacon-server](https://github.com/MeshCore-Beacon/beacon-server) and
 [beacon-web](https://github.com/MeshCore-Beacon/beacon-web).
+
+## Development audit and roadmap
+
+- [End-to-end audit, findings and verification](docs/audit-20261116.md)
+- [Prioritized implementation and release roadmap](docs/roadmap-20261116.md)
+- [Current PR and issue disposition](docs/review-map-20261116.md)
+
+The Canadaverse audit preview follows upstream dev plus audited fixes. Experimental
+Topology, scope extensions and the independent companion collector are separate
+proposals, not part of that running baseline. Native upstream telemetry remains an
+operator-configured feature.

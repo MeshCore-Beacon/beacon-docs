@@ -1930,3 +1930,10 @@ harmless.
 ## CPU profiling
 
 Bounded CPU captures on a running instance are described in [Profiling](profiling.md).
+
+## Current development audit
+
+See [the November audit](audit-20261116.md) and [release roadmap](roadmap-20261116.md)
+for source identities, the current fix-only preview policy, known limitations and
+the promotion gates. Historical preview screenshots and version strings alone do
+not identify current code or qualify a production deployment.
