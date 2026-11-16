@@ -110,12 +110,25 @@ repeater, which an observer then uses to log in.
   answer. The owners route has no login, so anyone can ask for an answer in an observer's name, but
   only the holder of that observer's private key can open the envelope. The route is on the
   observers' own `https` link, so keep the proxy on `https`.
-- **Who can receive one.** By default only observers you approved (`polling.request_observers:
-  approved`). Beacon also requires that the observer's claim accepts requests, that it has a free
-  seat, that Beacon holds advert evidence that it hears the repeater directly, and that it has no
-  admin stop for that repeater. Advert evidence comes from packets the observer uploads itself, so it
-  is not proof. With `request_observers: all` anyone who runs an observer could present evidence and
-  be handed a password. Withdrawing approval stops the password going out at the next answer.
+- **Who can receive one.** By default (`polling.request_observers: all`) any observer that Beacon
+  has heard the repeater through directly can be handed that repeater's guest password, sealed to
+  that observer's key. Beacon also requires that the observer's claim accepts requests, that it has
+  a free seat, that it has no admin stop for that repeater and is not blocked. The evidence that an
+  observer hears the repeater directly comes from packets the observer uploads itself, so it is
+  not proof: anyone who runs an observer could present evidence and be handed a password. If you
+  want to choose who receives passwords, set `polling.request_observers: approved` and approve
+  observers with `PUT /api/v1/admin/polling/observers/{publicKey}`. The body is
+  `{"approved": true, "blocked": false, "note": "..."}` (`note` up to 200 characters; all three
+  fields are replaced each time):
+
+  ```bash
+  curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: application/json" \
+    -d '{"approved":true,"blocked":false,"note":"north ridge, run by Sam"}' \
+    https://beacon.example.com/api/v1/admin/polling/observers/<observer public key>
+  ```
+
+  In `approved` mode only approved observers receive a password, and withdrawing approval stops it
+  going out at the next answer. Advert evidence is required in both modes.
 - **Guest only, never admin.** A password given to Beacon is shared with a volunteer's observer, so
   it must be a guest password. Beacon cannot tell an admin password from a guest one when it is
   entered, and says so on the form. When a repeater answers a login with admin access, the observer
