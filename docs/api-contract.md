@@ -1298,7 +1298,8 @@ Bearer admin key, see [Auth](#auth). `503` while accounts are off or the server 
 
 ### Atlas sync
 
-A signed-in user's [Atlas](atlas.md#sync-to-an-account), twelve pins at most. Both routes need a
+A signed-in user's [Atlas](atlas.md#sync-to-an-account), up to the server's
+[`atlas.limit`](configuration.md#atlas-size) (1 to 100, default 20). Both routes need a
 session (`401 not_signed_in`) and follow the [rules for account routes](#user-accounts) above. `PUT`
 takes a body of at most 32 KiB, passes the forgery check and answers `503 read_only` on a read-only
 server. Atlas sync is on whenever accounts are.

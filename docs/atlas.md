@@ -187,8 +187,8 @@ card imported elsewhere shows as no longer known.
 On a server with accounts on, a signed-in user's Atlas is stored on the server, so the web and the
 mobile app show the same cards. Signed out, nothing changes and the local copy is used as above.
 
-- The server keeps the range (24h or 3d) and up to twelve ordered pins. Each pin is stored by public
-  key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
+- The server keeps the range (24h or 3d) and ordered pins up to its configured limit. Each pin is
+  stored by public key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
   observer pin whose key now has a node record is returned as a node pin; if that node is already
   pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
   tiles and, for a node pin, the tab it opens on.
@@ -197,7 +197,7 @@ mobile app show the same cards. Signed out, nothing changes and the local copy i
   revision is refused with `409 atlas_conflict` and the stored Atlas. The client then adopts the
   server's copy, drops its own change and says so; it does not retry by itself.
 - On first sign-in the client merges the local cards into the account: the server's pins come first,
-  then local pins the server does not hold, up to twelve, and the page says how many did not fit.
+  then local pins the server does not hold, up to the server's limit, and the page says how many did not fit.
   The local copy remembers which user it was last synced to. If that is a different user, it is not
   merged and the account's Atlas replaces it, so one person's cards never move into another
   account on a shared device. Edits made while signed out keep that owner mark, so they are

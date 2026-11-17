@@ -36,8 +36,9 @@ token for that server.
 A server operator can add more features for signed-in users. Each one is held by the operator of
 that server, and deleting your account removes it.
 
-- **Synced Atlas.** Your Atlas (up to twelve pinned nodes and observers, their names, the tiles you
-  chose and the activity range) is stored on the server so your web and app lists match.
+- **Synced Atlas.** Your Atlas (pinned nodes and observers up to the server's
+  [configured limit](../configuration.md#atlas-size), their names, the tiles you chose and the
+  activity range) is stored on the server so your web and app lists match.
 - **Telemetry requests.** You can ask the server to have a repeater polled. The server stores which
   repeater you asked for. If you enter a guest password, it is stored encrypted and shared, sealed,
   with the observer that polls the repeater. Never enter an admin password.

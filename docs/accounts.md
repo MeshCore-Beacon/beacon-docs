@@ -144,8 +144,8 @@ The app does not use the cookie. It holds a bearer token (see below), so CORS do
 | One-time tokens | SHA-256 hashes only. A pending sign-up's token also holds that sign-up's username and password hash until it expires or is used. |
 | Times | Created, last login, and whether the user is disabled. |
 
-A user also owns, when those features are on, an Atlas (range and up to twelve pins), telemetry
-requests with their sealed guest passwords, alert rules and registered push tokens. Deleting the
+A user also owns, when those features are on, an Atlas (range and pins up to the server's configured
+limit), telemetry requests with their sealed guest passwords, alert rules and registered push tokens. Deleting the
 user removes all of them in the same transaction.
 
 Passwords, tokens and codes are never logged and never stored in clear text. Request bodies on the
