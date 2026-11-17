@@ -166,6 +166,8 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 **Change it**
 
+- [Cache, region and Atlas audit handoff](docs/performance-round4-20261117.md): focused dev drafts,
+  preview qualification, release boundaries and maintainer follow-up.
 - [Contributing](CONTRIBUTING.md): the workflow for all three repos and running the full stack
   locally.
 - beacon-server: [historical stats](https://github.com/MeshCore-Beacon/beacon-server/blob/main/docs/historical-stats.md),
