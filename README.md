@@ -166,6 +166,8 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 **Change it**
 
+- [Atlas view control layout handoff](docs/atlas-layout-20261117.md): narrow-card controls,
+  accessibility, persistence and preview qualification.
 - [Contributing](CONTRIBUTING.md): the workflow for all three repos and running the full stack
   locally.
 - beacon-server: [historical stats](https://github.com/MeshCore-Beacon/beacon-server/blob/main/docs/historical-stats.md),
