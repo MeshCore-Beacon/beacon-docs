@@ -952,7 +952,8 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
   "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "atlasTelemetry": true, "mapTelemetry": true },
-  "display": { "temperatureUnit": "c", "distanceUnit": "metric" }
+  "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
+  "limits": { "atlas": 20 }
 }
 ```
 
@@ -985,9 +986,15 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `temperatureUnit` | `c` or `f` | The unit clients show temperatures in, and the unit [alert](alerts.md) text and temperature limits use. |
 | `distanceUnit` | `metric` or `imperial` | The unit clients show distances in. |
 
+`limits` holds the instance caps:
+
+| Field | Meaning |
+|---|---|
+| `atlas` | The most cards one Atlas holds, set by [`atlas.limit`](configuration.md#atlas-size) (1 to 100, default 20). It applies to an Atlas kept in the browser or app and to one synced through [`/me/atlas`](#atlas-sync), whose `limit` is the same number. |
+
 The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), and a missing `display` as `c` and `metric`. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1301,7 +1308,7 @@ GET /api/v1/me/atlas
 ```
 
 ```json
-{ "revision": 7, "range": "24h", "limit": 12,
+{ "revision": 7, "range": "24h", "limit": 20,
   "pins": [
     { "kind": "node", "publicKey": "<64 hex>", "id": "uuid or null", "observerId": "uuid or null",
       "name": "Hilltop", "tiles": ["packets", "snr", "rssi", "noise"], "view": "telemetry",
@@ -1333,7 +1340,7 @@ characters. Answers `200` with the Atlas that this save committed, `revision` pl
 | Status | Code | When |
 |---|---|---|
 | 409 | `atlas_conflict` | `baseRevision` is not the stored revision. The body is the usual error plus the stored Atlas as `current`, at the top level: `{"error":{"code":"atlas_conflict","message":"..."},"current":{...}}`. |
-| 422 | `invalid_input` | Bad range, more than 12 pins, a bad key, id, tiles, telemetryTiles or view, `telemetryTiles` on an observer pin, or the same radio pinned twice. `message` names the pin. |
+| 422 | `invalid_input` | Bad range, more pins than `limit` (`atlas.limit`, default 20), a bad key, id, tiles, telemetryTiles or view, `telemetryTiles` on an observer pin, or the same radio pinned twice. `message` names the pin. |
 | 400, 413, 415, 429 | | As for other account routes. |
 
 Removing a radio from the Atlas deletes its alert rules in the same transaction.
@@ -1350,7 +1357,7 @@ GET /api/v1/me/telemetry-requests
 ```
 
 ```json
-{ "limit": 3,
+{ "limit": 6,
   "requests": [
     { "id": "uuid",
       "node": { "id": "uuid or null", "publicKey": "<64 hex>", "name": "Hilltop" },

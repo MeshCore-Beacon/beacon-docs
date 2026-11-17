@@ -36,7 +36,7 @@ and Beacon starts.
 
 | Key | Default | What it does |
 |---|---|---|
-| `polling.requests_per_user` | `3` | How many requests one user may hold, 0 to 20. `0` turns requests off. |
+| `polling.requests_per_user` | `6` | How many requests one user may hold, 0 to 20. `0` turns requests off. |
 | `polling.offline_disable_days` | `7` | Days without any observer hearing a repeater before its requests are turned off, 1 to 365. |
 | `polling.request_observers` | `all` | `all` or `approved`. Which observers may be handed a requested repeater. See below. |
 

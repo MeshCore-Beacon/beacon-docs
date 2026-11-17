@@ -1,6 +1,6 @@
 # Atlas
 
-A per-browser watchlist of up to twelve radios, each shown as a card of recent activity and signal.
+A per-browser watchlist of radios, up to the server's [`atlas.limit`](configuration.md#atlas-size) (20 by default), each shown as a card of recent activity and signal.
 A card can follow a node, an observer, or a node that is also an observer. The tab sits just before
 **Analytics**, in the desktop row and under **More** on a phone; the URL is `?tab=Atlas`. Hide it for a deployment
 with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
@@ -177,7 +177,7 @@ when that is Analytics. Any other value is dropped on import and the card is kep
 Analytics. A build from before the pin ignores the field.
 
 Imports go through the same checks as a saved collection: a file without the format tag is
-refused, malformed or duplicate cards are dropped, at most twelve are kept, and the page says how
+refused, malformed or duplicate cards are dropped, at most the server's limit are kept, and the page says how
 many were skipped. Files over 256 KB are refused. Node cards work on another Beacon server,
 because the public key finds the node there. Observer IDs belong to one server, so an observer
 card imported elsewhere shows as no longer known.
