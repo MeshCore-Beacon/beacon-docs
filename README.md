@@ -162,6 +162,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 - [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
 - [Atlas](docs/atlas.md): the watchlist of nodes and observers (per browser, or synced to an account), what its cards mean, and its export file.
+- [Atlas Unicode name handoff](docs/atlas-unicode-20261117.md): code-point limits, focused client fixes and preview qualification.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
 **Change it**

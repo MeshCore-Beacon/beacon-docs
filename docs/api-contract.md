@@ -1335,7 +1335,10 @@ PUT /api/v1/me/atlas
 
 Replaces every pin. A node pin needs `publicKey`. An observer pin needs `observerId` or
 `observerPublicKey`, and if it sends both they must name the same observer. A `name` is at most 160
-characters. Answers `200` with the Atlas that this save committed, `revision` plus one. The body is read inside the same transaction, so a save from another device that lands right afterwards does not change what this answer says.
+Unicode code points, not UTF-16 code units or grapheme clusters. Combining sequences count as their
+constituent code points; no Unicode normalization is applied. Answers `200` with the Atlas that this
+save committed, `revision` plus one. The body is read inside the same transaction, so a save from
+another device that lands right afterwards does not change what this answer says.
 
 | Status | Code | When |
 |---|---|---|
