@@ -1002,7 +1002,9 @@ The config file should remain the primary source of truth; admin UI writes would
 Different from the live packet flow on the map: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
 
 ### Mobile push notifications
-The Flutter app could let users set up notifications for specific events: a keyword appearing in a specific channel, a specific node starting to talk, an observer going offline, a packet matching arbitrary filter criteria. The `channelMessage` and `packetObservation` WebSocket events already carry everything a push service would need. This is purely a feature of the mobile app plus a notification dispatch service (Firebase or APNs).
+Part of this exists now as [Alerts](alerts.md): a signed-in user sets rules on the radios on their Atlas (gone quiet, low battery, rebooted, an observer offline and more), and Beacon sends the notices by email and as push notifications to the app. Every Beacon server sends push through the MeshCore Beacon push server, which forwards them to the phones; no Beacon server talks to Firebase or APNs itself.
+
+Not built yet: notifications for a keyword in a specific channel, a specific node starting to talk, or a packet matching arbitrary filter criteria. The `channelMessage` and `packetObservation` WebSocket events already carry what such rules would need, and they could go out through the same alert channels.
 
 ### Remote observer console
 Letsmesh has a feature where users can remote console into their own observer and run commands via MQTT, useful for diagnosing a misbehaving repeater or just managing it without going onsite. The auth flow uses the public key set as the owner on the observer: users authenticate to the web UI by signing a challenge with their companion device (USB-to-web), proving they own the pubkey, and the server then proxies a console session to the observer over MQTT.
@@ -1068,6 +1070,8 @@ Responses to dev feedback on this design. Captures decisions and rationale for t
 ### Q: Mobile push notifications for keywords in channel messages?
 
 **A:** Yeah, this would be awesome. Setting up a notify on the Flutter app when a specific keyword appears in a specific channel, or when a specific node starts talking. Added to Future Features.
+
+Since then, [Alerts](alerts.md) on Atlas radios have been built, delivered by email and push. Keyword and channel notifications are still not built.
 
 ### Q: Neighbor graph, live packet activity flowing node-to-node, less detail than pew pew, more "did my local pathing go the way I wanted"?
 
