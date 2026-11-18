@@ -951,7 +951,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "atlasTelemetry": true, "mapTelemetry": true },
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "mapTelemetry": true },
   "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
   "limits": { "atlas": 20 }
 }
@@ -1559,9 +1559,10 @@ POST /api/v1/me/devices
 DELETE /api/v1/me/devices
 ```
 
-Register or remove the push device of the calling app session. `pushToken` is the device handle the
-app got from the push server for this server (see [Push delivery](#push-delivery)): it starts with
-`h_`, is ASCII and at most 256 characters. `payloadKey` is the AES-256 key the app generated for this
+Register or remove the push device of the calling app session. `platform` is `ios` or `android`.
+`pushToken` is the device handle the app got from the push server for this server (see
+[Push delivery](#push-delivery)): it starts with `h_`, is ASCII with no spaces and at most 256
+characters. `payloadKey` is the AES-256 key the app generated for this
 device, standard base64 of exactly 32 bytes; the server encrypts every notice for the device with
 it. Registering turns the user's push switch on. `POST` answers `204`, `DELETE` `204` even when there
 was none. A handle another session or user held moves to this session. `POST` is limited to 10 per
@@ -1620,7 +1621,7 @@ with associated data `"beacon-push/v1:" + pushId`. It opens to the notice, not t
 |---|---|
 | `kind` | An alert kind from the table above, or `request_attention`. Ignore a notice of a kind you do not know. |
 | `name` | The radio's name, already cleaned and cut to 40 characters (see [Names in alerts](alerts.md#names-in-alerts)). Cap it again before showing it. |
-| `value` | The figure the sentence gives, in the kind's unit: hours for `gone_quiet`, millivolts for the battery kinds, tenths of a degree C for `temperature`, dBm for `noise_high`, seconds for `clock`, minutes for `observer_offline`. `null` when the kind has none. |
+| `value` | The figure the sentence gives, in the kind's unit: hours for `gone_quiet`, millivolts for the battery kinds, tenths of a degree C for `temperature`, dBm for `noise_high`, seconds for `clock`, minutes for `observer_offline`. Always `null` for `back_online`, `rebooted` and `request_attention`, which give no figure. |
 | `detail` | For `request_attention`: `login_failed`, `admin_stopped` or `disabled`. Otherwise empty. |
 | `targetKind`, `publicKey`, `id` | The radio, to open it on tap: by `id` when present, else by key. |
 | `tempUnit` | `c` or `f`, the instance's display unit for temperatures. |
