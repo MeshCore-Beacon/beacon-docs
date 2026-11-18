@@ -183,9 +183,10 @@ for the repeater can receive one; set `polling.request_observers: approved` to c
 [Sign-in through the MeshMapper portal](portal-sign-in.md),
 [Telemetry requests](telemetry-requests.md) and [Alerts](alerts.md).
 
-No client version floor changed: `minWebVersion` and `minAppVersion` stay at 2.1.0, so installed
-web and app builds keep working. Beacon Web and BEACON Mobile need the matching release only to
-show the new screens.
+Both client floors rise to 2.3.0. Beacon Web builds older than 2.3.0 show a reload screen and
+BEACON Mobile builds older than 2.3.0 show an update screen, because alert push now goes through
+the push server and older apps cannot register for it. Deploy the 2.3.0 web container with the
+server, and upgrade once the 2.3.0 app is out in the stores so users can update straight away.
 
 ### From a 2.3.0 test build
 

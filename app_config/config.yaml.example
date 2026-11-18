@@ -351,9 +351,9 @@ websocket:
 # prevents startup. Omitted or empty (default) means the built-in floor only.
 # Takes effect on restart.
 #mobile:
-#  min_app_version: "0.1.1"   # BEACON Mobile; built-in floor: none
+#  min_app_version: "2.3.0"   # BEACON Mobile; built-in floor: 2.3.0
 #web:
-#  min_web_version: "2.0.3"   # Beacon Web; built-in floor: 2.0.3
+#  min_web_version: "2.3.0"   # Beacon Web; built-in floor: 2.3.0
 
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.
