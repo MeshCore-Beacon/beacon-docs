@@ -176,9 +176,11 @@ notice and the device, the same on every retry, so the push server does not send
 when Beacon repeats it after a lost answer. Delivery is tracked per device: a retry goes only to the
 devices that do not have the notice yet. A device the push server reports as gone is deleted, and a
 message it refuses as invalid or too large is not sent to that device again. A call that fails as a
-whole uses up an attempt for its notices. If the push server answered with an error, every notice
-still to send in that run uses one up too; if it could not be reached or gave no answer within 30
-seconds, the rest is left for the next run.
+whole uses up an attempt for its notices. If the push server refused the call with an error status,
+every notice still to send in that run uses one up too. If it could not be reached, gave no answer
+within 30 seconds, or sent a `200` that was cut short, unreadable or had the wrong number of results,
+only that batch uses an attempt and the rest is left for the next run. A message that failed on its
+own waits at least as long as the push server asks before its next try.
 
 A user with no app signed in gets no push alerts. Only an app session can register a device; a
 browser session gets `403 app_session_required`. A device handle belongs to one account: registering
