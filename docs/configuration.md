@@ -406,10 +406,10 @@ The `alerts` block turns on [Alerts](alerts.md). It needs [User accounts](accoun
 
 | Key | Default | What it does |
 |---|---|---|
-| `email.enabled` | `false` | Send alerts by email. Needs `accounts.mode: local` and the `mail` block; with `portal` startup fails. |
-| `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
-| `push.id` | empty | The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`. |
-| `push.server` | `https://push.meshcorebeacon.ca` | The push server. You must use the official one: the Beacon app only receives notifications sent through it. Only change it if the project announces a new address. Must be https with no path; any other server logs a warning. |
+| `email.enabled` | `false` | Send alerts by email. Needs `accounts.mode: local` and the `mail` block; any other mode stops startup. |
+| `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs `accounts.mode` `local` or `portal`, `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
+| `push.id` | empty | Required with `push.enabled`. The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`, at most 64 characters. |
+| `push.server` | `https://push.meshcorebeacon.ca` | The push server. You must use the official one: the Beacon app only receives notifications sent through it. Only change it if the project announces a new address. Must be https with no path, query or credentials; any other server logs a warning. |
 
 Each user picks which of the offered channels reach them. The old `alerts.delivery` key stops
 startup with a message saying what replaced it.

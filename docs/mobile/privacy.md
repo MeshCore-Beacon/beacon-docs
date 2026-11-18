@@ -1,6 +1,6 @@
 # BEACON Mobile Privacy Policy
 
-_Last updated: November 15, 2026_
+_Last updated: November 18, 2026_
 
 BEACON Mobile ("the app") is an open-source iOS and Android client for Beacon, a
 real-time analyzer for MeshCore radio mesh networks. This policy explains what
@@ -43,11 +43,17 @@ that server, and deleting your account removes it.
   with the observer that polls the repeater. Never enter an admin password.
 - **Alert rules.** The server stores the alerts you set for radios on your Atlas and when each last
   fired.
-- **Push token.** If the server sends alerts by push, the app registers a push token with the server
-  and with Apple's or Google's notification service. The token is tied to your account and signed-in
-  device, is never shown back to you, stops being used when that app sign-in ends, and is deleted with your
-  account. Alerts can name a radio and carry only a short sentence about it. Alerts can instead
-  be sent by email to your account's address.
+- **Push notifications.** If the server sends alerts by push, the app gets a push token from Apple's or
+  Google's notification service and registers it with the MeshCore Beacon push server, which the
+  Beacon project runs and which every Beacon server sends push through. The push server gives the
+  app a device handle for that one server, and the app gives the server the handle and a key it
+  made for your device. The handle is tied to your account and signed-in device, is never shown
+  back to you, stops being used when that app sign-in ends, and the server deletes it with your
+  account. Each alert is encrypted with your device's key, so the push server cannot read it. To
+  catch abuse it records which server sent a notification to which handle, when, its size and a
+  hash of the encrypted message. An alert names a radio
+  and what happened to it. You choose in your profile whether alerts reach you by push, by email to
+  your account's address, or both.
 - **Sign-in through a portal.** Some servers sign you in through the MeshMapper portal. The server
   then stores only the username and display name the portal gives it, and no password or email
   address.
@@ -73,6 +79,10 @@ To work, the app connects to:
    [OpenFreeMap](https://openfreemap.org) and elevation data from the public
    AWS Terrain Tiles dataset. These providers see your IP address and the map
    areas requested, as with any map.
+3. **Push notifications.** Only on a server that sends alerts by push, and only
+   while you are signed in there: the app gets a push token from Apple's or
+   Google's notification service and registers it with the MeshCore Beacon push
+   server at `push.meshcorebeacon.ca` (see Push notifications above).
 
 The app sends no personal information to these services beyond what any network
 request carries, such as your IP address.

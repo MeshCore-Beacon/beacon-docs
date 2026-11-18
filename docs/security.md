@@ -144,9 +144,10 @@ repeater, which an observer then uses to log in.
 - Alert text holds only a radio's name, a figure and fixed words. Radio names come from adverts and
   are untrusted, so Beacon removes control and formatting characters and line breaks, collapses
   whitespace and cuts the name to 40 characters before it goes into a mail subject, a mail body or a
-  push title.
-- A push token is a possession secret. A token belongs to one account: registering it removes it
-  from every other session and user. No route returns it and it is never logged.
+  push notice. A push notice carries the facts, not text, and the app writes the sentence.
+- A push device handle and its payload key are possession secrets. A handle belongs to one account:
+  registering it removes it from every other session and user. No route returns either and neither
+  is ever logged.
 - `BEACON_PUSH_SECRET` lets anyone who holds it send push notifications as this server. Keep it in
   the environment, out of the repo and backups. If it leaks, register the server again for a new one.
   Notification contents are encrypted per device, so the push server and Firebase cannot read them.

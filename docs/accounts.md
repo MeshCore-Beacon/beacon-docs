@@ -148,7 +148,7 @@ The app does not use the cookie. It holds a bearer token (see below), so CORS do
 | Times | Created, last login, and whether the user is disabled. |
 
 A user also owns, when those features are on, an Atlas (range and up to twelve pins), telemetry
-requests with their sealed guest passwords, alert rules and registered push tokens. Deleting the
+requests with their sealed guest passwords, alert rules and registered push devices. Deleting the
 user removes all of them in the same transaction.
 
 Passwords, tokens and codes are never logged and never stored in clear text. Request bodies on the
