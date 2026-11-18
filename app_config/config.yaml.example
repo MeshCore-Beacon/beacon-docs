@@ -454,8 +454,19 @@ cache:
 #    url: ""                   # https base address of the portal; required when mode is portal
 #    client_id: ""             # required when mode is portal
 
-# Alerts: tell users when a radio on their Atlas needs attention. Needs accounts. Off by default.
-# email needs accounts.mode local and the mail block. push needs BEACON_PUSH_CREDENTIALS, the in-container path of a
-# Google service account key file; startup fails without it.
+# Alerts: tell users when a radio on their Atlas needs attention. Needs accounts (local or portal). Off by default.
+# Each user picks which of the channels below reach them.
 #alerts:
-#  delivery: off               # off, push or email
+#  email:
+#    # Send alerts by email. Needs accounts.mode: local and the top-level mail block.
+#    enabled: false
+#  push:
+#    # Send alerts as push notifications to the Beacon app.
+#    enabled: false
+#    # Your Push ID, from registering this server at https://push.meshcorebeacon.ca/register.
+#    # The matching Push secret goes in BEACON_PUSH_SECRET in .env, never here.
+#    id: ""
+#    # The push server. You must use the official MeshCore Beacon push server:
+#    # the Beacon app only receives notifications sent through it. Only change
+#    # this if the project announces a new address.
+#    server: https://push.meshcorebeacon.ca

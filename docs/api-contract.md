@@ -974,8 +974,9 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `registration` | True when new sign-ups are open. Only meaningful when `accounts` is `"local"`; always `false` for `"portal"`. |
 | `portalUrl` | The portal's base address. Present only when `accounts` is `"portal"`. |
 | `telemetryRequests` | True when [telemetry requests](#telemetry-requests) are on: polling and accounts are on, `BEACON_SECRET_KEY` is set and `polling.requests_per_user` is not 0. |
-| `alerts` | True when [alerts](#alerts) are on: accounts are on and `alerts.delivery` is not `off`. |
-| `alertDelivery` | `"push"` or `"email"`. Present only when `alerts` is true. |
+| `alerts` | True when [alerts](#alerts) are on: accounts are on and at least one channel is on. |
+| `alertChannels` | `{"email": bool, "push": bool}`: the channels this server sends alerts by. Always present. |
+| `push` | `{"server": "https://push.meshcorebeacon.ca", "pushId": "inst_…"}`: the push server the app gets a device handle from, and this server's Push ID there. Present only while `alertChannels.push` is true. See [Push delivery](#push-delivery). |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
 | `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
 
@@ -994,7 +995,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 
 The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `alertDelivery` as none, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1456,7 +1457,9 @@ GET /api/v1/me/alerts
 ```
 
 ```json
-{ "delivery": "push", "hasDevice": true,
+{ "channels": {
+    "email": { "available": true, "enabled": true, "reason": "" },
+    "push": { "available": true, "enabled": true, "hasDevice": true } },
   "targets": [
     { "id": "uuid or null", "kind": "node", "publicKey": "<64 hex>", "name": "Hilltop", "polled": true,
       "available": ["gone_quiet", "back_online", "clock", "battery_low"],
@@ -1476,9 +1479,21 @@ count, so a target that was polled can read `polled: false`, its telemetry kinds
 read `inactive`. It is what offers the telemetry kinds and, for a repeater, the 3 and 6 hour
 `gone_quiet` thresholds. `available` is always an array and `unavailable` always an object of kind to
 English reason. `unavailableCodes` is always an object with the same keys, kind to a stable code a
-client can translate; fall back to the sentence for a code it does not know. `delivery` is `push` or
-`email`. `hasDevice` says whether the user has a
-push device registered; it is the only thing the API says about devices.
+client can translate; fall back to the sentence for a code it does not know.
+
+`channels` is how the user's alerts reach them. Each user chooses: email, push, both or neither.
+
+| Field | Meaning |
+|---|---|
+| `email.available` | The server sends alert mail and the user has a verified address. |
+| `email.enabled` | The user's switch. Defaults to `true`. |
+| `email.reason` | Why email is not available: `server_off` (the server does not send alert mail), `portal_account` (portal users have no address) or `unverified_email`. Empty when available. |
+| `push.available` | The server sends push notifications. |
+| `push.enabled` | The user's switch. Defaults to `true`, and registering a device turns it on. |
+| `push.hasDevice` | An app session of the user has registered a device. Push reaches the user only when this and `enabled` are both true. It is the only thing the API says about devices. |
+
+A channel reaches the user only when it is both available and enabled. Clients show both switches
+in the user's profile, with the reason when one is not available.
 
 Reason codes (`unavailableCodes`, and `reasonCode` in the `kind_unavailable` error):
 
@@ -1530,16 +1545,29 @@ DELETE /api/v1/me/alerts/rules/{id}
 `204`.
 
 ```
+PUT /api/v1/me/alerts/channels
+{ "email": true, "push": false }
+```
+
+Turns the user's channels on or off. A field left out stays as it is; at least one is needed, else
+`422 invalid_input`. Answers `200` with the `channels` object above. Any session may call it, web or
+app. A switch can be on while its channel is unavailable: it takes effect once the channel is.
+
+```
 POST /api/v1/me/devices
-{ "platform": "ios", "pushToken": "..." }
+{ "platform": "ios", "pushToken": "h_3k9x2m7q…", "payloadKey": "<base64 of 32 bytes>" }
 DELETE /api/v1/me/devices
 ```
 
-Register or remove the push token of the calling app session. `POST` answers `204`, `DELETE` `204`
-even when there was none. A token has no whitespace or control characters and at most 4096
-characters. A token another session or user held moves to this session. `POST` is limited to 10 per
-user per 10 minutes. These routes need an app session: a cookie session gets
-`403 app_session_required`. No route returns a token.
+Register or remove the push device of the calling app session. `pushToken` is the device handle the
+app got from the push server for this server (see [Push delivery](#push-delivery)): it starts with
+`h_`, is ASCII and at most 256 characters. `payloadKey` is the AES-256 key the app generated for this
+device, standard base64 of exactly 32 bytes; the server encrypts every notice for the device with
+it. Registering turns the user's push switch on. `POST` answers `204`, `DELETE` `204` even when there
+was none. A handle another session or user held moves to this session. `POST` is limited to 10 per
+user per 10 minutes, and answers `404 push_disabled` when the server does not send push. These routes
+need an app session: a cookie session gets `403 app_session_required`. No route returns a handle or
+a key.
 
 | Status | Code | When |
 |---|---|---|
@@ -1547,14 +1575,59 @@ user per 10 minutes. These routes need an app session: a cookie session gets
 | 409 | `not_on_atlas` | The radio is not pinned on the user's Atlas. |
 | 422 | `kind_unavailable` | The radio cannot have this kind; `message` is the English reason and `error.reasonCode` its code (the only error with that extra field). |
 | 422 | `invalid_threshold` | The threshold is out of range or the wrong shape for the kind. |
-| 422 | `invalid_input` | A bad key or rule id, or a bad platform or token. |
+| 422 | `invalid_input` | A bad key or rule id; a bad platform, push token or payload key; or a channels body with neither field. |
+| 404 | `push_disabled` | `POST /me/devices` on a server that does not send push. |
 | 404 | `not_found` | Unknown or foreign rule id. |
 | 403 | `app_session_required` | A device route called with a cookie session. |
 
-**Push data.** A push message has a title (the radio's name) and a body (one English sentence). Its
-`data` is `{"targetKind": "node" | "observer", "publicKey": "<64 hex>", "id": "uuid"}`, which the app
-uses to open the radio. `id` is the node's or observer's id and is left out when the radio is not
-known to Beacon; open by `id` when present, else look the radio up by key.
+#### Push delivery
+
+Every Beacon server sends push through the MeshCore Beacon push server, `features.push.server`
+(the official one is `https://push.meshcorebeacon.ca`). Its API is documented in the
+[beacon-push README](https://github.com/MeshCore-Beacon/beacon-push/blob/dev/README.md). The app:
+
+1. Reads `features.push` from `/info`. Without it the server does not send push.
+2. Gets its FCM token, then `POST <push.server>/v1/handles`
+   `{"pushId": "<features.push.pushId>", "platform": "ios"|"android", "fcmToken": "..."}`, which answers
+   `{"handle", "handleSecret"}`. The handle works for this server only. Keep both per server.
+3. Generates a random 32-byte payload key for this server and keeps it in secure storage.
+4. Calls `POST /api/v1/me/devices` with the handle as `pushToken` and the key as `payloadKey`.
+5. When FCM gives a new token: `PUT <push.server>/v1/handles/{handle}` `{"handleSecret", "fcmToken"}`
+   for every server. The handle stays the same, so the Beacon server needs no call.
+6. On sign-out or removing the server: `DELETE /api/v1/me/devices`, then
+   `DELETE <push.server>/v1/handles/{handle}` `{"handleSecret"}`.
+
+What reaches the phone is FCM data, the same on both platforms:
+
+```json
+{ "v": "1", "pushId": "inst_…", "serverName": "Ottawa Mesh", "messageId": "m_…", "ct": "<base64>" }
+```
+
+`serverName` is the name the server registered with the push server; the server cannot change it.
+Android gets a data-only, high-priority message that the app decrypts and shows itself. iOS gets a
+placeholder alert (title: the server name, body: "New alert") with `mutable-content: 1`, so a
+Notification Service Extension decrypts the message and replaces the text.
+
+`ct` is AES-256-GCM with the device's payload key: `nonce (12 bytes) || ciphertext || tag (16 bytes)`,
+with associated data `"beacon-push/v1:" + pushId`. It opens to the notice, not to ready-made text:
+
+```json
+{ "v": 1, "kind": "battery_low", "name": "Ridge Rptr", "value": 3412, "detail": "",
+  "targetKind": "node", "publicKey": "<64 hex>", "id": "<uuid or empty>", "tempUnit": "c" }
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` | An alert kind from the table above, or `request_attention`. Ignore a notice of a kind you do not know. |
+| `name` | The radio's name, already cleaned and cut to 40 characters (see [Names in alerts](alerts.md#names-in-alerts)). Cap it again before showing it. |
+| `value` | The figure the sentence gives, in the kind's unit: hours for `gone_quiet`, millivolts for the battery kinds, tenths of a degree C for `temperature`, dBm for `noise_high`, seconds for `clock`, minutes for `observer_offline`. `null` when the kind has none. |
+| `detail` | For `request_attention`: `login_failed`, `admin_stopped` or `disabled`. Otherwise empty. |
+| `targetKind`, `publicKey`, `id` | The radio, to open it on tap: by `id` when present, else by key. |
+| `tempUnit` | `c` or `f`, the instance's display unit for temperatures. |
+
+The app builds the sentence itself from these fields, in the same words as alert mail, and always
+shows which server sent it. A server therefore cannot put text of its own choosing under the app's
+name.
 
 
 ## Firmware polling

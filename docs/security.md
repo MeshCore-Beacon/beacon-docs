@@ -147,9 +147,9 @@ repeater, which an observer then uses to log in.
   push title.
 - A push token is a possession secret. A token belongs to one account: registering it removes it
   from every other session and user. No route returns it and it is never logged.
-- `BEACON_PUSH_CREDENTIALS` points to a service account key that can send push messages. Mount it
-  read-only, keep it out of the repo, and give it only the send permission. Errors and logs carry
-  neither its path nor its content.
+- `BEACON_PUSH_SECRET` lets anyone who holds it send push notifications as this server. Keep it in
+  the environment, out of the repo and backups. If it leaks, register the server again for a new one.
+  Notification contents are encrypted per device, so the push server and Firebase cannot read them.
 
 ## Rate limits and bans
 

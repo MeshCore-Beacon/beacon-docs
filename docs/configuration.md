@@ -26,7 +26,7 @@ to open).
 | `MESHMAPPER_API_KEY` | unset | Regional or grouped-region key for enabled MeshMapper imports. When set, even to an empty string, it replaces `meshmapper.api_key`. Missing keys leave imports unconfigured while Beacon keeps running. See [MeshMapper API key](#meshmapper-api-key). |
 | `BEACON_SECRET_KEY` | unset | 32 random bytes in base64. Seals the guest passwords of [telemetry requests](telemetry-requests.md). See [BEACON_SECRET_KEY](#beacon_secret_key). |
 | `BEACON_PORTAL_SECRET` | unset | The client secret for sign-in through the MeshMapper portal. Required when `accounts.mode` is `portal`; has no YAML key. See [Sign-in through the MeshMapper portal](portal-sign-in.md). |
-| `BEACON_PUSH_CREDENTIALS` | unset | Path to a Google service account key file for push alerts. Required when `alerts.delivery` is `push`. See [Alerts](alerts.md#push). |
+| `BEACON_PUSH_SECRET` | unset | The Push secret from registering the server with the push server. Required when `alerts.push.enabled` is true; has no YAML key. See [Alerts](alerts.md#push). |
 | `BEACON_SMTP_PASSWORD` | unset | Password for `mail.username`. Read only when `accounts.mode` is `local`; it has no YAML key. See [User accounts](#user-accounts). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Overrides `log.level`. Anything else stops startup. |
 | `LOG_FORMAT` | `text` | `text` or `json`. Overrides `log.format`. Anything else stops startup. |
@@ -86,7 +86,7 @@ which ones to read.
 | `polling` | Repeater polling: whether Beacon coordinates observers polling repeaters, which broker hosts they publish to, and how long readings are kept. Off by default. | You want [Repeater polling](repeater-polling.md). See [Repeater polling](#repeater-polling). |
 | `mail` | The outgoing SMTP server for account mail and email alerts. The password is `BEACON_SMTP_PASSWORD`. | You use `accounts.mode: local`. See [User accounts](#user-accounts). |
 | `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. `local` needs the `mail` block; `portal` signs in through the MeshMapper portal. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
-| `alerts` | `delivery`: `off`, `push` or `email`. Off by default. Needs accounts. | You want [Alerts](alerts.md). See [Alerts](#alerts). |
+| `alerts` | The alert channels: `email.enabled` and `push.enabled`, with `push.id`. Off by default. Needs accounts. | You want [Alerts](alerts.md). See [Alerts](#alerts). |
 | `backup` | Turns on the admin backup download. Off by default. | You want [Backup and export](backup-export.md). |
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
@@ -406,16 +406,25 @@ The `alerts` block turns on [Alerts](alerts.md). It needs [User accounts](accoun
 
 | Key | Default | What it does |
 |---|---|---|
-| `delivery` | `off` | `off`, `push` or `email`. `email` needs `accounts.mode: local`; with `portal` startup fails. `push` needs `BEACON_PUSH_CREDENTIALS` in the environment, and startup fails without it. Anything else stops startup. |
+| `email.enabled` | `false` | Send alerts by email. Needs `accounts.mode: local` and the `mail` block; with `portal` startup fails. |
+| `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
+| `push.id` | empty | The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`. |
+| `push.server` | `https://push.meshcorebeacon.ca` | The push server. You must use the official one: the Beacon app only receives notifications sent through it. Only change it if the project announces a new address. Must be https with no path; any other server logs a warning. |
+
+Each user picks which of the offered channels reach them. The old `alerts.delivery` key stops
+startup with a message saying what replaced it.
 
 ```yaml
 alerts:
-  delivery: email
+  email:
+    enabled: true
+  push:
+    enabled: true
+    id: inst_7f3k2m9qxa
 ```
 
-`BEACON_PUSH_CREDENTIALS` is the path, inside the container, of a Google service account key file
-(JSON with `project_id`, `client_email` and `private_key`). Mount the file read-only and keep it out
-of source control. See [Push](alerts.md#push).
+`BEACON_PUSH_SECRET` is the Push secret, in the environment, never in the file. See
+[Push](alerts.md#push).
 
 ## Atlas size
 

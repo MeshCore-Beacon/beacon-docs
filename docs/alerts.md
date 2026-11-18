@@ -2,7 +2,8 @@
 
 A signed-in user can ask Beacon to tell them when a radio on their [Atlas](atlas.md) needs
 attention: it went quiet, its battery is low, it rebooted. Alerts go by email or by push
-notification to the mobile app, depending on what the operator sets up. Alerts are off by default.
+notification to the mobile app. The operator decides which channels the server offers, and each user
+chooses email, push or both in their profile. Alerts are off by default.
 
 Routes and shapes are in the [API contract](api-contract.md#alerts).
 
@@ -13,18 +14,27 @@ have pinned.
 
 ```yaml
 alerts:
-  delivery: email   # off, push or email
+  email:
+    enabled: true
+  push:
+    enabled: true
+    id: inst_7f3k2m9qxa
 ```
 
-| `alerts.delivery` | What it needs |
+| Channel | What it needs |
 |---|---|
-| `off` | Nothing. Default. Every alert route answers `404 alerts_disabled`. |
-| `email` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Portal mode is refused at startup because portal users have no address. |
-| `push` | The credential file named by `BEACON_PUSH_CREDENTIALS`, see [Push](#push). Without it Beacon does not start. |
+| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Portal mode is refused at startup because portal users have no address. |
+| `push.enabled` | A Push ID in `push.id` and the Push secret in `BEACON_PUSH_SECRET`, from registering the server with the push server. See [Push](#push). Without them Beacon does not start. |
 
-Any other value stops startup. With accounts off, alert routes answer `404 accounts_disabled`.
-`features.alerts` and `features.alertDelivery` in [`/api/v1/info`](api-contract.md#server-info) tell
-clients whether to show the section. A read-only server never evaluates or sends alerts.
+With both off (the default) every alert route answers `404 alerts_disabled`. With accounts off,
+alert routes answer `404 accounts_disabled`. The old `alerts.delivery` key stops startup with a
+message saying what replaced it. `features.alerts` and `features.alertChannels` in
+[`/api/v1/info`](api-contract.md#server-info) tell clients whether to show the section. A read-only
+server never evaluates or sends alerts.
+
+Each user has an email switch and a push switch, both on by default; registering the app turns push
+on. A channel reaches the user only while the server offers it and the user's switch is on. Delivery
+is tracked per channel: a retry repeats only the channel that failed.
 
 ## Alert kinds
 
@@ -46,7 +56,7 @@ assignment right now; the user is told to request telemetry for it first (see
 | `noise_high` | with a noise floor reading | dBm, -130 to -50. |
 | `observer_offline` | observers | Minutes without a status report: 30, 60, 180 or 360. |
 
-On an instance with `display.temperature_unit: f` ([Display units](configuration.md#display-units)), alert mail and push text give temperatures in F, and clients take and show the temperature limits in whole degrees F. The API still stores and sends tenths of a degree C.
+On an instance with `display.temperature_unit: f` ([Display units](configuration.md#display-units)), alert mail and the app's push text give temperatures in F, and clients take and show the temperature limits in whole degrees F. The API still stores and sends tenths of a degree C.
 
 A sixth announcement, `request_attention`, is not a rule. Every user who has a telemetry request
 gets one notice when it moves to `login_failed`, `admin_stopped` or `disabled`, and another if it
@@ -105,40 +115,57 @@ gets nothing.
 
 ## Push
 
-Push goes to the mobile app through Firebase Cloud Messaging (the HTTP v1 API). The publisher of
-the app, not each operator of a Beacon server, owns the Firebase project the app is built with, so
-push works only on a server the publisher sets up with a key for that project. The steps:
+Only the app's publisher can send push notifications to the Beacon app, so every Beacon server sends
+push through the MeshCore Beacon push server at `https://push.meshcorebeacon.ca`, which the project
+runs. No server holds a Firebase key. To turn push on:
 
-1. Create the Firebase project for the app and add the Android and iOS apps to it. For iOS, add the
-   Apple push key in the project.
-2. Create a service account key for the project that may send messages. The file is JSON with
-   `project_id`, `client_email` and `private_key` (and optionally an https `token_uri`).
-3. Mount the file into the server container and set its in-container path:
+1. Register the server at `https://push.meshcorebeacon.ca/register`. It takes a name (shown on every
+   notification), your email and, optionally, the server's public URL. Open the emailed link to get
+   a **Push ID** and a **Push secret**. The secret is shown once.
+2. Put the secret in the environment and the ID in `config.yaml`:
 
 ```
-BEACON_PUSH_CREDENTIALS=/app/push-credentials.json
+BEACON_PUSH_SECRET=...
 ```
 
 ```yaml
 alerts:
-  delivery: push
+  push:
+    enabled: true
+    id: inst_7f3k2m9qxa
+    # server: https://push.meshcorebeacon.ca   (the default; leave it)
 ```
 
-With `push` and no `BEACON_PUSH_CREDENTIALS`, startup stops with an error: otherwise users would set
-rules that never send. A file that cannot be read or is not a service account key also stops
-startup, and the message names neither the path nor the content. Keep the file private.
+3. Recreate the app container. At startup Beacon logs that push goes through the push server and
+   which limits apply, and it checks in again every hour.
 
-Each live app session with a registered token gets one message per notice. Delivery is tracked per
-device: a retry goes only to the devices that do not have the notice yet, and a notice is delivered
-once every device has it. The title is the
-radio's name and the body is one English sentence; the app opens the radio from the message data
-(`targetKind`, `publicKey` and, when the radio is known, its `id`). A token Google reports as no longer registered is deleted. A user
-with no app signed in gets no push alerts. Only an app session can register a token; a browser
-session gets `403 app_session_required`.
+You must use the official push server: the Beacon app only receives notifications sent through it.
+`push.server` exists only in case the project announces a new address; any other value logs a
+warning. `push.enabled` without `push.id` or `BEACON_PUSH_SECRET` stops startup with a message
+pointing to the registration page.
 
-A push token belongs to one account. Registering a token removes it from every other session and
-user, because one phone has one account. The token is never returned by any route and never
-logged.
+**What the push server sees.** It identifies this server as the sender of every notification, puts
+the server's registered name on it, enforces rate limits and keeps usage records (server, time,
+device handle, size) to catch abuse. Servers that abuse it may be rate-limited, suspended or banned.
+It cannot read the notifications: each one is encrypted for its device with a key only the app and
+this server have.
+
+**Limits.** A newly registered server may send 30 notifications a minute and 500 a day, and each
+device 10 a minute and 200 a day. If the server's public URL was given, the push server checks it
+daily at `<url>/.well-known/beacon-push` (Beacon answers it while push is on), and a server that
+passes may send 300 a minute and 10,000 a day. A notice that is refused for a limit is retried within
+the normal retry rules above, so a server that hits its daily limit drops notices once they pass 2
+hours.
+
+**Devices.** Each app session that registered a device gets one message per notice, in batches of up
+to 100 per call. Delivery is tracked per device: a retry goes only to the devices that do not have
+the notice yet. A device the push server reports as gone is deleted. A user with no app signed in
+gets no push alerts. Only an app session can register a device; a browser session gets
+`403 app_session_required`. A device handle belongs to one account: registering it removes it from
+every other session and user. Handles and keys are never returned by any route and never logged.
+
+The push message carries the notice, not ready-made text; the app writes the sentence. The format is
+in the [API contract](api-contract.md#push-delivery).
 
 ## Names in alerts
 
