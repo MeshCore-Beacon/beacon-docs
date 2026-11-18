@@ -156,12 +156,13 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading from 2.2.0: accounts, telemetry requests, alerts and portal sign-in
 
-This release adds migrations `064` to `083` (polling, user accounts, telemetry requests, the portal
-sign-in state, alert rules and their outbox, and an Atlas telemetry view). They run at startup and
+This release adds migrations `064` to `085` (polling, user accounts, telemetry requests, the portal
+sign-in state, alert rules, their channels and outbox, and an Atlas telemetry view). They run at startup and
 are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
 `081`, `082`) on tables this release creates, so they start empty. On the project's test server the
 whole set took seconds. The only data migrations are `065`, which marks readings of the empty
-`repeater_readings` table, and `078`, which copies one drift row per node into a new table.
+`repeater_readings` table, `078`, which copies one drift row per node into a new table, and `084`
+and `085`, which touch only alert tables that are still empty on a 2.2.0 database.
 
 Every new feature is off by default, so an upgrade with no config change behaves as before:
 
@@ -185,6 +186,25 @@ for the repeater can receive one; set `polling.request_observers: approved` to c
 No client version floor changed: `minWebVersion` and `minAppVersion` stay at 2.1.0, so installed
 web and app builds keep working. Beacon Web and BEACON Mobile need the matching release only to
 show the new screens.
+
+### From a 2.3.0 test build
+
+A server that ran a development build of 2.3.0 with accounts or alerts on needs these changes
+before the release starts:
+
+- **Mail.** The `accounts.smtp` block is now a top-level `mail` block with the same keys. An `smtp`
+  block left under `accounts` stops startup with a message saying it moved.
+- **Alert channels.** `alerts.delivery` is replaced by `alerts.email.enabled` and
+  `alerts.push.enabled`, and the old key stops startup. Push no longer uses a Firebase key: it goes
+  through the push server, with `alerts.push.id` and `BEACON_PUSH_SECRET` from
+  [registering the server](alerts.md#push). `BEACON_PUSH_CREDENTIALS` is no longer read; remove it
+  and its key file.
+- **Push devices.** Migration `084` deletes every registered push device, because a device now holds
+  a push server handle and a payload key. App users must sign in again on the 2.3.0 app to get push
+  alerts.
+- **Outbox.** Migration `085` gives email and push their own attempts and retry times and drops the
+  shared columns. A build from before `085` cannot read the outbox after it, so going back to one is
+  not supported.
 
 ## Upgrading to 2.1
 
