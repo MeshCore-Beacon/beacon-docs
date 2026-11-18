@@ -23,7 +23,7 @@ alerts:
 
 | Channel | What it needs |
 |---|---|
-| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Portal mode is refused at startup because portal users have no address. |
+| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Any other mode stops startup; portal users have no address. |
 | `push.enabled` | A Push ID in `push.id` and the Push secret in `BEACON_PUSH_SECRET`, from registering the server with the push server. See [Push](#push). Without them Beacon does not start. |
 
 With both off (the default) every alert route answers `404 alerts_disabled`. With accounts off,
@@ -33,8 +33,9 @@ message saying what replaced it. `features.alerts` and `features.alertChannels` 
 server never evaluates or sends alerts.
 
 Each user has an email switch and a push switch, both on by default; registering the app turns push
-on. A channel reaches the user only while the server offers it and the user's switch is on. Delivery
-is tracked per channel: a retry repeats only the channel that failed.
+on. A channel reaches the user only while the server offers it and the user's switch is on. Email
+and push are delivered and retried apart: a retry repeats only the channel that failed, and a
+failing channel never holds back the other.
 
 ## Alert kinds
 
@@ -92,8 +93,15 @@ clients can translate it. The codes are listed in the [API contract](api-contrac
   flapping.
 - Notices are sent every minute, and only for an evaluation pass that has finished, so the notices
   of one pass reach a user together. Notices of a pass that never finished (the process stopped) are
-  sent once that pass is 15 minutes old. A notice not delivered within 2 hours is dropped, and a
-  notice that failed 5 times is dropped. Delivered notices are kept a day.
+  sent once that pass is 15 minutes old.
+- Email and push each have their own 5 attempts. A failed channel waits 1, 2, 4 and then 8 minutes
+  before its next try (longer when the push server asks for it) and gives up after the fifth
+  failure. A push failure never uses up or delays the mail, and the other way round.
+- A notice is finished once both channels are done: sent, not wanted (the server does not offer
+  the channel, the user's switch is off, there is no verified address or no app device), or out of
+  attempts. A notice not finished within 2 hours is dropped, whatever attempts it has left. A notice
+  that went out on every channel it needed is kept a day; one that ran out of attempts is deleted
+  once it is finished.
 - Evaluation reads at most the newest 12 readings per radio within 14 days, except for `rebooted`:
   that rule starts from the last reading it has seen and reads forward in pages of 200 readings per
   pass, so every reading counts. A backlog longer than 200 readings takes several 5 minute passes
@@ -107,11 +115,11 @@ clients can translate it. The codes are listed in the [API contract](api-contrac
 One message per user for each evaluation pass: subject "Beacon: 1 alert" or "Beacon: n alerts",
 one plain sentence per alert, and a link to `<public_url>/?tab=Atlas`. The alert sender sends it
 directly, not through the account mail queue, with a 30 second timeout for each message. A notice
-counts as delivered only once the SMTP server accepted the mail. A failed send is retried after 1,
-2, 4 and 8 minutes, at most 5 attempts in all, and within the 2 hour limit above; it also ends that
-minute's run, so one dead mail server costs one timeout a minute. At most 16 mails go out per run,
-and the notices of one user and pass are never split across mails. A user with no verified address
-gets nothing.
+counts as mailed only once the SMTP server accepted it, and a mail that went out is never sent again,
+even when the push of the same notice is retried. A failed send is retried on the email channel's
+own schedule above. It also ends the mail part of that minute's run, so one dead mail server costs
+one timeout a minute; push still goes out. At most 16 mails go out per run, and the notices of one
+user and pass are never split across mails. A user with no verified address gets nothing.
 
 ## Push
 
@@ -153,16 +161,29 @@ this server have.
 **Limits.** A newly registered server may send 30 notifications a minute and 500 a day, and each
 device 10 a minute and 200 a day. If the server's public URL was given, the push server checks it
 daily at `<url>/.well-known/beacon-push` (Beacon answers it while push is on), and a server that
-passes may send 300 a minute and 10,000 a day. A notice that is refused for a limit is retried within
-the normal retry rules above, so a server that hits its daily limit drops notices once they pass 2
-hours.
+passes may send 300 a minute and 10,000 a day. Daily counts start again at midnight UTC. When the
+push server refuses a message for a limit, or the whole call with `429`, Beacon holds that push for
+as long as the push server asks (a minute when it gives no time), and the wait does not use up an
+attempt. Only the push waits: the mail of the same notice goes out as usual. A server over its daily
+limit keeps its push notices until the quota resets or they pass the 2 hour limit, whichever comes
+first. A suspended or banned server's calls fail and use up the push attempts; mail is not affected.
 
-**Devices.** Each app session that registered a device gets one message per notice, in batches of up
-to 100 per call. Delivery is tracked per device: a retry goes only to the devices that do not have
-the notice yet. A device the push server reports as gone is deleted. A user with no app signed in
-gets no push alerts. Only an app session can register a device; a browser session gets
-`403 app_session_required`. A device handle belongs to one account: registering it removes it from
-every other session and user. Handles and keys are never returned by any route and never logged.
+**Devices.** Each app session that registered a device gets one message per notice. Messages go in
+batches of up to 100 per call; a notice whose push failed before goes in smaller ones, half the size
+for each failure, so a batch that timed out is not sent again the same way. No new batch starts after
+2 minutes of a run, and the rest waits for the next one. Each message carries an id made of the
+notice and the device, the same on every retry, so the push server does not send a message twice
+when Beacon repeats it after a lost answer. Delivery is tracked per device: a retry goes only to the
+devices that do not have the notice yet. A device the push server reports as gone is deleted, and a
+message it refuses as invalid or too large is not sent to that device again. A call that fails as a
+whole uses up an attempt for its notices. If the push server answered with an error, every notice
+still to send in that run uses one up too; if it could not be reached or gave no answer within 30
+seconds, the rest is left for the next run.
+
+A user with no app signed in gets no push alerts. Only an app session can register a device; a
+browser session gets `403 app_session_required`. A device handle belongs to one account: registering
+it removes it from every other session and user. Handles and keys are never returned by any route
+and never logged.
 
 The push message carries the notice, not ready-made text; the app writes the sentence. The format is
 in the [API contract](api-contract.md#push-delivery).
