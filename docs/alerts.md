@@ -125,7 +125,8 @@ user and pass are never split across mails. A user with no verified address gets
 
 Only the app's publisher can send push notifications to the Beacon app, so every Beacon server sends
 push through the MeshCore Beacon push server at `https://push.meshcorebeacon.ca`, which the project
-runs. No server holds a Firebase key. To turn push on:
+runs. It sends iPhone notices straight to Apple and Android notices through Firebase, so no
+Beacon server holds an Apple or Firebase key. To turn push on:
 
 1. Register the server at `https://push.meshcorebeacon.ca/register`. It takes a name (shown on every
    notification), your email and, optionally, the server's public URL. Open the emailed link to get

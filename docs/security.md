@@ -150,7 +150,9 @@ repeater, which an observer then uses to log in.
   is ever logged.
 - `BEACON_PUSH_SECRET` lets anyone who holds it send push notifications as this server. Keep it in
   the environment, out of the repo and backups. If it leaks, register the server again for a new one.
-  Notification contents are encrypted per device, so the push server and Firebase cannot read them.
+  Notification contents are encrypted per device, so the push server, Apple
+  (APNs, for iPhones) and Google (FCM, for Android) cannot read them. iPhone notices never pass
+  through Google.
 
 ## Rate limits and bans
 

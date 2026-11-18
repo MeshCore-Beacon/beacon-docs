@@ -1002,7 +1002,7 @@ The config file should remain the primary source of truth; admin UI writes would
 Different from the live packet flow on the map: less detail, more focused on local pathing. Shows live packet activity flowing node-to-node so users can answer "did my local pathing go the way I wanted?" Less about flood visualization, more about understanding whether a specific node's traffic is taking the expected routes through nearby repeaters.
 
 ### Mobile push notifications
-Part of this exists now as [Alerts](alerts.md): a signed-in user sets rules on the radios on their Atlas (gone quiet, low battery, rebooted, an observer offline and more), and Beacon sends the notices by email and as push notifications to the app. Every Beacon server sends push through the MeshCore Beacon push server, which forwards them to the phones; no Beacon server talks to Firebase or APNs itself.
+Part of this exists now as [Alerts](alerts.md): a signed-in user sets rules on the radios on their Atlas (gone quiet, low battery, rebooted, an observer offline and more), and Beacon sends the notices by email and as push notifications to the app. Every Beacon server sends push through the MeshCore Beacon push server, which forwards them to the phones (iPhones straight through Apple APNs, Android through Firebase); no Beacon server talks to Firebase or APNs itself.
 
 Not built yet: notifications for a keyword in a specific channel, a specific node starting to talk, or a packet matching arbitrary filter criteria. The `channelMessage` and `packetObservation` WebSocket events already carry what such rules would need, and they could go out through the same alert channels.
 

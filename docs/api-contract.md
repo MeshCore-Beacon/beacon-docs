@@ -1588,17 +1588,21 @@ Every Beacon server sends push through the MeshCore Beacon push server, `feature
 [beacon-push README](https://github.com/MeshCore-Beacon/beacon-push/blob/dev/README.md). The app:
 
 1. Reads `features.push` from `/info`. Without it the server does not send push.
-2. Gets its FCM token, then `POST <push.server>/v1/handles`
-   `{"pushId": "<features.push.pushId>", "platform": "ios"|"android", "fcmToken": "..."}`, which answers
+2. Gets its device token (APNs on iOS, FCM on Android), then `POST <push.server>/v1/handles`
+   `{"pushId": "<features.push.pushId>", "platform": "ios"|"android", "token": "...", "apnsEnvironment": "sandbox"|"production"}`
+   (`apnsEnvironment` on iOS only), which answers
    `{"handle", "handleSecret"}`. The handle works for this server only. Keep both per server.
 3. Generates a random 32-byte payload key for this server and keeps it in secure storage.
 4. Calls `POST /api/v1/me/devices` with the handle as `pushToken` and the key as `payloadKey`.
-5. When FCM gives a new token: `PUT <push.server>/v1/handles/{handle}` `{"handleSecret", "fcmToken"}`
+5. When the platform gives a new token: `PUT <push.server>/v1/handles/{handle}`
+   `{"handleSecret", "token", "apnsEnvironment"}` (`apnsEnvironment` on iOS only)
    for every server. The handle stays the same, so the Beacon server needs no call.
 6. On sign-out or removing the server: `DELETE /api/v1/me/devices`, then
    `DELETE <push.server>/v1/handles/{handle}` `{"handleSecret"}`.
 
-What reaches the phone is FCM data, the same on both platforms:
+The push server sends iOS notices straight to Apple (APNs) and Android notices through Firebase
+Cloud Messaging, so Google sees no iPhone traffic. The fields are the same on both platforms (FCM
+data on Android, custom payload keys next to `aps` on iOS):
 
 ```json
 { "v": "1", "pushId": "inst_…", "serverName": "Ottawa Mesh", "messageId": "m_…", "ct": "<base64>" }
