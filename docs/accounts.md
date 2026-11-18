@@ -18,19 +18,21 @@ the operator. User accounts live in their own tables and routes, called `users`.
 ## Turn them on
 
 Accounts need an SMTP server that can send mail, because sign-up, password reset and email changes
-all work by a mailed link. Add this to `config.yaml`:
+all work by a mailed link. Add this to `config.yaml`. The mail server is a top-level `mail` block,
+because email alerts send through it too:
 
 ```yaml
+mail:
+  host: smtp.example.org
+  port: 587
+  username: beacon@example.org
+  from: "Beacon <no-reply@example.org>"
+  starttls: true
+
 accounts:
   mode: local
   public_url: https://beacon.example.org
   registration: open
-  smtp:
-    host: smtp.example.org
-    port: 587
-    username: beacon@example.org
-    from: "Beacon <no-reply@example.org>"
-    starttls: true
 ```
 
 Put the SMTP password in the environment, never in the file:
@@ -46,14 +48,15 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 | `mode` | `off` | `off`, `local` or `portal`. Anything else stops startup. The rest of the block is not checked while this is `off`. The rest of this page is about `local`; see [portal sign-in](portal-sign-in.md) for `portal`. |
 | `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
 | `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
-| `smtp.host` | none | Required. |
-| `smtp.port` | `587` | 1 to 65535. |
-| `smtp.username` | empty | Empty means no authentication. When set, Beacon uses AUTH PLAIN, and the server must offer AUTH. |
-| `smtp.from` | none | Required, one address, for example `"Beacon <no-reply@example.org>"`. |
-| `smtp.starttls` | `true` | When true the send fails if the server does not offer STARTTLS; Beacon never falls back to plain text. Set `false` only for a trusted local relay. |
+| `mail.host` | none | Required. |
+| `mail.port` | `587` | 1 to 65535. |
+| `mail.username` | empty | Empty means no authentication. When set, Beacon uses AUTH PLAIN, and the server must offer AUTH. |
+| `mail.from` | none | Required, one address, for example `"Beacon <no-reply@example.org>"`. |
+| `mail.starttls` | `true` | When true the send fails if the server does not offer STARTTLS; Beacon never falls back to plain text. Set `false` only for a trusted local relay. |
 
 `BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment. A mistake in the
-block stops startup with an error naming the key. Port 465 (implicit TLS) is not supported; use a
+block stops startup with an error naming the key. An `smtp` block left under `accounts` stops startup
+too, with a message saying it moved to `mail`. Port 465 (implicit TLS) is not supported; use a
 submission port that offers STARTTLS.
 
 Mail is sent in the background from a small queue. A request never waits for the mail server, so a
@@ -63,8 +66,8 @@ address) and the user asks for another link. If the queue is full a mail is drop
 Mail names the instance with the `VITE_APP_NAME` value, the same text as the web wordmark, for example
 `Confirm your email address for Beacon - Ottawa`. The server reads it from its own environment, so the
 variable must be visible to the server container as well as the web container (a shared `.env` does
-this). Unset, blank or `BEACON` gives `Beacon`. When `smtp.from` is a bare address, the name is also the
-sender's display name; an explicit display name in `smtp.from` is kept as it is. Alert mail uses the same
+this). Unset, blank or `BEACON` gives `Beacon`. When `mail.from` is a bare address, the name is also the
+sender's display name; an explicit display name in `mail.from` is kept as it is. Alert mail uses the same
 name in its subject.
 
 The mailed links are `<public_url>/?view=verify#token=...` and `<public_url>/?view=reset#token=...`

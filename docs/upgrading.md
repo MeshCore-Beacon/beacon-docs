@@ -168,7 +168,7 @@ Every new feature is off by default, so an upgrade with no config change behaves
 | Feature | Turn it on with | Secret |
 |---|---|---|
 | Repeater polling | `polling.enabled: true` and `polling.mqtt_hosts` | none |
-| Accounts | `accounts.mode: local` (needs `accounts.public_url` and `accounts.smtp.host` and `from`) | `BEACON_SMTP_PASSWORD` if the mail server wants a login |
+| Accounts | `accounts.mode: local` (needs `accounts.public_url` and `mail.host` and `mail.from`) | `BEACON_SMTP_PASSWORD` if the mail server wants a login |
 | Portal sign-in | `accounts.mode: portal` (needs `accounts.public_url`, `accounts.portal.url` and `client_id`) | `BEACON_PORTAL_SECRET` |
 | Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `3`) | `BEACON_SECRET_KEY` |
 | Alerts | `alerts.delivery: push` or `email`, with accounts on (`email` needs `local` mode) | `BEACON_PUSH_CREDENTIALS` for `push` |

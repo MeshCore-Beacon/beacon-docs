@@ -32,7 +32,7 @@ BEACON_PORTAL_SECRET=...
 | `accounts.portal.client_id` | Required. The identifier the portal knows this Beacon instance by. |
 | `BEACON_PORTAL_SECRET` | Required in the environment, never in the file. The client secret the portal issued. Startup stops if it is missing. |
 
-Portal mode needs no SMTP. The `smtp` block is ignored and registration is always off
+Portal mode needs no mail server. The `mail` block is not used for sign-in and registration is always off
 (`features.registration` is `false`). `features.accounts` in
 [`/api/v1/info`](api-contract.md#server-info) is `"portal"` and `features.portalUrl` carries the
 portal's address, so clients show a "Sign in with MeshMapper" button instead of a form.

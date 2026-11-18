@@ -19,7 +19,7 @@ alerts:
 | `alerts.delivery` | What it needs |
 |---|---|
 | `off` | Nothing. Default. Every alert route answers `404 alerts_disabled`. |
-| `email` | `accounts.mode: local` with working SMTP. Portal mode is refused at startup because portal users have no address. |
+| `email` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Portal mode is refused at startup because portal users have no address. |
 | `push` | The credential file named by `BEACON_PUSH_CREDENTIALS`, see [Push](#push). Without it Beacon does not start. |
 
 Any other value stops startup. With accounts off, alert routes answer `404 accounts_disabled`.
