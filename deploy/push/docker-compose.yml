@@ -1,0 +1,27 @@
+# Push relay for push.meshcorebeacon.ca. See README.md in this folder.
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data/caddy/
+      - ./caddy/config:/config/caddy/
+    restart: unless-stopped
+
+  beacon-push:
+    image: ${BEACON_PUSH_IMAGE:-ghcr.io/meshcore-beacon/beacon-push:dev}
+    container_name: beacon-push
+    env_file: .env
+    environment:
+      - PUSH_LISTEN_ADDR=:8080
+      - PUSH_DATABASE_PATH=/data/beacon-push.db
+      - PUSH_FIREBASE_CREDENTIALS=/run/secrets/firebase.json
+      - PUSH_APNS_KEY=/run/secrets/apns.p8
+    volumes:
+      - ./data:/data
+      - ./secrets:/run/secrets:ro
+    restart: unless-stopped

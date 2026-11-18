@@ -1,0 +1,4 @@
+push.meshcorebeacon.ca {
+	encode zstd gzip
+	reverse_proxy beacon-push:8080
+}
