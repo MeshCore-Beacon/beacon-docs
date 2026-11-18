@@ -197,14 +197,15 @@ before the release starts:
 - **Alert channels.** `alerts.delivery` is replaced by `alerts.email.enabled` and
   `alerts.push.enabled`, and the old key stops startup. Push no longer uses a Firebase key: it goes
   through the push server, with `alerts.push.id` and `BEACON_PUSH_SECRET` from
-  [registering the server](alerts.md#push). `BEACON_PUSH_CREDENTIALS` is no longer read; remove it
-  and its key file.
+  [registering the server](alerts.md#push). `BEACON_PUSH_CREDENTIALS` is no longer read, and
+  startup logs a warning while it is still set; remove it and its key file.
 - **Push devices.** Migration `084` deletes every registered push device, because a device now holds
   a push server handle and a payload key. App users must sign in again on the 2.3.0 app to get push
   alerts.
 - **Outbox.** Migration `085` gives email and push their own attempts and retry times and drops the
-  shared columns. A build from before `085` cannot read the outbox after it, so going back to one is
-  not supported.
+  shared columns. A notice queued before it keeps its attempts and retry time for push, and its mail,
+  if not sent yet, starts with no attempts and is tried at once. A build from before `085` cannot
+  read the outbox after it, so going back to one is not supported.
 
 ## Upgrading to 2.1
 
