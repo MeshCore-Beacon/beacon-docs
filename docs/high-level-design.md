@@ -29,7 +29,7 @@ This is the single source of truth for the project; sub-documents (deployment, r
 
 - **Backend:** Single Go binary, pgx + pgxpool + sqlc for Postgres, `github.com/meshcore-go/meshcore-go` for packet decoding, internal Go channels for live WebSocket fanout
 - **Database:** Postgres with BRIN + composite indexes, hourly rollup tables for historical stats
-- **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus purpose-specific bounded in-process state
+- **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus small in-process caches in Go in front
 - **Web client:** React 19 + Vite + TypeScript + Tailwind 4 + TanStack Query/Virtual, MapLibre GL for the map, ECharts for analytics charts, i18next for translations
 - **Mobile client:** Flutter (native iOS + Android)
 - **Edge:** Caddy for TLS and reverse proxy
@@ -91,7 +91,7 @@ We need Role 2 because the analyzer relies on SNR and RSSI per observation. Coor
 
 ### Why this is fast
 
-One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React uses virtualized lists to limit mounted rows. Flutter is native-compiled, but frame rate depends on scene size, device and workload; measure actual frame timing before making a performance claim.
+One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React uses virtualized lists to limit mounted rows. Flutter on mobile is native-compiled.
 
 ---
 
