@@ -465,6 +465,8 @@ cache:
 #    enabled: false
 #    # Your Push ID, from registering this server at https://push.meshcorebeacon.ca/register.
 #    # The matching Push secret goes in BEACON_PUSH_SECRET in .env, never here.
+#    # Register with this server's public URL for higher limits (300 a minute, 10,000 a day
+#    # instead of 30 and 500); the proxy must send /.well-known/beacon-push to beacon-server.
 #    id: ""
 #    # The push server. You must use the official MeshCore Beacon push server:
 #    # the Beacon app only receives notifications sent through it. Only change

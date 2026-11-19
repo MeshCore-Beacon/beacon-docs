@@ -129,8 +129,11 @@ runs. It sends iPhone notices straight to Apple and Android notices through Fire
 Beacon server holds an Apple or Firebase key. To turn push on:
 
 1. Register the server at `https://push.meshcorebeacon.ca/register`. It takes a name (shown on every
-   notification), your email and, optionally, the server's public URL. Open the emailed link to get
-   a **Push ID** and a **Push secret**. The secret is shown once.
+   notification), your email and, optionally, the server's public URL. Give the URL: the push
+   server then checks `<url>/.well-known/beacon-push` daily and raises the server's limits once it
+   passes (see Limits below). Your proxy must send that path to beacon-server; the stock Caddy
+   configs do, and [Reverse proxy](reverse-proxy.md) shows nginx and Apache. Open the emailed link
+   to get a **Push ID** and a **Push secret**. The secret is shown once.
 2. Put the secret in the environment and the ID in `config.yaml`:
 
 ```

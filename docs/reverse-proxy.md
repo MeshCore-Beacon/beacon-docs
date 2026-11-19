@@ -101,6 +101,11 @@ location = /ws {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_read_timeout 120s;
 }
+location = /.well-known/beacon-push {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
 location / {
     proxy_pass http://127.0.0.1:8081;   # beacon-web published on loopback
 }
@@ -116,7 +121,13 @@ ports, the app sees the Docker network's gateway as the peer, so trust the compo
 
 Apache works the same way. [`app_config/apache/analyzer-vhost.snippet.conf`](../app_config/apache/analyzer-vhost.snippet.conf)
 is a working virtual host snippet, including the `RequestHeader set X-Real-IP` line that
-replaces whatever the client sent.
+replaces whatever the client sent. Proxy `/.well-known/beacon-push` to beacon-server next to
+your `/api` and `/ws` rules:
+
+```apache
+ProxyPass        /.well-known/beacon-push http://127.0.0.1:8080/.well-known/beacon-push
+ProxyPassReverse /.well-known/beacon-push http://127.0.0.1:8080/.well-known/beacon-push
+```
 
 ## Rate limits and connection caps
 
