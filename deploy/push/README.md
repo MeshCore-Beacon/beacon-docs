@@ -58,10 +58,10 @@ starting point.
    The log should show the relay starting with no config errors. `docker inspect` on the image
    shows the commit in the `org.opencontainers.image.revision` label.
 
-5. Install the backup as a daily cron job for root:
+5. Install the backup as a daily cron job:
 
-   ```
-   17 3 * * * /opt/docker/beacon-push/backup.sh
+   ```bash
+   echo "17 3 * * * root /opt/docker/beacon-push/backup.sh >/dev/null 2>&1" | sudo tee /etc/cron.d/beacon-push-backup
    ```
 
    It keeps 14 days in `data/`. Copy them off the box as well; a backup on the same disk does not
