@@ -1930,3 +1930,11 @@ harmless.
 ## CPU profiling
 
 Bounded CPU captures on a running instance are described in [Profiling](profiling.md).
+
+## Bounded container logs
+
+The deployment templates rotate each service's Docker `json-file` logs at 10 MB
+per file and retain three files. This does not rotate PostgreSQL data, Caddy access
+files, backups or source archives. An existing container adopts the policy only
+when it is recreated; inspect `HostConfig.LogConfig` before and afterward and keep
+all data-volume mounts unchanged. Do not delete a live container log file by hand.
