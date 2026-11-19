@@ -57,6 +57,13 @@
 		}
 	}
 
+	# The push server's daily domain check; beacon-server answers it while push is on
+	handle /.well-known/beacon-push {
+		reverse_proxy app:8080 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
 	handle {
 		reverse_proxy web:80
 	}

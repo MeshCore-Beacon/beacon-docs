@@ -43,7 +43,7 @@ docker-deployment-type2/
    WEB_DOMAIN=beacon.example.com
    ```
 
-   Caddy redirects anything that is not `/api/*` or `/ws` to that host. The password inside
+   Caddy redirects anything that is not `/api/*`, `/ws` or `/.well-known/beacon-push` to that host. The password inside
    `POSTGRES_DSN` must match `POSTGRES_PASSWORD` in `docker-compose.yml`.
 
    For MeshMapper imports, set `MESHMAPPER_API_KEY` in this server host's `.env`.

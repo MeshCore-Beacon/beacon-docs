@@ -2,7 +2,8 @@
 
 However you front Beacon, the proxy has the same three jobs:
 
-- Send `/api/*` and `/ws` to beacon-server (port `8080`) and everything else to beacon-web. `/ws`
+- Send `/api/*`, `/ws` and `/.well-known/beacon-push` to beacon-server (port `8080`) and everything
+  else to beacon-web. The last one is the push server's daily [domain check](alerts.md#push). `/ws`
   is a WebSocket, so the proxy must pass the upgrade through and keep idle sockets open for more
   than 90 seconds (the browser pings every 30 seconds; the server drops a socket after 90 seconds
   of silence).
@@ -28,6 +29,11 @@ handle /api/* {
 	}
 }
 handle /ws {
+	reverse_proxy app:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+handle /.well-known/beacon-push {
 	reverse_proxy app:8080 {
 		header_up X-Real-IP {remote_host}
 	}

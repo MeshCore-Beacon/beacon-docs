@@ -161,7 +161,8 @@ this server have.
 
 **Limits.** A newly registered server may send 30 notifications a minute and 500 a day, and each
 device 10 a minute and 200 a day. If the server's public URL was given, the push server checks it
-daily at `<url>/.well-known/beacon-push` (Beacon answers it while push is on), and a server that
+daily at `<url>/.well-known/beacon-push` (Beacon answers it while push is on; the stock
+Caddy configs route it, and in deployment type 2 the URL to register is the API host), and a server that
 passes may send 300 a minute and 10,000 a day. Daily counts start again at midnight UTC. When the
 push server refuses a message for a limit, or the whole call with `429`, Beacon holds that push for
 as long as the push server asks (a minute when it gives no time), and the wait does not use up an
