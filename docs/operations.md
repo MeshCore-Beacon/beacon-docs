@@ -1517,6 +1517,8 @@ scrape_configs:
 | `beacon_guard_refused_total` | counter | `family`, `guard` | Requests a guard refused |
 | `beacon_ingest_queue_depth` | gauge | | Messages waiting in the ingest queue |
 | `beacon_ingest_dropped_total` | counter | | Messages dropped because the ingest queue was full |
+| `beacon_ingest_rejected_total` | counter | `reason` | MQTT messages refused before queueing for size (`envelope_size`: over 64 KiB, or a topic over 256 bytes), and neighbour report entries skipped as malformed (`neighbor_shape`) |
+| `beacon_stream_dropped_total` | counter | `queue` | Live events dropped from a full queue (`global`, `repeat`, `client`) |
 | `beacon_job_duration_seconds` | histogram | `job` | Background job run time (`cleanup`, `analytics_rollup`, `reconfirm`, `route_retention`, ...) |
 | `beacon_job_rows_total` | counter | `job` | Rows removed by background jobs, today `reconfirm` and `route_retention` |
 | `beacon_index_bytes` | gauge | `index` | Size of each index, hourly |

@@ -117,7 +117,7 @@ All errors use one shape:
 { "error": { "code": "not_found", "message": "packet not found" } }
 ```
 
-`code` is the HTTP status text in snake_case, so match on it or on the status. The account routes add their own codes, listed under [User accounts](#user-accounts). Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window.
+`code` is the HTTP status text in snake_case, so match on it or on the status. The account routes add their own codes, listed under [User accounts](#user-accounts). Codes in use: `bad_request`, `unauthorized`, `not_found`, `conflict`, `request_entity_too_large`, `unsupported_media_type`, `rate_limited`, `internal_server_error`, `service_unavailable`, `gateway_timeout`, `insufficient_storage`, and `deadline_exceeded` (a `503` from the [cost guards](#cost-guards)). A `503` `service_unavailable` with `Retry-After` can also mean a page is [waiting for server data](#pages-that-wait-for-server-data). A `503` `deadline_exceeded` with `Retry-After` from any endpoint means its query ran out of time; retry later or ask for a shorter window. A response the server cannot encode is a `500` `internal_server_error`, never an empty `200`.
 
 A `404` means the requested thing doesn't exist. A database or other server-side failure is always a `500` (or `503` above), never a `404`, so clients can retry 5xx and treat 4xx as final. Empty lists are `200` with `[]`.
 
@@ -175,7 +175,7 @@ Most list and stats endpoints take the same location filters:
 |---|---|
 | `iatas` | Comma-separated IATA codes, case-insensitive (`YOW,YYZ`) |
 | `iata` | Single IATA, used only when `iatas` is absent |
-| `region` / `regionId` | Region slug or ID; expands to its member IATAs and adds them to any `iatas`. An unknown region or malformed ID is a `400`; a failed lookup is a `500`. |
+| `region` / `regionId` | Region slug or ID; expands to its member IATAs and adds them to any `iatas`. An unknown region or malformed ID is a `400`; a failed lookup is a `500`. A region with no member IATAs matches nothing, so a list filtered by it alone comes back empty. |
 | `scope` | Transport scope name, URL-encoded (`%23bc` for `#bc`) |
 
 Comma-separated list params (`iatas`, `scopes`, `payloadTypes`, `routeTypes`) take at most 1000 values; more is a `400`.
@@ -375,8 +375,8 @@ Ties go newest `lastSeen` first, then by `id`. Filters work the same as without 
 #### Node activity
 
 `GET /nodes/{nodeId}/activity` reports how often a node's packets were heard, in one-hour buckets
-over a trailing window that ends now. `range` is a Go duration (default `24h`); it must be positive
-and at most `720h`. A bad `range` or node ID is a `400` and an unknown node is a `404`. There is no
+over a trailing window that ends now. `range` is a Go duration (default `24h`); it must be at least
+`1h` and at most `720h`. A bad `range` or node ID is a `400` and an unknown node is a `404`. There is no
 `interval`: buckets are always one hour, aligned to the clock in UTC. The response is cached for 60
 seconds.
 
@@ -767,10 +767,10 @@ Known routes are fully resolved multi-hop paths distilled from packet history.
 
 | Endpoint | Notes |
 |---|---|
-| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iatas` (comma list, at most 100), `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50, larger values clamp to 200). With neither `iatas` nor `iata`, every IATA. |
+| `GET /routes` | Plain array, newest `lastSeen` first. Params: `iatas` (comma list, at most 100), `iata`, `hopCount`, `cursor` (last item's `lastSeen`, epoch ms), `cursorId` (last item's `id`), `limit` (default 50, larger values clamp to 200). A `hopCount` or `cursor` that is not a number is a `400`. With neither `iatas` nor `iata`, every IATA. |
 | `GET /routes/search?from=&to=[&iatas=]` | Routes within one IATA between two node hash prefixes. `from`, `to` required (hex, 1–4 bytes; widths may differ). `iatas` optional: comma list, at most 100, omitted = every IATA; the single `iata` is still accepted. At most 500 results, shortest first. `hops` is trimmed to source…destination and `hopCount` = `hops.length`. |
 | `GET /routes/cross?fromHash=&toHash=[&iatas=]` | Routes that cross from one IATA into another. `fromHash`, `toHash` required. `iatas` optional: 2–100 codes, omitted = every IATA. The legacy `fromIata`+`toIata` pair is still accepted, but not together with `iatas`. At most 500 results, sorted by `totalHops`, then `crossHop.lastSeen` newest first. |
-| `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. A lookup past the statement limit answers `503` + `Retry-After` ([Cost guards](#cost-guards)). |
+| `GET /routes/{iata}/{pathKey}/observations` | Retained reports that match a saved route exactly. `pathKey` comes from a route response. Window: `range` (default `24h`, max `720h`) or `since`+`until` (max 30 days); `pageCursor` for the next page; `limit` default 50. The cursor keeps the hash size and path bytes the first page matched, so later pages follow the same path even if the route's stored prefixes change. A lookup past the statement limit answers `503` + `Retry-After` ([Cost guards](#cost-guards)). |
 
 To page `/routes`, send the last item's `lastSeen` as `cursor` and its `id` as `cursorId`. Routes share a millisecond often (one batch of upserts), and `cursorId` returns the ones that didn't fit on the previous page. `cursor` alone still works but can skip those ties. `cursorId` must be a positive integer and requires `cursor`; otherwise `400`.
 
@@ -912,6 +912,7 @@ GET /api/v1/traces/{tag}
 ```
 
 `/traces` reads a per-tag summary kept at ingest and also accepts `iatas`, `region` and `regionId`.
+A `since`, `until` or `cursor` that is not epoch ms is a `400`.
 Filters apply to whole tags: `type` is `TRACE` if any packet in the tag is multi-hop and `PING`
 otherwise, `scope` matches the first scope seen, and `since`/`until` match the tag's first hearing.
 Counts and times always describe the whole tag.
@@ -1862,7 +1863,7 @@ All client messages have a `type` and an optional `id`, which replies echo.
 }
 ```
 
-- `iatas`, plus the member IATAs of any `regionIds` (numeric IDs as strings) and `regionSlugs`. Unknown regions are skipped.
+- `iatas`, plus the member IATAs of any `regionIds` (numeric IDs as strings) and `regionSlugs`. Unknown regions are skipped. If regions were given and they, together with `iatas`, yield no IATA, the subscription is still acknowledged with `subscribed` and receives no events.
 - `payloadTypes`: numeric payload types.
 - `channelHashes`: only filters `channelMessage` events.
 - `events`: any of `packetObservation`, `observerStatus`, `nodeUpdate`, `channelMessage`.
@@ -2022,6 +2023,8 @@ Each connection has a 256-event send buffer. When it is full, the server evicts 
 `droppedCount` is 1 or 2 per buffer notice; `since` is when the notice was sent. Several can arrive in a burst.
 
 Each connection also has a send budget: at most `websocket.max_send_bytes_per_second` of event JSON (default 1048576, 1 MiB/s, counted before compression), with a `websocket.send_burst_bytes` burst (default 8 MiB). Events past it are dropped, and a `lagged` notice, at most one every 30 seconds, carries how many; its `droppedCount` can be any size. The connection stays open.
+
+When the server-wide live queue overflows, every connection with a subscription gets a `lagged` notice whose `droppedCount` is the number of events lost for all clients since the last such notice. These are sent at most once every 5 seconds.
 
 Clients should treat any `lagged` notice as a gap and refresh the affected view over REST.
 
