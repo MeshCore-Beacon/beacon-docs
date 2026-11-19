@@ -951,7 +951,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "mapTelemetry": true },
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "mapTelemetry": true, "appDeviceLabel": true },
   "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
   "limits": { "atlas": 20 }
 }
@@ -979,6 +979,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `push` | `{"server": "https://push.meshcorebeacon.ca", "pushId": "inst_…"}`: the push server the app gets a device handle from, and this server's Push ID there. Present only while `alertChannels.push` is true. See [Push delivery](#push-delivery). |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
 | `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
+| `appDeviceLabel` | True when `POST /auth/app/token` takes a `deviceLabel`. Always true on servers that have it. The app sends one only when this is true: an older server refuses the unknown field. |
 
 `display` holds the instance's display units, set by the operator in [`display`](configuration.md#display-units):
 
@@ -995,7 +996,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 
 The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `appDeviceLabel` as `false`, a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1183,7 +1184,7 @@ password hash. `provider` is `local` or `portal`; a portal user has an empty `em
 | `POST /auth/reset/request` | nothing | `{email}` | `202 {"status":"check_email"}` |
 | `POST /auth/reset/confirm` | nothing | `{token, password}` | `200 {"status":"password_set"}` |
 | `POST /auth/app/code` | cookie session | `{codeChallenge, state, deviceLabel}` | `200 {"code","redirectUri"}` |
-| `POST /auth/app/token` | nothing | `{code, codeVerifier}` | `200 {"token","expiresAt","user"}` |
+| `POST /auth/app/token` | nothing | `{code, codeVerifier, deviceLabel?}` | `200 {"token","expiresAt","user"}` |
 | `GET /me` | session | | `200 {"user":{...}}` |
 | `PATCH /me` | session | `{displayName}` | `200 {"user":{...}}` |
 | `POST /me/password` | session | `{currentPassword, newPassword}` | `204`, ends every other session |
@@ -1239,7 +1240,9 @@ Notes:
 - **App sign-in.** The user must be signed in on the web. `/auth/app/code` takes the base64url
   SHA-256 of a random verifier as `codeChallenge` (S256 only), a `state` of at most 256 characters
   and a `deviceLabel`, and returns a one-time `code` and `redirectUri`, always `meshcorebeacon://auth`.
-  The app sends `code` and `codeVerifier` to `/auth/app/token`. The code lasts 5 minutes and is used
+  The app sends `code` and `codeVerifier` to `/auth/app/token`, and its own `deviceLabel` (such as
+  `Beacon app on iOS`) when `/info` has `features.appDeviceLabel`. That label names the session; when it
+  is missing or blank the session keeps the label the browser sent with the code. The code lasts 5 minutes and is used
   up before the verifier is checked, so a wrong verifier needs a new code. The `token` goes in the
   `Authorization: Bearer` header. Beacon mails the user when an app signs in. Without the cookie,
   `/auth/app/code` is `401 not_signed_in`.
