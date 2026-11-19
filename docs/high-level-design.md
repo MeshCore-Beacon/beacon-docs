@@ -29,7 +29,7 @@ This is the single source of truth for the project; sub-documents (deployment, r
 
 - **Backend:** Single Go binary, pgx + pgxpool + sqlc for Postgres, `github.com/meshcore-go/meshcore-go` for packet decoding, internal Go channels for live WebSocket fanout
 - **Database:** Postgres with BRIN + composite indexes, hourly rollup tables for historical stats
-- **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus in-memory LRU in Go in front
+- **Cache:** Redis for hot reads (recent packets, region stats, node metadata) plus purpose-specific bounded in-process state
 - **Web client:** React 19 + Vite + TypeScript + Tailwind 4 + TanStack Query/Virtual, MapLibre GL for the map, ECharts for analytics charts, i18next for translations
 - **Mobile client:** Flutter (native iOS + Android)
 - **Edge:** Caddy for TLS and reverse proxy
@@ -91,7 +91,7 @@ We need Role 2 because the analyzer relies on SNR and RSSI per observation. Coor
 
 ### Why this is fast
 
-One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React with virtualized lists renders only the rows on screen. Flutter on mobile is native-compiled and runs at 60fps by default.
+One process, no inter-service network hops for live packets. Postgres queries hit Redis or in-memory cache most of the time. BRIN indexes keep time-range scans cheap as the observation table grows. Caddy terminates TLS and serves gzip. React uses virtualized lists to limit mounted rows. Flutter is native-compiled, but frame rate depends on scene size, device and workload; measure actual frame timing before making a performance claim.
 
 ---
 
@@ -119,7 +119,7 @@ Maximum total packet size is 255 bytes (LoRa MTU constraint).
 - Bottom 6 bits: hop count (0-63)
 - Effective path bytes = `hash_size * hop_count`
 
-**Path bytes** are accumulated as the packet hops. Each forwarding repeater appends its truncated node hash. Regular (non-trace) packets use 1, 2, or 3 byte hashes. Trace packets (`0x09`) use 1, 2, or 4 byte hashes. Which sizes a given repeater is capable of emitting depends on its firmware version (see Node firmware capability detection below).
+**Path bytes** are accumulated as the packet hops. Each forwarding repeater appends its truncated node hash. Regular (non-trace) packets use 1, 2, or 3 byte hashes. Trace packets (`0x09`) encode a power-of-two hash width in payload flags: 1, 2, 4 or 8 bytes. Their wire path carries SNR bytes, separately from requested payload hashes. Which sizes a given repeater is capable of emitting depends on its firmware version (see Node firmware capability detection below).
 
 **Payload** is the actual content, type-specific.
 
@@ -133,7 +133,7 @@ This means:
 
 ### Path resolution scope
 
-MeshCore path hashes are 1, 2, 3, or 4 byte truncations of a node's public key. The hash size used is signaled by the top 2 bits of the path_length byte. Regular packets use 1, 2, or 3 byte hashes; trace packets (`0x09`) use 1, 2, or 4 byte hashes.
+MeshCore path hashes are 1, 2, 3, or 4 byte truncations of a node's public key. The hash size used is signaled by the top 2 bits of the path_length byte. Regular packets use 1, 2, or 3 byte hashes; trace packets (`0x09`) use payload widths of 1, 2, 4 or 8 bytes and keep consumed-hop SNR bytes in the wire path.
 
 - 1 byte: 256 possible IDs (collisions guaranteed globally)
 - 2 bytes: 65,536 possible IDs (collisions at scale)
