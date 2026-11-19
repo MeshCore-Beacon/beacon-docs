@@ -156,13 +156,18 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading from 2.2.0: accounts, telemetry requests, alerts and portal sign-in
 
-This release adds migrations `064` to `085` (polling, user accounts, telemetry requests, the portal
+This release adds migrations `064` to `086` (polling, user accounts, telemetry requests, the portal
 sign-in state, alert rules, their channels and outbox, and an Atlas telemetry view). They run at startup and
 are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
 `081`, `082`) on tables this release creates, so they start empty. On the project's test server the
 whole set took seconds. The only data migrations are `065`, which marks readings of the empty
 `repeater_readings` table, `078`, which copies one drift row per node into a new table, and `084`
 and `085`, which touch only alert tables that are still empty on a 2.2.0 database.
+
+`086` is the one that works on existing data: it builds an index on `packets` (`origin_pubkey`,
+`last_heard_at`) with `CONCURRENTLY`, so ingest keeps running while it builds. It took about two
+seconds on a test table of 4 million packets and added about a quarter of the table's size; allow
+more time and disk on a larger database.
 
 Every new feature is off by default, so an upgrade with no config change behaves as before:
 

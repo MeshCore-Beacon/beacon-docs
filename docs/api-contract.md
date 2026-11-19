@@ -288,7 +288,7 @@ Each observation:
 | `heardAt` | number | Epoch ms |
 | `pathLength` | object | `raw` (hex byte), `hashSize` (1–3), `hopCount` |
 | `pathBytes` | string | Accumulated path hashes (hex). For TRACE these are per-hop SNR bytes. |
-| `rssi`, `snr` | number | dBm / dB, omitted when missing |
+| `rssi`, `snr` | number | dBm / dB, each omitted when the observer did not report a usable value. A usable RSSI is -164 to -1 dBm and a usable SNR is -32 to 32 dB. An SNR of 0 is a real reading when it comes with a usable RSSI; 0 with no RSSI is how observers write "unknown" and is omitted. A missing value is never sent as 0 and never counted in an average. |
 | `propagationTimeMs` | number | Milliseconds after the packet's first observation (0 for the first) |
 | `radio` | object | `freqMhz`, `spreadFactor`, `bandwidthKhz`, `codingRate`, copied from the observer |
 | `sourceBroker` | string | Name of the MQTT broker it arrived through |
@@ -1955,6 +1955,7 @@ Events share one envelope and carry no `id`:
 - `payloadTypeName` here is the protocol name (`ADVERT`, `GRP_TXT`, `TXT_MSG`, ...), not the lower-case REST name.
 - `scope` and `summary` are omitted when there is none. `resolvedSource` / `resolvedDestination` are omitted for types without endpoints.
 - `resolvedPath` is `null` unless the connection set `resolvePath`. `observerPublicKey` appears only with `includeObserverKey`.
+- `observation.rssi` and `observation.snr` are each omitted when not measured, under the same rule as the REST observation fields. Servers before 2.3.0 sent 0.
 - `propagationTimeMs` is always 0 on live events. The event has no observation ID.
 
 Connections with `includeRepeats` also get repeats, which have `packet.isRepeat: true`. A repeat is a later hearing of the packet by an observer that already reported it, arriving over a different path, for example after a repeater further out rebroadcast it. Repeats are never stored, so they don't appear in REST reads. They carry `observationCount: 0` and `isFirstObservation: false`, so don't treat them as count updates. Exact copies (the same path again, or the same hearing via another broker) are not sent. When the server is busy, repeats are dropped before any other event. Without `includeRepeats` the key is absent.
