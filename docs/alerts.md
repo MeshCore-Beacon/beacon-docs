@@ -151,6 +151,11 @@ alerts:
 3. Recreate the app container. At startup Beacon logs that push goes through the push server and
    which limits apply, and it checks in again every hour.
 
+To check connectivity, open the [push server health endpoint](https://push.meshcorebeacon.ca/healthz).
+An HTTP 200 response with the text `ok` confirms the public relay answered. On your own Beacon
+instance, check `features.alertChannels.push` in `/api/v1/info` to see whether it offers push.
+To verify delivery all the way to a phone, use an enrolled app session and confirm receipt on that device.
+
 You must use the official push server: the Beacon app only receives notifications sent through it.
 `push.server` exists only in case the project announces a new address; any other value logs a
 warning. `push.enabled` without `push.id` or `BEACON_PUSH_SECRET` stops startup with a message
