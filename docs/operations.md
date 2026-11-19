@@ -485,6 +485,17 @@ off-peak and expect the following.
   rule already condemned, typically a few percent of the table. About half of those come back
   the next time they are heard.
 
+At info level, `route reconfirm` reports a cycle wrap or a sweep that encountered a statement
+timeout. `timed_out` counts timed-out statements, including the smaller retry. `skipped`
+counts routes deferred to a later cycle. A successful smaller retry can leave `skipped` at zero.
+`completed` records whether the sweep returned successfully. Ordinary five-minute slices are
+logged at debug level.
+
+For the hourly pass, `route retention` with `neighbors_reconfirmed=true` confirms that neighbor
+cleanup completed. The `routes_grace` checkpoint is saved just before that cleanup. If the
+checkpoint advances without a completion entry, check for `task failed` with
+`task=route_retention` and make sure the log covers the same running process and time window.
+
 ### After upgrading: observation payload types
 
 Observations stored by servers older than the observation `payload_type` column have no payload
