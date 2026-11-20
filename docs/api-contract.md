@@ -287,7 +287,8 @@ Each observation:
 | `iata` | string | Where it was heard |
 | `heardAt` | number | Epoch ms |
 | `pathLength` | object | `raw` (hex byte), `hashSize` (1–3), `hopCount` |
-| `pathBytes` | string | Accumulated path hashes (hex). For TRACE these are per-hop SNR bytes. |
+| `pathBytes` | string | Accumulated path hashes (hex). For a TRACE, the live event and packet lists carry the on-air path field, one SNR byte per hop reached. Packet detail carries the hop hashes the TRACE payload lists instead, and `pathLength.hashSize` and `hopCount` describe those. |
+| `wirePathBytes` | string | Packet detail observations only, optional. The path field exactly as it was on air (hex), sent for a TRACE whose `pathBytes` were replaced by its hop hashes; empty when no hop had been reached. To rebuild the frame use header + `pathLength.raw` + `wirePathBytes` if present, else `pathBytes`, + payload. Absent before 2.3.0. |
 | `rssi`, `snr` | number | dBm / dB, each omitted when the observer did not report a usable value. A usable RSSI is -164 to -1 dBm and a usable SNR is -32 to 32 dB. An SNR of 0 is a real reading when it comes with a usable RSSI; 0 with no RSSI is how observers write "unknown" and is omitted. A missing value is never sent as 0 and never counted in an average. |
 | `propagationTimeMs` | number | Milliseconds after the packet's first observation (0 for the first) |
 | `radio` | object | `freqMhz`, `spreadFactor`, `bandwidthKhz`, `codingRate`, copied from the observer |
