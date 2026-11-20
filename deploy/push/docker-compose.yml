@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
 
   beacon-push:
-    image: ${BEACON_PUSH_IMAGE:-ghcr.io/meshcore-beacon/beacon-push:dev}
+    image: ${BEACON_PUSH_IMAGE:-ghcr.io/meshcore-beacon/beacon-push:1.0}
     container_name: beacon-push
     env_file: .env
     environment:
