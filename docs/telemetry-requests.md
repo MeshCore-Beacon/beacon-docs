@@ -195,11 +195,13 @@ transaction, and the server rebuilds it if an earlier build was cut short.
 
 ## Observers
 
-A repeater that is also an observer (its public key sends status over MQTT) reports its own
-battery, noise floor and airtime, so Beacon never polls it. Creating a request for one answers
+A repeater that is also an observer (its public key sent status over MQTT in the last 7 days)
+reports its own battery, noise floor and airtime, so Beacon does not poll it. An observer that
+has sent no status for 7 days counts as a plain repeater again. Creating a request for one answers
 `422 observer_node`. Every hour Beacon turns off the waiting and active requests on such a
 repeater with the reason code `observer`, which also covers a repeater that becomes an observer
-after it was requested. `enabled: true` on such a request answers `422 observer_node`.
+after it was requested. `enabled: true` on such a request answers `422 observer_node` until the observer has been quiet
+for 7 days.
 
 ## Admin routes
 

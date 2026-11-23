@@ -1409,7 +1409,7 @@ for a live claim). The same `poller` object is in the create and update answers.
 | `admin_stopped` | `admin_stopped` | The password gave admin access and Beacon deleted it. |
 | `admin_stopped` | `blank_blocked` | The repeater gives admin access to a blank login; a guest password is needed. |
 | `disabled` | `offline` | No observer heard the repeater for `statusReasonDays` days. Only a `waiting` or `active` request becomes `disabled`; `login_failed` and `admin_stopped` keep their status and code. |
-| `disabled` | `observer` | The repeater is also an observer, which reports its own telemetry over MQTT, so it is never polled. A `waiting` or `active` request on it becomes `disabled` and cannot be enabled again. |
+| `disabled` | `observer` | The repeater is also an observer that sent status over MQTT in the last 7 days, so it reports its own telemetry and is not polled. A `waiting` or `active` request on it becomes `disabled`, and `enabled: true` is refused until the observer has sent no status for 7 days. |
 | any | `other` | A reason the server has no code for. Show `statusReason`. |
 
 `statusReason` is the English sentence for the same reason.
@@ -1451,7 +1451,7 @@ DELETE /api/v1/me/telemetry-requests/{id}
 | 409 | `request_limit` | The user holds `limit` requests. |
 | 409 | `no_password_blocked` | The repeater gives admin to a blank login, so a request needs a guest password. Also when removing the password on such a repeater. |
 | 422 | `not_a_repeater` | The node is not a repeater or room server. |
-| 422 | `observer_node` | The node is also an observer, which reports its own telemetry. Answered on create, and on `enabled: true`. |
+| 422 | `observer_node` | The node is also an observer that sent status in the last 7 days, so it reports its own telemetry. Answered on create, and on `enabled: true`. |
 | 422 | `password_invalid` | The password is not 1 to 15 bytes without a zero byte. |
 | 422 | `invalid_input` | Another value is out of range, or `enabled` is `false`. |
 
