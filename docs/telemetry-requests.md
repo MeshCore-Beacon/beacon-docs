@@ -141,7 +141,7 @@ seat a withdrawn target frees, in the same answer.
 | `active` | An observer polls it, or the requests ride on a poll that is already set. | none |
 | `login_failed` | The repeater did not accept the guest password, or a blank or hello login. | `login_failed`, `blank_login_failed` |
 | `admin_stopped` | The repeater answered with admin access. | `admin_stopped`, `blank_blocked` |
-| `disabled` | Nobody heard the repeater for `polling.offline_disable_days` days. | `offline` |
+| `disabled` | Nobody heard the repeater for `polling.offline_disable_days` days, or the repeater is also an observer. | `offline`, `observer` |
 
 The profile also shows the poller's name, the state its own claim reports for the repeater
 (`poller.state`, or `not_claimed` when the claim does not list it) and when the newest trusted reading arrived. Only a new
@@ -192,6 +192,14 @@ status and reason while the repeater is unheard, because only a new password res
 Migration `080` adds an index on `polling_targets.active_request_id`, so deleting a request does
 not scan every repeater ever requested. It is built with `CREATE INDEX CONCURRENTLY`, outside a
 transaction, and the server rebuilds it if an earlier build was cut short.
+
+## Observers
+
+A repeater that is also an observer (its public key sends status over MQTT) reports its own
+battery, noise floor and airtime, so Beacon never polls it. Creating a request for one answers
+`422 observer_node`. Every hour Beacon turns off the waiting and active requests on such a
+repeater with the reason code `observer`, which also covers a repeater that becomes an observer
+after it was requested. `enabled: true` on such a request answers `422 observer_node`.
 
 ## Admin routes
 

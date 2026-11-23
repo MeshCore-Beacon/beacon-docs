@@ -159,6 +159,7 @@ curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: applica
   already in the config adds nothing to the count. If you later add keys to the config and the
   two lists go over 16 at startup, Beacon logs an error and sends only the first 16, config
   first. Shorten one of the lists.
+- A repeater that is also an observer is never polled. It reports its own readings over MQTT.
 - A blocked observer is ignored. Beacon drops its claims and readings, its owners answer is empty
   and its policy has `observer_blocked: true`, so the device stops. Unblock it by setting
   `blocked` to `false`.
