@@ -953,7 +953,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "mapTelemetry": true, "appDeviceLabel": true },
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "atlas7d": true, "mapTelemetry": true, "appDeviceLabel": true },
   "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
   "limits": { "atlas": 20 }
 }
@@ -980,6 +980,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `alertChannels` | `{"email": bool, "push": bool}`: the channels this server sends alerts by. Always present. |
 | `push` | `{"server": "https://push.meshcorebeacon.ca", "pushId": "inst_…"}`: the push server the app gets a device handle from, and this server's Push ID there. Present only while `alertChannels.push` is true. See [Push delivery](#push-delivery). |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
+| `atlas7d` | True when the server accepts the `7d` range on [`/me/atlas`](#atlas-sync). Always true on servers that have it. |
 | `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
 | `appDeviceLabel` | True when `POST /auth/app/token` takes a `deviceLabel`. Always true on servers that have it. The app sends one only when this is true: an older server refuses the unknown field. |
 
@@ -998,7 +999,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 
 The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `mapTelemetry` as `false` (hide the toggle), a missing `appDeviceLabel` as `false`, a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `atlas7d` as `false` (do not offer `7d` or send it; a saved `7d` Atlas shows and sends `3d`), a missing `mapTelemetry` as `false` (hide the toggle), a missing `appDeviceLabel` as `false`, a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1324,7 +1325,10 @@ GET /api/v1/me/atlas
   ] }
 ```
 
-`range` is `24h` or `3d`. A node pin has `publicKey` and `id`; an observer pin has
+`range` is `24h`, `3d` or `7d`; `7d` only on a server that reports `features.atlas7d`. At `7d` a
+client reads `168h` in hourly buckets: `/nodes/{id}/activity?range=168h`, and
+`/observers/{id}/activity`, `/observers/{id}/telemetry` and `/nodes/{id}/telemetry` with
+`range=168h&interval=1h`. A node pin has `publicKey` and `id`; an observer pin has
 `observerPublicKey`. `observerId` is the observer record with that key, or `null`. `tiles` (exactly
 four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard`, `observer` or `telemetry`, node pins only) are left out when not set.
 `telemetryTiles` (node pins only) is exactly four distinct ids from `battery`, `noise`, `uptime`,

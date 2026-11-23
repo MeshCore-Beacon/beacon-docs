@@ -8,7 +8,7 @@ with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
 ## What is stored, and where
 
 Cards live only in the visitor's browser, under the localStorage key `beacon-atlas-v2`: each
-card's kind, ID, last known name, card order and the activity window (24h or 3d). A node card also
+card's kind, ID, last known name, card order and the activity window (24h, 3d or 7d). A node card also
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
 A card whose Observer view tiles were changed also keeps its four tiles (see
 [Choosing the Observer tiles](#choosing-the-observer-tiles)), and a node card pinned to open on
@@ -52,13 +52,19 @@ The Analytics and Observer views end in a one-line footer. It never wraps: text 
 is cut short, and the info tip at its end lists every fact in full, with absolute times, followed
 by the help text. While a view's data is loading, or when it fails to load, the line says so.
 
+Clicking a tile's graph on the web, or tapping it in the app, opens a large graph of that metric
+with exact values and zoom.
+
+The window is 24 hours, 3 days or 7 days. 7 days is offered only on a server that reports
+`features.atlas7d`; on a server without it, an Atlas saved at 7 days shows 3 days.
+
 A node card opens on **Analytics** unless it is pinned to another tab (see
 [The tab a card opens on](#the-tab-a-card-opens-on)). Analytics is the Analytics Signal row for
 that node over the selected window:
 
 - **Observations**: stored receptions of packets originating from that key. The count and the
-  hourly bars come from hourly totals the server keeps for the selected window (24 hours or 3
-  days), so a busy node is counted in full rather than cut off at its newest receptions. Hours
+  hourly bars come from hourly totals the server keeps for the selected window (24 hours, 3
+  days or 7 days), so a busy node is counted in full rather than cut off at its newest receptions. Hours
   the server has not covered are left empty rather than drawn as zero, and the tile then says
   "Partial history" in place of the window.
 - **Mean SNR / Mean RSSI**: averages of the observers' last-hop measurements, with an hourly
@@ -187,7 +193,7 @@ card imported elsewhere shows as no longer known.
 On a server with accounts on, a signed-in user's Atlas is stored on the server, so the web and the
 mobile app show the same cards. Signed out, nothing changes and the local copy is used as above.
 
-- The server keeps the range (24h or 3d) and ordered pins up to its configured limit. Each pin is
+- The server keeps the range (24h, 3d or 7d) and ordered pins up to its configured limit. Each pin is
   stored by public key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
   observer pin whose key now has a node record is returned as a node pin; if that node is already
   pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
