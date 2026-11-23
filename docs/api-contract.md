@@ -937,7 +937,10 @@ A list item:
 }
 ```
 
-`pathHashes` and `snrValues` come from the most complete observation. The detail is
+`pathHashes` and `snrValues` come from the observation with the most reached hops.
+`pathHashes` lists the requested hops. Each SNR value, including zero, confirms one
+leading hop on that path. The overview shows that prefix, up to the shorter of the
+two arrays. Packet detail keeps the full requested path. The detail response is
 `{ traceTag, packets }`, one entry per packet: `{ packetHash, routeType, routeTypeName, scope, firstHeardAt,
 lastHeardAt, rawPath, resolvedRoute }`. `rawPath` is `[{ hash, snr }]` as received; `resolvedRoute` uses the
 resolved hop shape from packet detail.
