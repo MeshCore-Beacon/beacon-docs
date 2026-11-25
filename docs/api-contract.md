@@ -362,7 +362,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/telemetry/latest` | The newest battery and temperature of every polled node, for map labels. See [Latest node telemetry](#latest-node-telemetry). |
 | `GET /nodes/{nodeId}/polling` | Which observer polls the node and when it last got a trusted reading. See [Node polling](#node-polling). |
 
-`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
+`/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `poller` (`true` keeps only nodes with a stored polling claim, `false` drops them, omit for no filter; any other value is a `400`), `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `isPoller` (`true` when the node's public key has a stored polling claim, so it is an observer running polling firmware, assigned to a repeater or not; see [repeater polling](repeater-polling.md#what-beacon-stores)), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
 
 Sorted node lists (2.1.0): `sort` is `lastSeen` (the default), `name`, `type` or `neighbors`, and `order` is `asc` (the default) or `desc`. `lastSeen` defaults to `desc`, the newest-first list; from 2.1.1 it also takes `asc`, oldest heard first, which is a sorted list like the others (a server before 2.1.1 answers it with a `400`). Every page says which order it is in with `sort` and `order` (`lastSeen` and `desc` by default). The orders match what the web's node table shows:
 
@@ -2008,6 +2008,7 @@ Connections with `includeRepeats` also get repeats, which have `packet.isRepeat:
     "lat": 45.3,
     "lng": -75.9,
     "isObserver": false,
+    "isPoller": false,
     "iatas": [{ "iata": "YOW", "lastHeard": 1747665462000 }],
     "defaultScope": "#bc",
     "radio": "910.525,62.5,7",
@@ -2016,7 +2017,7 @@ Connections with `includeRepeats` also get repeats, which have `packet.isRepeat:
 }
 ```
 
-`lat`/`lng` omitted means the advert had no position (keep the one you have); `null` means the advert cleared it. `iatas` holds only the IATA that heard this advert, so merge it into what you have. `possiblyForeign` is only sent when `nodes.mark_foreign` is on. `defaultScope` and `radio` are omitted when unknown.
+`lat`/`lng` omitted means the advert had no position (keep the one you have); `null` means the advert cleared it. `iatas` holds only the IATA that heard this advert, so merge it into what you have. `isPoller` is `true` when the node has a stored polling claim. `possiblyForeign` is only sent when `nodes.mark_foreign` is on. `defaultScope` and `radio` are omitted when unknown.
 
 **`channelMessage`**: a group text was decrypted into a new message. The `data` is the same shape as a REST message (see [Channels and messages](#channels-and-messages)) plus `channelId`, without `observationCount`.
 
