@@ -129,6 +129,8 @@ call the API with `include=untrusted`, for example
 `/api/v1/nodes/{nodeId}/telemetry?range=168h&include=untrusted`. The answer also says how many
 readings it left out. See the [API contract](api-contract.md#node-telemetry).
 
+A Poller tag means a stored claim exists for that observer, whether or not it is assigned a repeater. The hourly cleanup removes a claim about a day after the last one received, and the tag goes with it. Claims from a blocked observer are not stored. An observer blocked after claiming keeps the tag until its claim is cleaned up. With polling off no new claims are stored, so existing tags clear within about a day. The API carries it as `isPoller` on nodes, and `GET /nodes` takes `poller=true|false`.
+
 A gap in a chart means there is no usable value for that series in that bucket. The cause can be the poll cadence (status values arrive every few hours), a field the repeater does not report, a counter that was inconsistent and was dropped, or a missed poll. It does not mean the repeater was down.
 
 ## Pause, exclude and block
