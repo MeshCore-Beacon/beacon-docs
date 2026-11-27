@@ -20,14 +20,18 @@ Beacon has no health endpoint yet. Use these instead:
 ## Logs
 
 Logs go to stderr and Docker collects them. Docker's default `json-file` driver does not
-rotate, so on a long-running host set a cap, either in `/etc/docker/daemon.json` for every
-container or per service in `docker-compose.yml`:
+rotate on its own, so the deployment templates cap every service at three files of 10 MB (see
+[Bounded container logs](#bounded-container-logs)). To keep more, change the `logging` block in
+`docker-compose.yml` and recreate the container:
 
 ```yaml
     logging:
       driver: json-file
       options: { max-size: "50m", max-file: "5" }
 ```
+
+A compose file of your own without that block does not rotate at all; add it, or set the cap
+for every container in `/etc/docker/daemon.json`.
 
 Set `log.level` (`debug`, `info`,
 `warn`, `error`; default `info`) and `log.format` (`text` or `json`) in `config.yaml`, or
@@ -37,6 +41,11 @@ Every record has a `component`. Ingest records add the broker name; HTTP complet
 add the validated client address, route, status and duration. Query strings and WebSocket
 hello payloads are never logged. Expected ingest skips and routine WebSocket lifecycle events
 are at debug level.
+
+At startup the server logs one line for each optional feature, which is the quickest way to see
+what is on: `accounts` and `accounts mode`, `repeater polling`, `telemetry requests` (or
+`telemetry requests are off` with a `reason`), `alerts` and `alert channels`. See
+[Accounts, polling, requests and alerts](#accounts-polling-requests-and-alerts).
 
 ```bash
 docker compose logs -f app      # the API and ingest
@@ -55,7 +64,9 @@ Everything persistent is under `data/` next to `docker-compose.yml`:
 - `data/Caddy/data/` holds TLS certificates. Deleting it means a new certificate request on
   the next start, which counts against Let's Encrypt rate limits.
 - `data/app/config.yaml` and `.env` are your configuration. Keep copies of both somewhere
-  else; no backup below includes `.env`.
+  else; no backup below includes `.env`. With the optional features on, `.env` also holds
+  `BEACON_SECRET_KEY`, `BEACON_PUSH_SECRET`, `BEACON_SMTP_PASSWORD` and `BEACON_PORTAL_SECRET`,
+  which exist nowhere else.
 
 ## Channel message backfill
 
@@ -82,8 +93,9 @@ accepted is lost:
 1. It stops taking HTTP requests and lets the ones in flight finish (up to 30 s). At the same
    time, ingest stops reading MQTT and stores what it has queued (up to 20 s).
 2. Background jobs (rollups, retention, read-model upkeep, the channel message backfill, imports)
-   stop on their next check; a statement in flight finishes or is cancelled. Shutdown waits up
-   to 15 s for them, then logs `shutdown: background jobs still running` and goes on.
+   stop on their next check; a statement in flight finishes or is cancelled. With accounts on,
+   the mail worker sends the account mail still queued, for up to 10 s. Shutdown waits up
+   to 15 s for all of them, then logs `shutdown: background jobs still running` and goes on.
 3. Observer and packet presence held in memory is written out (up to 15 s), then the database
    connections close.
 
@@ -104,6 +116,7 @@ if you want more history.
 | `packets.retention` | `168h` (7 days) | Packets, observations and channel messages |
 | `analytics.rollup_retention` | `2160h` (90 days) | Hourly stats rollups. Also the longest window the stats endpoints accept |
 | `telemetry.retention` | `744h` (31 days) | Observer telemetry snapshots |
+| `polling.reading_retention` | `744h` (31 days) | Repeater readings from [repeater polling](repeater-polling.md). At least `1h` |
 | `routes.retention` | `336h` (14 days) | Known routes, counted from when a route was last seen |
 | `nodes.delete_after` | `720h` (30 days) | Nodes not heard from |
 | `observers.delete_after` | off | Observers not heard from. Opt in by setting a duration |
@@ -122,6 +135,31 @@ advert timestamp stays the same, so every advert has the same hash). A later hea
 observer that already reported the packet stores no new observation, but it still counts as
 heard. On a 72 h retention this tail was about 0.5 % of observations.
 
+Account data has its own hourly cleanup with fixed windows (ended sessions, spent links,
+sign-ups never confirmed); see [Cleanup](accounts.md#cleanup).
+
+## Accounts, polling, requests and alerts
+
+These features are off by default and each has its own page: [User accounts](accounts.md),
+[Sign-in through the MeshMapper portal](portal-sign-in.md),
+[Repeater polling](repeater-polling.md), [Requested telemetry](telemetry-requests.md) and
+[Alerts](alerts.md). What they add to day-to-day running is a set of background jobs. Their
+names are the `job` label on `beacon_job_duration_seconds` and the `task` in a `task failed`
+log line. There are no other metrics for these features.
+
+| Job | Every | Runs when | What it does |
+|---|---|---|---|
+| `users_cleanup` | 1 hour | accounts are on | Removes ended sessions, spent or expired links and stale unconfirmed sign-ups |
+| `polling_election` | 1 minute | polling is on | Picks the poller and standbys for each repeater |
+| `polling_corroborate` | 5 minutes | polling is on | Counts how many other observers heard each reading's reply |
+| `polling_cleanup` | 1 hour | always | Removes claims a day after they were received and readings older than `polling.reading_retention`. It runs with polling off too, so what an earlier run stored still ages out |
+| `requests_offline` | 1 hour | telemetry requests are on | Turns off requests for repeaters no observer has heard for `polling.offline_disable_days` |
+| `alerts_eval` | 5 minutes | an alert channel can send | Evaluates the alert rules |
+| `alerts_send` | 1 minute | an alert channel can send | Sends queued alert mail and push notices |
+
+Account mail (confirmation, reset and notice mail) is not a job. A worker sends it as it is
+queued, and a failure is logged as `mail not sent`.
+
 ## Backing up
 
 Two options.
@@ -133,7 +171,10 @@ docker compose exec -T db pg_dump -U beacon -d beacon -Fc > beacon-$(date +%F).d
 ```
 
 Keep `data/app/config.yaml` and `.env` with it. The dump holds message data and anything you
-have decrypted, so treat it as private.
+have decrypted. With accounts on it also holds user email addresses, password hashes, sessions,
+alert rules, push device keys and the sealed guest passwords of telemetry requests, so treat it
+as private. The sealed passwords can only be read with `BEACON_SECRET_KEY` from `.env`; see
+[If BEACON_SECRET_KEY is lost or changed](telemetry-requests.md#if-beacon_secret_key-is-lost-or-changed).
 
 **The admin backup endpoint** produces an archive of the database and the saved
 `config.yaml`, with a manifest and checksums, and a command-line tool that verifies it. It is
@@ -561,8 +602,9 @@ On a deployment that had untyped observations, the backfill corrects two things:
 per-observer payload breakdown's unknown (`-1`) bucket shrinks into the real types, and route
 evidence starts to include those rows.
 
-Don't upgrade to a release that drops `idx_observations_observer_id` until the progress query
-shows `"done": true`.
+Migration `046` drops `idx_observations_observer_id`, so a server upgraded straight from before
+`034` gets both in one start. The adverts pages answer `503` until the progress query shows
+`"done": true`.
 
 Going back to the previous server image needs nothing here. Older servers ignore the
 `observation_payload_type` key, and rows the job typed stay typed, which older servers read the
@@ -719,7 +761,7 @@ of the same name on `(iata)`; leave it in place.
 `channel_message_iatas` is a small table with one row for each channel message and each site
 that heard it. Each row also copies the message's channel and its packet's scope. Ingest keeps
 it up to date, and a background reconcile repairs it every 5 minutes. On a large deployment it
-takes about 125-155 MB with its six indexes.
+takes about 125-155 MB with its seven indexes (the primary key and six more).
 
 While the server process trusts the table, these channel message pages read it:
 
@@ -1520,7 +1562,7 @@ scrape_configs:
 | `beacon_ingest_rejected_total` | counter | `reason` | MQTT messages refused before queueing for size (`envelope_size`: over 64 KiB, or a topic over 256 bytes), and neighbour report entries skipped as malformed (`neighbor_shape`) |
 | `beacon_stream_dropped_total` | counter | `queue` | Live events dropped from a full queue (`global`, `repeat`, `client`) |
 | `beacon_job_duration_seconds` | histogram | `job` | Background job run time (`cleanup`, `analytics_rollup`, `reconfirm`, `route_retention`, ...) |
-| `beacon_job_rows_total` | counter | `job` | Rows removed by background jobs, today `reconfirm` and `route_retention` |
+| `beacon_job_rows_total` | counter | `job` | Rows a background job removed (`reconfirm`, `route_retention`), typed (`payload_type_backfill`) or visited (`packet_sites.sweep`) |
 | `beacon_index_bytes` | gauge | `index` | Size of each index, hourly |
 | `beacon_index_bloat_ratio` | gauge | `index` | Bytes per row against the last rebuild, hourly. See [Index health](#index-health). |
 | `beacon_pg_wal_bytes_total` | counter | | WAL written, cluster-wide |

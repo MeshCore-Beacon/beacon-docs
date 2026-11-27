@@ -43,6 +43,8 @@ The single Go binary connects to both MeshCore MQTT brokers over WSS with SUBSCR
 
 The same binary serves REST API endpoints for historical queries, hitting Redis first and falling back to Postgres on misses. Caddy terminates TLS and reverse-proxies HTTP and WebSocket traffic to the Go binary. Web and mobile clients connect through Caddy.
 
+Three optional paths are not in the diagram below. With repeater polling on, observer firmware calls the same binary over HTTPS at `/api/guest-polling` for its policy and role, and publishes claims and readings on the brokers alongside packets. With accounts on, clients sign in under `/api/v1/auth` and `/api/v1/me`. With push alerts on, the binary makes outbound calls to the push server. See [Accounts, polling, telemetry requests and alerts](#accounts-polling-telemetry-requests-and-alerts).
+
 ### Diagram
 
 ```
@@ -222,7 +224,7 @@ This lets the UI show which repeaters have proven minimum firmware versions and 
 
 ### MeshCore decoder
 
-We use **`github.com/meshcore-go/meshcore-go`** (MIT, pure Go, v1.0.6 as of May 2026) for all packet decoding. It implements the actual LoRa over-the-air protocol that we receive via MQTT, not the host-to-device companion protocol. Key features for our purposes:
+We use **`github.com/meshcore-go/meshcore-go`** (MIT, pure Go, v1.0.8) for all packet decoding. It implements the actual LoRa over-the-air protocol that we receive via MQTT, not the host-to-device companion protocol. Key features for our purposes:
 
 - **`PacketFromBytes([]byte)`** parses the full wire format: header byte → optional transport codes (FLOOD/DIRECT) → path_length byte (hash_size + hop_count) → path bytes → payload
 - **`PacketHash()`** computes the canonical content-based dedup hash: SHA256(payload_type + [path_length for traces] + payload) truncated to 8 bytes. Matches the firmware's `Packet::calculatePacketHash`. This is exactly the `packet_hash` column in our `packets` table.
@@ -264,6 +266,7 @@ Reference: `github.com/michaelhart/meshcore-decoder` (TypeScript, used by letsme
 | `0x08` | Returned path       | route discovery                                    |
 | `0x09` | Trace               | path tracing with SNR per hop                      |
 | `0x0A` | Multi-part packet   | sequence of packets exceeding MTU                  |
+| `0x0B` | Control             | control and discovery packets                      |
 | `0x0F` | Custom packet       | raw, custom encryption                             |
 
 ---
@@ -613,7 +616,7 @@ CREATE TABLE trace_iatas (
 CREATE INDEX idx_trace_iatas_iata ON trace_iatas(iata, last_heard DESC);
 
 -- Channel decryption keys, loaded from the server config file on startup.
--- Adding or rotating a key requires updating the config and restarting (or SIGHUP).
+-- Adding or rotating a key requires updating the config and restarting.
 CREATE TABLE channel_keys (
   channel_id INT PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
   key_bytes  BYTEA NOT NULL,
@@ -662,6 +665,7 @@ bounded batches:
 | Packets, observations, channel messages | `packets.retention` (minimum `24h`) | `168h` (7 days) |
 | Hourly analytics rollups | `analytics.rollup_retention` (minimum `24h`) | `2160h` (90 days) |
 | Observer telemetry | `telemetry.retention` | `744h` (31 days) |
+| Repeater readings from polling | `polling.reading_retention` (minimum `1h`), enforced by the hourly polling cleanup task | `744h` (31 days) |
 | Nodes not heard from | `nodes.delete_after` | `720h` (30 days) |
 | Observers not heard from | `observers.delete_after` | off (opt in; only with one ingest process per database) |
 | Known routes | `routes.retention` / `routes.grace` / `routes.min_observations` | `336h` / `168h` / `3`, enforced by the route retention task, run every `background.reconfirm` |
@@ -689,7 +693,8 @@ unclean shutdown loses at most one interval of freshness, never packets or obser
 
 ### MeshMapper integration
 
-Optional, no API key, all under `meshmapper:` and off by default:
+Optional, all under `meshmapper:` and off by default. Refreshes need a MeshMapper API key in
+`MESHMAPPER_API_KEY`; see [MeshMapper API key](configuration.md#meshmapper-api-key).
 
 - `scopes` imports each known IATA's transport scope names from its MeshMapper site
   (`get_scopes.php`). Manual `scopes:` stay authoritative. Refresh `1h`–`24h`.
@@ -702,6 +707,40 @@ Optional, no API key, all under `meshmapper:` and off by default:
 Sources are discovered per known IATA from MeshMapper's per-country zone list; there is nothing to
 list by hand. Imports and ETags persist in Postgres, and a failed refresh keeps the last good data.
 Out-of-range intervals fail startup.
+
+### Accounts, polling, telemetry requests and alerts
+
+Added in 2.3.0, all off by default. Each has its own page; this is only how they fit together.
+
+- **[User accounts](accounts.md).** `accounts.mode: local` gives sign-up by email, sessions and
+  password reset. `accounts.mode: portal` signs users in through the MeshMapper portal instead
+  ([Sign-in through the MeshMapper portal](portal-sign-in.md)). Routes are under `/api/v1/auth`
+  and `/api/v1/me`. Account mail goes out through the `mail` block.
+- **Atlas sync.** A signed-in user's Atlas is stored on the server and follows the account
+  ([Atlas](atlas.md#sync-to-an-account)).
+- **[Repeater polling](repeater-polling.md).** Observer firmware asks Beacon for its policy and
+  role over HTTPS (`/api/guest-polling/policy` and `/owners`), publishes a claim of the repeaters
+  it can poll and then the readings, both over MQTT. Beacon elects one poller per repeater every
+  minute and stores the readings. It never talks to a repeater itself.
+- **[Requested telemetry](telemetry-requests.md).** A signed-in user asks for a repeater to be
+  polled. Beacon hands it to an observer that hears it, with the guest password sealed under
+  `BEACON_SECRET_KEY` and encrypted to that observer.
+- **[Alerts](alerts.md).** Rules on a user's Atlas radios are evaluated every 5 minutes and sent
+  every minute, by email and by push. Push goes through the MeshCore Beacon push server, which
+  forwards to Apple and Google; the Beacon server holds no Apple or Firebase key.
+
+Tables these add, in migrations `064` to `087` (the DDL above predates them):
+
+| Area | Tables |
+|---|---|
+| Polling | `polling_claims`, `polling_candidates`, `polling_assignments`, `polling_targets`, `polling_observers`, `polling_state`, `polling_other_states`, `polling_admin_stops`, `polling_served_versions`, `repeater_readings` |
+| Accounts | `users`, `user_sessions`, `user_tokens`, `portal_states` |
+| Atlas sync | `user_atlas`, `user_atlas_pins` |
+| Telemetry requests | `telemetry_requests` |
+| Alerts | `user_alert_rules`, `user_devices`, `alert_outbox`, `alert_outbox_devices`, `alert_passes`, `node_clock_drifts` |
+
+Their background jobs are listed in
+[Operations](operations.md#accounts-polling-requests-and-alerts).
 
 ### Configuration
 
@@ -721,13 +760,19 @@ MQTT_BROKER_2_URL=wss://mqtt2.meshcore.ca:443
 MQTT_BROKER_2_USERNAME=...
 MQTT_BROKER_2_PASSWORD=...
 BEACON_API_KEY=...            # optional admin bearer key
+MESHMAPPER_API_KEY=...        # optional, for MeshMapper imports
+BEACON_SECRET_KEY=...         # optional, seals guest passwords for telemetry requests
+BEACON_SMTP_PASSWORD=...      # optional, SMTP login for account and alert mail
+BEACON_PORTAL_SECRET=...      # optional, portal sign-in
+BEACON_PUSH_SECRET=...        # optional, push alerts
 LOG_LEVEL=info                # optional, overrides log.level
 LOG_FORMAT=text               # optional, overrides log.format
 ```
 
 **YAML config** (`config.yaml`, snake_case keys) for everything else: IATA overrides, regions,
 channel keys, transport scopes, retention, rate limits, WebSocket limits, trusted proxies, CORS,
-cache TTLs, MeshMapper imports, and the ingest geo filter. A short sample:
+cache TTLs, MeshMapper imports, the ingest geo filter, and the optional `polling`, `mail`,
+`accounts`, `alerts`, `atlas` and `display` blocks. A short sample:
 
 ```yaml
 regions:
@@ -767,8 +812,14 @@ Channel hashes also auto-populate as messages arrive; adding a key in the config
 
 Public reads and the WebSocket need no credentials. The `/api/v1/admin/*` subtree requires
 `Authorization: Bearer <key>` with the key from `BEACON_API_KEY` or `auth.api_key`; with no key set it
-returns 503. It currently covers inspecting the running config and replacing CORS origins at runtime,
-operator account records (no login or sessions yet), and the backup download below.
+returns 503. It covers inspecting the running config and replacing CORS origins at runtime
+(`/admin/config`), operator account records (`/admin/accounts`; operators have no login of their
+own, the key is the only admin credential), user management (`/admin/users`), the polling pause,
+exclusions and observer flags (`/admin/polling`), statement statistics and plan checks
+(`/admin/db`), and the backup download below (`/admin/backup`).
+
+User sign-in is separate: with accounts on, `/api/v1/auth` and `/api/v1/me` use a session cookie
+or an app token, not the admin key. See [User accounts](accounts.md).
 
 `/api/v1/*` is rate limited per client IP (`ratelimit:`, 600/min by default, IPv6 grouped by /64).
 WebSocket upgrades have their own per-IP rate and concurrency limits and a same-origin check
@@ -917,7 +968,7 @@ Covers REST endpoints (`/api/v1/`), auth and rate limits, WebSocket protocol (`/
 ### Channels
 - List: `SELECT * FROM channels ORDER BY last_seen DESC`
 - Per-channel page: paginated `channel_messages` with decrypted content where `key_known`. These are the actual chat messages (payload type 0x05) sent to a channel, distinct from other packet types.
-- **Key management:** channel keys are defined in the server config file. Adding or rotating a key requires updating the config and restarting (or sending `SIGHUP`). On startup, the service retroactively decrypts any existing packets that now have a known key.
+- **Key management:** channel keys are defined in the server config file. Adding or rotating a key requires updating the config and restarting. On startup, the service retroactively decrypts any existing packets that now have a known key.
 
 ### Nodes List
 - Three tabs filtered by `node_type`: Repeaters, Room Servers, Companions
@@ -989,7 +1040,8 @@ Already shipped from this list: the trace explorer (Traces tab, with per-hop SNR
 
 ### Web-based admin UI
 The admin API exists (see [Admin API and access control](#admin-api-and-access-control)), but there is
-no login or browser UI yet. A future version could add:
+no operator login or browser UI yet; users can sign in, operators still use the admin key. A
+future version could add:
 
 - Operator login and sessions built on the existing account records
 - Write endpoints for regions, channel keys, and retention overrides
