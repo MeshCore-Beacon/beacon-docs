@@ -182,6 +182,8 @@ readings it left out. See the [API contract](api-contract.md#node-telemetry).
 
 A Poller tag means a stored claim exists for that observer, whether or not it is assigned a repeater. The hourly cleanup removes a claim about a day after the last one received, and the tag goes with it. Claims from a blocked observer are not stored. An observer blocked after claiming keeps the tag until its claim is cleaned up. With polling off no new claims are stored, so existing tags clear within about a day. The API carries it as `isPoller` on nodes, and `GET /nodes` takes `poller=true|false`.
 
+An observer with the Poller tag also gets a Poller view on its node, beside Node and Observer, in Beacon Web and in the mobile app. It shows how many of its 8 slots are used (its owner's own repeaters and requested ones), how many are free, when Beacon last received its claim, and one row for each repeater it holds: whether it is the poller, a standby or not assigned, the state it reports, its last reply and SNR, and how many of the repeater's adverts Beacon heard through it. Anyone who can open the node can see this, including which repeaters are requested and a `login_failed` or `admin_stop` state. The API route is `GET /nodes/{nodeId}/poller`, see the [API contract](api-contract.md#node-poller).
+
 A gap in a chart means there is no usable value for that series in that bucket. The cause can be the poll cadence (status values arrive every few hours), a field the repeater does not report, a counter that was inconsistent and was dropped, or a missed poll. It does not mean the repeater was down.
 
 ## Pause, exclude and block

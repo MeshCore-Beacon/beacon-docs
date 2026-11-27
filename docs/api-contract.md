@@ -362,6 +362,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/{nodeId}/telemetry?range=168h&interval=6h` | Repeater readings of a polled node, bucketed for charts. See [Node telemetry](#node-telemetry). |
 | `GET /nodes/telemetry/latest` | The newest battery and temperature of every polled node, for map labels. See [Latest node telemetry](#latest-node-telemetry). |
 | `GET /nodes/{nodeId}/polling` | Which observer polls the node and when it last got a trusted reading. See [Node polling](#node-polling). |
+| `GET /nodes/{nodeId}/poller` | For a node that is a poller: how many of its slots are used and the repeaters it polls. See [Node poller](#node-poller). |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `poller` (`true` keeps only nodes with a stored polling claim, `false` drops them, omit for no filter; a value that is not a boolean answers `400`), `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `isPoller` (`true` when the node's public key has a stored polling claim, so it is an observer running polling firmware, assigned to a repeater or not; see [repeater polling](repeater-polling.md#seeing-the-readings)), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
 
@@ -546,6 +547,69 @@ Who polls this node right now. A `400` for a `nodeId` that is not a UUID and a `
 | `standbys` | The other assigned observers, in rank order, each with `observerId`, `name` and `rank` (1, 2, ...). An empty array when there are none. The poller has no `rank` field. |
 
 `name` is the observer's display name, or the first 8 hex characters of its public key when it has none.
+
+#### Node poller
+
+```
+GET /api/v1/nodes/{nodeId}/poller
+```
+
+The other side of [Node polling](#node-polling): what an observer that polls says it holds, read from its last stored [claim](#claim-message). A `400` for a `nodeId` that is not a UUID and a `404` for an unknown node. A node with no stored claim answers `{"claim":null,"readings24h":0,"targets":[]}`. With polling off the route still checks the node (an unknown node is a `404`) and then gives that same answer. Not cached.
+
+```json
+{
+  "claim": {
+    "receivedAt": 1795800000000,
+    "live": true,
+    "acceptsRequests": true,
+    "slots": { "max": 8, "used": 5, "own": 3, "requested": 2, "free": 3 }
+  },
+  "readings24h": 212,
+  "targets": [
+    {
+      "nodeId": "3d0a8a8e-1c55-4c0b-9f0e-6a1f0b7f2c11",
+      "publicKey": "5be1c07a...",
+      "name": "Hilltop R2",
+      "requested": false,
+      "role": "poller",
+      "rank": 0,
+      "state": "ok",
+      "misses": 0,
+      "lastAttempt": 1795799000000,
+      "lastOk": 1795799000000,
+      "claimedSnr": 9.5,
+      "evidenceSnr": 8.1,
+      "evidenceCount": 14,
+      "latestReadingAt": 1795799000000
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `claim` | The observer's last stored claim, or `null` when it has none. |
+| `claim.receivedAt` | When Beacon received it, epoch ms. |
+| `claim.live` | True while the claim is within its 65 minutes. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
+| `claim.acceptsRequests` | The observer takes repeaters handed out by [telemetry requests](#telemetry-requests). |
+| `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is the free seats the claim reported, never more than `max` minus `used`. `used` plus `free` can be less than `max`. |
+| `readings24h` | Readings Beacon received from this observer in the last 24 hours, trusted or not. |
+| `targets` | One entry for each repeater in the claim. Assigned ones first in rank order, then the rest; within a tie by name, with unnamed ones last. An empty array when there are none. |
+
+Each target:
+
+| Field | Notes |
+|---|---|
+| `nodeId`, `name` | The repeater's node, when Beacon has one for the key. Otherwise both are `null`. `name` is also `null` for a node without a name. |
+| `publicKey` | The repeater's key, 64 lowercase hex. |
+| `requested` | True when the observer was given the repeater by a telemetry request, false when its owner set it up. |
+| `role`, `rank` | From the last election: `poller` with rank `0`, `standby` with rank `1` and up, or `unassigned` with `rank` `null`. |
+| `state` | As the observer reported it: `pending`, `ok`, `no_reply`, `login_failed`, `admin_stop` or `not_direct`. Empty from firmware without request support. A newer firmware may send other values. |
+| `misses` | Failed polls in a row. |
+| `lastAttempt`, `lastOk` | Epoch ms, or `null` when never. |
+| `claimedSnr` | The SNR the observer reports for the repeater, or `null`. |
+| `evidenceSnr`, `evidenceCount` | Zero-hop adverts of the repeater that Beacon saw through this observer in the day before the last election: their mean SNR and how many. `null` and `0` for an unassigned repeater or one with no such adverts. |
+| `latestReadingAt` | `sampledAt` of the newest reading this observer delivered for the repeater, trusted or not. `null` when it has delivered none. |
 
 #### MeshMapper repeater details
 
