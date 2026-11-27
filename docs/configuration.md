@@ -340,6 +340,9 @@ the key.
 | `offline_disable_days` | `7` | 1 to 365 | Days no observer hears a repeater before its requests are turned off. |
 | `request_observers` | `all` | `all` or `approved` | Which observers may be handed a requested repeater and its guest password. `all`: any observer with advert evidence for the repeater. `approved`: only observers you approved. Advert evidence is required in both modes. Set `approved` if you want to vet observers first. See [Approve observers](telemetry-requests.md#approve-observers). |
 
+The number of repeaters one observer polls is not a setting: the firmware holds 8. See
+[Fixed limits](repeater-polling.md#fixed-limits).
+
 Telemetry requests also need accounts on and `BEACON_SECRET_KEY`; see
 [Requested telemetry](telemetry-requests.md#turn-it-on). The gates are checked in this order:
 polling on, `requests_per_user` above `0`, accounts on, then the key. The first one that fails turns

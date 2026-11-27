@@ -113,6 +113,26 @@ the target count and the clock. `get poll.status` has one line per target with i
 and `get poll.status <n>` the details of target n. `poll now <key>` sends one poll right away,
 at most once a minute per target.
 
+## Fixed limits
+
+Some limits are built into the observer firmware and the server. They have no setting.
+
+| Limit | Value |
+|---|---|
+| Repeaters one observer polls | 8. This counts the repeaters its owner added and the ones Beacon hands it through [telemetry requests](telemetry-requests.md). |
+| Observers assigned to one requested repeater | 3: one poller and two standbys. |
+| Repeaters an operator can exclude | 16, across the config and the admin route. |
+
+There is no setting for how many repeaters Beacon gives one observer. A requested repeater is only
+handed to an observer that reports a free seat, so an observer whose owner filled all 8 takes no
+requests. To change how much polling happens, use these instead (see
+[Configuration](configuration.md#repeater-polling)):
+
+- `direct_window` sets how often each repeater is polled.
+- `max_requests` sets how many poll attempts a repeater gets in each window.
+- `requests_per_user` sets how many repeaters one user may ask for.
+- `request_observers: approved` limits which observers take requests at all.
+
 ## What Beacon stores
 
 | Data | Kept for |
