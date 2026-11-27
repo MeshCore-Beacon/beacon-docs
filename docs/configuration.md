@@ -336,7 +336,7 @@ the key.
 | `excluded_nodes` | none | up to 16 | Repeater public keys, 64 hex characters each, that are never polled. |
 | `paused` | `false` | | Tells every observer to stop. Overrides the admin route. |
 | `authority` | `evidence` | `evidence` or `approved` | Who can be elected to poll. `evidence`: any observer, ranked on the advert evidence it reports. `approved`: only observers approved through the admin route. See [Trust](repeater-polling.md#trust). |
-| `evidence_window` | `168h` | `24h` to `720h` | How far back a repeater's zero-hop adverts count as advert evidence that an observer hears it. Adverts older than `packets.retention` are gone, so a longer window adds nothing. Raise both if your repeaters advert less than weekly and you use telemetry requests. |
+| `evidence_window` | `168h` | `24h` to `720h` | How far back a repeater's zero-hop adverts count as advert evidence that an observer hears it. Adverts older than `packets.retention` are gone, so a longer window adds nothing. Raise both if your repeaters advert less than weekly. |
 | `requests_per_user` | `6` | 0 to 20 | How many [telemetry requests](telemetry-requests.md) one user may hold. `0` turns requests off. |
 | `offline_disable_days` | `7` | 1 to 365 | Days no observer hears a repeater before its requests are turned off. |
 | `request_observers` | `all` | `all` or `approved` | Which observers may be handed a requested repeater and its guest password. `all`: any observer with advert evidence for the repeater. `approved`: only observers you approved. Advert evidence is required in both modes. Set `approved` if you want to vet observers first. See [Approve observers](telemetry-requests.md#approve-observers). |
