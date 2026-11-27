@@ -19,7 +19,8 @@ for where the readings show up.
 3. The observer publishes a claim to the MQTT broker, listing its targets and how its last
    polls went.
 4. Every minute Beacon ranks the observers that claimed each repeater. Observers it saw hear the
-   repeater's zero-hop adverts in the last 24 hours (advert evidence) come first, by mean SNR,
+   repeater's zero-hop adverts in the last 7 days (advert evidence, `polling.evidence_window`)
+   come first, by mean SNR,
    then by number of adverts. Observers without evidence come after, by the signal they claim.
    One observer is the poller. The others are standbys. With `polling.authority: approved` only
    observers you approved take part (see [Trust](#trust)).
@@ -27,9 +28,12 @@ for where the readings show up.
    newest reading is older than the poll window. A standby waits the window plus one grace period
    for each rank, so it only polls if the poller has not.
 6. The poller publishes the reading to the broker. Beacon stores it. The next owners answer
-   carries the new reading time, which tells every observer the repeater is fresh. Only readings
-   from a ranked observer with advert evidence, poller or standby, move that time. A poller
-   without evidence still polls, but its readings do not hold the standbys back.
+   carries the new reading time, which tells every observer the repeater is fresh. Only trusted
+   readings move that time: those from a ranked observer with advert evidence, poller or
+   standby. When no ranked observer has evidence for the repeater, readings from any of them
+   count, so a repeater that rarely or never adverts is still polled and charted. A poller
+   without evidence, next to a standby that has it, still polls, but its readings do not hold
+   the standbys back.
 
 Evidence comes before health. An observer with advert evidence always ranks above one without,
 even when it reports misses. Within each group, an observer that reports 3 or more misses in a row
@@ -175,7 +179,10 @@ and shows readings for room servers too, but the current polling firmware polls 
 
 Only trusted readings are charted. A reading is trusted when its observer was assigned to the
 repeater and Beacon had itself heard the repeater directly through that observer when the reading
-was stored. Readings from any other observer are kept but left out of the charts. To see them,
+was stored. If Beacon had heard the repeater through none of its assigned observers, readings
+from observers whose owner set the repeater as a target are trusted too; a repeater polled
+through a [telemetry request](telemetry-requests.md) always needs the evidence. Readings from
+any other observer are kept but left out of the charts. To see them,
 call the API with `include=untrusted`, for example
 `/api/v1/nodes/{nodeId}/telemetry?range=168h&include=untrusted`. The answer also says how many
 readings it left out. See the [API contract](api-contract.md#node-telemetry).
@@ -265,7 +272,8 @@ approved are. See
 In both modes:
 
 - An observer without advert evidence never outranks one with it, and its readings never stand
-  anyone down.
+  down or get charted beside an observer that has it. They only count while no ranked observer
+  has evidence for the repeater.
 - Claims and readings are rate limited and capped in size per observer, including an hourly
   limit on readings across all its repeaters.
 - Each reading records how many other observers heard the repeater's reply. It is not checked
@@ -288,8 +296,8 @@ are then dropped, and the election moves its repeaters to other observers.
   chain can use nearly all of that on an ESP32. See
   [An RSA certificate for the devices](#an-rsa-certificate-for-the-devices).
 - **The device polls but the charts stay empty.** Only trusted readings are charted, and a
-  reading is trusted only when its observer was assigned to the repeater and Beacon had advert
-  evidence for the pair when the reading was stored. `GET /api/v1/admin/polling/targets` shows
+  reading is trusted only when its observer was assigned to the repeater and either Beacon had
+  advert evidence for the pair when the reading was stored, or no assigned observer had any. `GET /api/v1/admin/polling/targets` shows
   each observer's rank and evidence. Add `include=untrusted` to the node telemetry request to
   see the readings that were left out.
 - **A repeater is never polled after a login.** It answered the device with admin access, so
@@ -306,7 +314,7 @@ are then dropped, and the election moves its repeaters to other observers.
   lists the repeater. Check the observer sent a claim after its last `poll add`, and that it is
   not blocked.
 - **Standbys poll a repeater the poller already polls.** The poller has no advert evidence for
-  it, so its readings do not count as fresh for the others. Once Beacon sees it hear the
+  it and a standby does, so its readings do not count as fresh for the others. Once Beacon sees it hear the
   repeater's adverts directly, they do. In `approved` mode, check the poller is approved.
 - **Everything is paused.** Check `polling.paused`, then `GET /api/v1/admin/polling`.
 - **An old firmware is refused.** If `polling.min_client_version` is set, the policy tells
