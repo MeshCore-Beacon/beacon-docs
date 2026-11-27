@@ -27,7 +27,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: beacon
-      POSTGRES_PASSWORD: CHANGE_PASS
+      POSTGRES_PASSWORD: CHANGE_DB_PASS
       POSTGRES_DB: beacon
     volumes:
       - ./data/postgres/:/var/lib/postgresql/data

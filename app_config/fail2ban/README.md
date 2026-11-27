@@ -67,9 +67,8 @@ sudo fail2ban-regex <logpath> /etc/fail2ban/filter.d/beacon-api-flood.conf   # d
 sudo fail2ban-client status beacon-api-flood
 ```
 
-**Observe first.** The Caddy jail file ships with `banaction = dummy`; on the Apache box add the same
-line per jail. Would-be bans land in `/var/run/fail2ban/fail2ban.dummy`. Run 3–7 days; every IP
-there must be an obvious scraper, otherwise raise `maxretry`.
+**Observe first.** Both jail files ship with `banaction = dummy`. Would-be bans land in
+`/var/run/fail2ban/fail2ban.dummy`. Run 3–7 days; every IP there must be an obvious scraper, otherwise raise `maxretry`.
 
 **Enforce.** Caddy box: traffic to Docker-published ports is DNAT'ed through the FORWARD path, which
 the default nftables action (input hook) never sees, so switch to

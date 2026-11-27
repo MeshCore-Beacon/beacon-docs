@@ -87,6 +87,8 @@ which ones to read.
 | `mail` | The outgoing SMTP server for account mail and email alerts. The password is `BEACON_SMTP_PASSWORD`. | You use `accounts.mode: local`. See [User accounts](#user-accounts). |
 | `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. `local` needs the `mail` block; `portal` signs in through the MeshMapper portal. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
 | `alerts` | The alert channels: `email.enabled` and `push.enabled`, with `push.id`. Off by default. Needs accounts. | You want [Alerts](alerts.md). See [Alerts](#alerts). |
+| `display` | The units clients show: `temperature_unit` and `distance_unit`. | You want Fahrenheit or miles. See [Display units](#display-units). |
+| `atlas` | `limit`: how many cards one Atlas holds. Default 20. | You want larger or smaller Atlases. See [Atlas size](#atlas-size). |
 | `backup` | Turns on the admin backup download. Off by default. | You want [Backup and export](backup-export.md). |
 | `packets` | How long packets, observations and channel messages are kept. Default 7 days. | Disk is tight, or you want more history. |
 | `analytics` | How long hourly stats rollups are kept. Default 90 days. They outlive raw packets. | You want longer stats windows. |
@@ -150,9 +152,10 @@ layout sets the sizes.
 - **`custom_all`** plans every API statement for its own parameters on every call, so no
   statement can switch to a slow generic plan. Use it.
 - **`split`** runs the statements the plan corpus admits as safe on cached generic plans, in
-  the `api_cached` pool. Today that is `GetNodeByID`, `GetObserverTelemetrySince`,
-  `ListKnownRoutesByIATA`, `ListKnownRoutesGlobal`, `ListObserverAdverts`, `ListPacketsByTypes`
-  and `ListPacketsPage`. `ListObserverAdverts` runs there only once the
+  the `api_cached` pool. The list is generated into beacon-server's
+  `db/planpolicy/cached_gen.go`: today 16 statements, covering node detail, observer telemetry
+  and adverts, known routes, and the packet and channel message pages.
+  `ListObserverAdverts` runs there only once the
   [payload-type backfill](operations.md#after-upgrading-observation-payload-types) is done. Keep
   `custom_all` unless the [plan check](operations.md#plan-checks-planguard) has run clean against
   this deployment's database.
@@ -358,7 +361,8 @@ go over.
 ## User accounts
 
 The `accounts` block turns on [User accounts](accounts.md). It is off by default. A value out of range
-stops startup with an error naming the key. With `mode: off` the rest of the block is not read.
+stops startup with an error naming the key. With `mode: off` the rest of the block is not read,
+except a leftover `smtp` block, which always stops startup (it moved to the top-level `mail` block).
 
 | Key | Default | What it does |
 |---|---|---|
@@ -408,7 +412,7 @@ The `alerts` block turns on [Alerts](alerts.md). It needs [User accounts](accoun
 |---|---|---|
 | `email.enabled` | `false` | Send alerts by email. Needs `accounts.mode: local` and the `mail` block; any other mode stops startup. |
 | `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs `accounts.mode` `local` or `portal`, `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
-| `push.id` | empty | Required with `push.enabled`. The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`, at most 64 characters. |
+| `push.id` | empty | Required with `push.enabled`. The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`: at most 64 characters, with no dot, space or non-ASCII character. |
 | `push.server` | `https://push.meshcorebeacon.ca` | The push server. You must use the official one: the Beacon app only receives notifications sent through it. Only change it if the project announces a new address. Must be https with no path, query or credentials; any other server logs a warning. |
 
 Each user picks which of the offered channels reach them. The old `alerts.delivery` key stops

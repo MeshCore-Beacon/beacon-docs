@@ -48,6 +48,11 @@ signed. The flow is the same in both repos; only the version bump differs.
    Open the draft (or create the release in beacon-web), paste the release notes and publish it.
 6. Fast-forward `dev` to `main` so the branches match: `git push origin origin/main:dev`.
 
+beacon-docs follows the same branches without a version: open a PR from `dev` into `main` titled
+`docs: sync dev to main` and merge it as a merge commit. There is no bump and no tag.
+
+In every repo a check rejects a PR into `main` that does not come from that repo's `dev` branch.
+
 ## Where to find release notes
 
 Each repo's GitHub Releases page:

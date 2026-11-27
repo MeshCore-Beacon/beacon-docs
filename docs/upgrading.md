@@ -156,15 +156,17 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading from 2.2.0: accounts, telemetry requests, alerts and portal sign-in
 
-This release adds migrations `064` to `086` (polling, user accounts, telemetry requests, the portal
-sign-in state, alert rules, their channels and outbox, and an Atlas telemetry view). They run at startup and
+This release adds migrations `064` to `087` (polling, user accounts, telemetry requests, the portal
+sign-in state, alert rules, their channels and outbox, an Atlas telemetry view and the Atlas 7 day
+range). They run at startup and
 are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
 `081`, `082`) on tables this release creates, so they start empty. On the project's test server the
 whole set took seconds. The only data migrations are `065`, which marks readings of the empty
-`repeater_readings` table, `078`, which copies one drift row per node into a new table, and `084`
-and `085`, which touch only alert tables that are still empty on a 2.2.0 database.
+`repeater_readings` table, `073`, which removes duplicate rows from the still empty `user_devices`
+table, `078`, which copies one drift row per node into a new table, and `084` and `085`, which touch
+only alert tables that are still empty on a 2.2.0 database.
 
-`086` is the one that works on existing data: it builds an index on `packets` (`origin_pubkey`,
+`086` is the only index built on an existing table: it builds an index on `packets` (`origin_pubkey`,
 `last_heard_at`) with `CONCURRENTLY`, so ingest keeps running while it builds. It took about two
 seconds on a test table of 4 million packets and added about a quarter of the table's size; allow
 more time and disk on a larger database.
@@ -176,7 +178,7 @@ Every new feature is off by default, so an upgrade with no config change behaves
 | Repeater polling | `polling.enabled: true` and `polling.mqtt_hosts` | none |
 | Accounts | `accounts.mode: local` (needs `accounts.public_url` and `mail.host` and `mail.from`) | `BEACON_SMTP_PASSWORD` if the mail server wants a login |
 | Portal sign-in | `accounts.mode: portal` (needs `accounts.public_url`, `accounts.portal.url` and `client_id`) | `BEACON_PORTAL_SECRET` |
-| Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `3`) | `BEACON_SECRET_KEY` |
+| Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `6`) | `BEACON_SECRET_KEY` |
 | Alerts | `alerts.email.enabled` and/or `alerts.push.enabled` with `alerts.push.id`, with accounts on (email needs `local` mode) | `BEACON_PUSH_SECRET` for push |
 
 Telemetry requests hand guest passwords to observers. By default any observer with advert evidence
@@ -188,9 +190,9 @@ for the repeater can receive one; set `polling.request_observers: approved` to c
 [Sign-in through the MeshMapper portal](portal-sign-in.md),
 [Telemetry requests](telemetry-requests.md) and [Alerts](alerts.md).
 
-Both client floors rise to 2.3.0. Beacon Web builds older than 2.3.0 show a reload screen and
-BEACON Mobile builds older than 2.3.0 show an update screen, because alert push now goes through
-the push server and older apps cannot register for it. Deploy the 2.3.0 web container with the
+Both client floors rise to 2.3.0. Beacon Web builds older than 2.3.0 show a reload screen, because
+they lack the alert channel switches. BEACON Mobile builds older than 2.3.0 show an update screen,
+because alert push now goes through the push server and older apps cannot register for it. Deploy the 2.3.0 web container with the
 server, and upgrade once the 2.3.0 app is out in the stores so users can update straight away.
 
 ### From a 2.3.0 test build

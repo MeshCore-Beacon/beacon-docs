@@ -28,7 +28,8 @@ docker-deployment-type2/
    ```
 
 2. Create `.env` from the shared template and fill in every `CHANGE_*` value. Only the `app`
-   and `caddy` lines matter here; the `VITE_*` lines can be deleted. If you have one broker,
+   and `caddy` lines matter here; the `VITE_*` lines can be deleted, except `VITE_APP_NAME` if you
+   send account mail or alerts (the server names the instance with it). If you have one broker,
    clear `MQTT_BROKER_2_URL`.
 
    ```bash

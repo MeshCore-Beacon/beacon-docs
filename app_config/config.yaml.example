@@ -52,15 +52,15 @@ ratelimit:
   # A 429 returns error.code=rate_limited and Retry-After (1 or 60 seconds).
   burst: 600
 
-# Database pools. custom_all (default) opens api_legacy 8, api_custom 8, ingest 6, maint 4 connections
-# (26); split opens 30 (api_custom 7, api_cached 5); single opens 18 (api_legacy, ingest, maint).
+# Database pools. custom_all (default) opens api_custom 8, ingest 6, maint 4 connections (18); split opens
+# 22 (api_custom 7, api_cached 5); single opens 18 (api_legacy 8, ingest, maint).
 # ingest grows to one connection per CPU on hosts with more than 6 CPUs, adding to each total.
 # Keep max_connections well above that. A pool_max_conns in POSTGRES_DSN is overridden.
 #database:
 #  # custom_all (default): every API statement gets a custom plan.
-#  # split: statements admitted to the generic-plan class (GetNodeByID, GetObserverTelemetrySince,
-#  #   ListKnownRoutesByIATA, ListKnownRoutesGlobal, ListObserverAdverts, ListPacketsByTypes,
-#  #   ListPacketsPage) run on cached generic plans. Keep custom_all unless the plan check is clean.
+#  # split: statements admitted to the generic-plan class (listed in beacon-server's
+#  #   db/planpolicy/cached_gen.go) run on cached generic plans on api_cached; every other API statement
+#  #   keeps custom plans. Keep custom_all unless the plan check is clean.
 #  # single: rollback. One API pool on the previous settings; every guard family observes.
 #  api_plan_layout: custom_all
 
@@ -81,15 +81,25 @@ ratelimit:
 #  daily_check: false
 
 # Read models. cmi is channel_message_iatas, one row per channel message and site that heard it; region
-# and scope message pages read it once this process trusts it. enabled: false serves every page from the
-# previous statements; the table is still maintained, so turning it back on needs only a restart.
+# and scope message pages read it once this process has repaired and verified it. Until then, and whenever
+# it is not trusted, those pages answer 503 with Retry-After. enabled: false is the kill switch: those pages
+# stay off (503). The table is still maintained, so turning it back on needs only a restart.
 #readmodels:
 #  cmi:
 #    enabled: true
 #  packet_sites:
 #    # Serve region packet pages (iatas, region) from packet_sites once this process has repaired and verified
-#    # it. false serves them from the original statement; the table is still maintained and swept.
+#    # it; until then they answer 503. false turns them off (503); the table is still maintained and swept.
 #    enabled: true
+#  # Pacing of the one-off backfills (packet_sites, cmi and observation payload types). After each slice or
+#  # batch a fill sleeps max(min_pause, elapsed x (1 - duty) / duty), where elapsed is that slice's run time,
+#  # so it is busy at most duty of the time and a slow disk stretches the pauses on its own. Pacing changes
+#  # only when the fills run, not what they write. The resolved values are logged at boot in "config: loaded".
+#  fill:
+#    duty: 0.5                  # share of time a fill may be busy, 0.01 to 1; 0.25 on a slow (rotational) disk
+#    min_pause: 100ms           # shortest pause after a slice or batch, 0s to 1m
+#    packet_sites_slice: 500000 # observations per packet_sites backfill slice, 1 to 10000000
+#    cmi_batch: 10000           # message ids per cmi backfill batch, 1 to 1000000
 
 # MeshMapper integrations (optional, require a regional or grouped-region API key).
 # Your local MeshMapper regional or grouped-region admin can generate the key.
@@ -119,7 +129,7 @@ ratelimit:
 #  api_key: ""
 #  scopes:
 #    enabled: false
-#    refresh_interval: 1h  # 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
+#    refresh_interval: 24h # default; 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
 #
 # Region boundaries (Zones API). Every known IATA, including ones auto-created
 # from traffic, is looked up in its country's zone list, then its get_geojson.php
@@ -209,6 +219,7 @@ iatas:
 regions:
   - slug: western-canada
     name: Western Canada
+    description: BC and Alberta   # optional, shown with the region
     display_order: 1
     center_lat: 51.0
     center_lng: -114.0
@@ -254,6 +265,15 @@ scopes:
   - name: "#west"
     region: western-canada
 
+# Units clients show. Default: c and metric. Any other value stops startup.
+display:
+  temperature_unit: c   # c or f
+  distance_unit: metric # metric or imperial
+
+# How many cards one Atlas holds, in the browser or synced to an account. 1 to 100; default: 20.
+atlas:
+  limit: 20
+
 telemetry:
   retention: 744h   # 31 days
   resolution: 1h    # store one snapshot per observer per hour
@@ -298,6 +318,9 @@ routes:
   # count never resets, so once a route crosses this bar it stays in the
   # retention tier for good.
   min_observations: 3
+  # Routes the reconfirm sweep checks per hour for departed or now-ambiguous hops,
+  # run in 5-minute slices. 0 or omitted means 81000.
+  reconfirm_rows_per_hour: 81000
 
 websocket:
   max_connections_per_ip: 5 # default: 5
@@ -424,7 +447,7 @@ cache:
 #  authority: evidence         # evidence or approved; approved elects only observers you approve
 #  # Telemetry requests also need accounts on and BEACON_SECRET_KEY (32 random bytes in base64,
 #  # from: openssl rand -base64 32). Losing or changing the key makes stored guest passwords unreadable.
-#  requests_per_user: 3        # 0 to 20; 0 turns requests off; default: 3
+#  requests_per_user: 6        # 0 to 20; 0 turns requests off; default: 6
 #  offline_disable_days: 7     # 1 to 365; days unheard before a repeater's requests are turned off; default: 7
 #  request_observers: all      # all (default) or approved. all: any observer with advert evidence for a requested
 #                              # repeater can be handed it and its guest password. approved: only observers you
