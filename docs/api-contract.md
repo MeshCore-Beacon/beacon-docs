@@ -91,7 +91,7 @@ Some pages are served only from data the server prepares in the background. Whil
 | Pages | Ready when |
 |---|---|
 | `/packets` with `iata`, `iatas`, `region` or `regionId`, without `hashPrefix` (region pages) | the server trusts its `packet_sites` read model |
-| `/channels/{id}/messages` with `iatas`, or with `scope` and no `since`; `/messages` with `iatas` (with or without `since` or `scope`), or with `scope`, no `since` and no `iatas` | the server trusts its `channel_message_iatas` read model |
+| `/channels/{id}/messages` with a location filter (`iata`, `iatas`, `region` or `regionId`), or with `scope` and no `since`; `/messages` with a location filter (with or without `since` or `scope`), or with `scope`, no `since` and no location filter | the server trusts its `channel_message_iatas` read model |
 | `/observers/{observerId}/adverts` | every observation carries its payload type |
 
 That happens during the first fill after an upgrade, during a repair, after a failed verification, until the observation payload-type backfill is done, and for as long as the operator turns a read model off (see [Operations](operations.md#pages-that-wait-for-a-read-model)). `/messages` with `iatas` and `since` or `scope` is in the table since 2.1: development builds of 2.1 served it from the observations whatever the read model's state, and answered `503` with `Retry-After: 5` when that pool was busy; that `503` is gone.
@@ -133,7 +133,7 @@ Pass `nextCursor` back as `cursor` for the next page; it is omitted on the last 
 
 ID cursors are 64-bit integers: the observation ID `cursor` of `/observers/{id}/adverts` and `/nodes/{id}/observations`, telemetry `afterId`, the message ID `cursor` of `/messages`, and the backfill `afterObservationId` and `afterId` ([Backpressure and reconnection](#backpressure-and-reconnection)). The same goes for the IDs they come from. Store and send them as full integers; never narrow them to 32 bits, since a busy server passes 2^31. As JSON numbers they stay exact up to 2^53, so a JavaScript `number` or a Dart `int` holds them.
 
-A few lists return a plain array instead: the backfill endpoints, `/routes*`, `/traces` and the stats endpoints.
+A few lists return a plain array instead: the backfill endpoints, `/routes`, `/routes/search`, `/routes/cross`, `/traces` and most stats endpoints.
 
 ### Exact page cursors
 
@@ -164,8 +164,9 @@ on `/packets` and `v1:<epoch µs>:<id>` on `/nodes` and `/observers`.
   `503` (see [Pages that wait for server data](#pages-that-wait-for-server-data)). Keep sending
   both cursors whenever a page has both.
 - A malformed `pageCursor` is a `400` with message `invalid pageCursor` on those three
-  endpoints, on every path, including the `/packets` paths that ignore it. Start again from
-  the first page without it. An empty `pageCursor` counts as absent.
+  endpoints, on every path, including the `/packets` paths that ignore it. A sorted `/nodes`
+  list says `invalid pageCursor for this sort`. Start again from the first page without it. An
+  empty `pageCursor` counts as absent.
 
 ## Common filters
 
@@ -612,7 +613,7 @@ edges spanning more than 180 degrees are rejected.
 | `GET /observers` | Page of observers, most recently seen first, ties by `id` descending. Params: location filters, `type` (e.g. `meshcoretomqtt`), `broker`, `status` (`online`/`offline`), `name`, `scope`, `cursor` (last-seen epoch ms), `pageCursor`, `limit`. |
 | `GET /observers/directory` | Traffic/name pagination, row counts and type facets. See [observer directory contract](observer-directory.md) for rollout status and exact semantics. |
 | `GET /observers/{observerId}` | Observer detail. |
-| `GET /observers/{observerId}/telemetry?range=24h&interval=1h` | Telemetry history. `interval` is `1h` (default), `6h` or `24h`. `afterId` returns only newer points. |
+| `GET /observers/{observerId}/telemetry?range=24h&interval=1h` | Telemetry history. `interval` is `1h` (default), `6h` or `24h`. `afterId` returns only newer points, with `interval=1h` only; `6h` and `24h` ignore it. |
 | `GET /observers/{observerId}/activity?range=24h&interval=15m` | What the observer heard, bucketed. |
 | `GET /observers/{observerId}/adverts` | Page of adverts the observer heard. Cursor is the observation ID. |
 
@@ -811,7 +812,7 @@ GET /api/v1/stats/observations?iatas=YOW&since=<ms>
 GET /api/v1/stats/payload-breakdown?iatas=YOW&since=<ms>
 GET /api/v1/stats/top-nodes?iatas=YOW&since=<ms>&limit=10
 GET /api/v1/stats/top-observers?iatas=YOW&since=<ms>&limit=10
-GET /api/v1/stats/top-advertisers?iatas=YOW&since=<ms>&limit=10
+GET /api/v1/stats/top-advertisers?iatas=YOW&since=<ms>&sort=flood&limit=10
 GET /api/v1/stats/top-talkers?iatas=YOW&since=<ms>&limit=10
 GET /api/v1/stats/scopes?iatas=YOW&since=<ms>
 GET /api/v1/stats/signal?iatas=YOW&since=<ms>&until=<ms>
@@ -839,6 +840,8 @@ filters give exact distinct counts.
 Default windows: `overview` covers the 24 most recent rolled hours; `observations` and `scopes`/`top-nodes`
 default to the last 7 days; `payload-breakdown`, `top-observers`, `top-advertisers` and `top-talkers`
 default to the last 24 hours.
+
+`top-advertisers` needs `sort`, either `flood` or `direct`. Without it the answer is `400`.
 
 #### `GET /stats/series`
 
@@ -952,7 +955,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 
 ```json
 {
-  "minAppVersion": "0.1.1", "minWebVersion": "2.0.3", "serverVersion": "2.0.4",
+  "minAppVersion": "2.3.0", "minWebVersion": "2.3.0", "serverVersion": "2.3.0",
   "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "atlas7d": true, "mapTelemetry": true, "appDeviceLabel": true },
   "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
   "limits": { "atlas": 20 }
@@ -960,10 +963,11 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```
 
 `minAppVersion` and `minWebVersion` are the oldest BEACON Mobile and Beacon Web releases allowed
-to use this server, as strict `X.Y.Z` strings, or `null` when there is no requirement. Each is the
-higher of the server's built-in floor and the operator's `mobile.min_app_version` /
-`web.min_web_version`. With `websocket.require_origin` on, `minAppVersion` is at least `2.1.1`, the
-first release that sends a [WebSocket ticket](#websocket-ticket). `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
+to use this server, as strict `X.Y.Z` strings. Each is the higher of the server's built-in floor
+(`2.3.0` for both since server 2.3.0) and the operator's `mobile.min_app_version` /
+`web.min_web_version`. Older servers can send `null` for no requirement, so keep handling it. With
+`websocket.require_origin` on, `minAppVersion` is at least `2.1.1`, the first release that sends a
+[WebSocket ticket](#websocket-ticket); the built-in floor is already above that. `serverVersion` is the server's API version (`X.Y.Z`, no `v`), the same value
 Swagger shows. Servers older than this endpoint return `404`. See
 [Mobile-specific concerns](#mobile-specific-concerns) for how the app uses it.
 
@@ -1030,7 +1034,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 
 | Endpoint | Notes |
 |---|---|
-| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors; `""` when there is none), and `guards` (below). No credentials, broker addresses, channel material or database connection settings. |
+| `GET /admin/config` | Running CORS settings with defaults applied, `auth.configured`, `ingest.broker_count` (configured broker workers, not connection status), `mobile.min_app_version` and `web.min_web_version` (read-only effective floors, at least the built-in `2.3.0`), and `guards` (below). No credentials, broker addresses, channel material or database connection settings. |
 | `PUT /admin/config` | Replaces `cors.allowed_origins`, `guards.enforce` or both until the next restart. JSON body up to 16 KiB. |
 | `GET /admin/db/statements` | `pg_stat_statements` for this database, summed by statement name. `503` when the extension is missing or not preloaded. |
 | `GET /admin/db/planguard` | The last report of the daily plan check. `?fresh=true` runs it now, at most one run per 5 minutes. `404` while `planguard.daily_check` is off or before the first run; `500` when no run has succeeded. Details below. |
@@ -1268,8 +1272,9 @@ Notes:
   at exchange.
 
 Rate limits per client address, on top of the normal REST limit: register 5 / 5 min, login 10 / 1 min, verify 30 /
-1 min, resend and reset request 5 / 5 min, reset confirm 10 / 5 min, app token 10 / 1 min, every other
-`/auth` and `/me` write 60 / 1 min together. The answer is `429 rate_limited` with `Retry-After`.
+1 min, resend and reset request 5 / 5 min, reset confirm 10 / 5 min, app token 10 / 1 min, portal
+start and callback 20 / 1 min each. Logout and the app code share 60 / 1 min, and every `/me` write
+shares another 60 / 1 min. The answer is `429 rate_limited` with `Retry-After`.
 
 Error codes the account routes use:
 
@@ -1298,10 +1303,13 @@ Bearer admin key, see [Auth](#auth). `503` while accounts are off or the server 
 - `GET /admin/users?search=&cursor=&limit=` lists users newest first. `limit` is 1 to 200, default 50;
   `search` is part of a username or email, at most 100 characters. Returns `{items, nextCursor}`;
   `nextCursor` is missing on the last page. Each item is a user plus `disabled` and `lastLoginAt`
-  (epoch ms or `null`).
+  (epoch ms or `null`). `400` for a `search` that is too long, a `limit` out of range or a bad
+  `cursor`.
 - `PUT /admin/users/{id}` with `{"disabled": true}` ends every session of the user and refuses new
   sign-ins; `false` lifts it. Returns `{user}`. `404` for an unknown id.
 - `DELETE /admin/users/{id}` removes the user and everything it owns in one transaction, taking the same locks as a telemetry request change: `204`, or `404`.
+
+Both `{id}` routes answer `400` when the id is not a UUID.
 
 ### Atlas sync
 
@@ -1587,7 +1595,7 @@ a key.
 | 404 | `alerts_disabled` | Alerts are off. |
 | 409 | `not_on_atlas` | The radio is not pinned on the user's Atlas. |
 | 422 | `kind_unavailable` | The radio cannot have this kind; `message` is the English reason and `error.reasonCode` its code (the only error with that extra field). |
-| 422 | `invalid_threshold` | The threshold is out of range or the wrong shape for the kind. |
+| 422 | `invalid_threshold` | The threshold is out of range or the wrong shape for the kind. Also an unknown `kind` or `target.kind`. |
 | 422 | `invalid_input` | A bad key or rule id; a bad platform, push token or payload key; or a channels body with neither field. |
 | 404 | `push_disabled` | `POST /me/devices` on a server that does not send push. |
 | 404 | `not_found` | Unknown or foreign rule id. |
@@ -1780,12 +1788,17 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
   both pass it. The firmware claims at most once a minute.
 - `misses` and `request_slots` are clamped (0 to 255, 0 to 8). A number too large for a 64-bit
   integer counts as absent.
+- The whole claim is also dropped when it is over 16384 bytes, `v` is not `2`, a node's
+  `reply_hops` is not `0` or `1`, its `snr` is not a finite number, or its `last_attempt` or
+  `last_ok` is not a valid time.
 
 ### Reading message
 
 Published to `.../telemetry` (`"v": 2`) or `.../battery` (`"v": 1`), same topic prefix, QoS 1,
-not retained. One reading per message in the v2 format, up to 1664 bytes. Beacon accepts up to 8
-readings in one message and drops a message with more.
+not retained. One reading per message in the v2 format, up to 1664 bytes. Beacon accepts 1 to 8
+readings in one message of at most 16384 bytes, and drops a message with none or with more. A
+malformed reading (no `node_id`, an unknown `method`, a missing or unreadable `sampled_at`, bad
+`lpp` hex) drops the whole message, not just that reading.
 
 ```json
 {"v":2,"origin":"Name","origin_id":"<UPPER hex>","timestamp":"2026-11-13T22:13:23Z",
@@ -1875,13 +1888,13 @@ All client messages have a `type` and an optional `id`, which replies echo.
 - `channelHashes`: only filters `channelMessage` events.
 - `events`: any of `packetObservation`, `observerStatus`, `nodeUpdate`, `channelMessage`.
 
-Every field is optional, and an omitted field or an empty array means no filter on that dimension. `routeTypes` filters `packetObservation` events; `observerIds` filters `packetObservation` and `observerStatus`; `channelHashes` only filters `channelMessage`. The server replies with `subscribed`:
+`scope` itself is required; a `subscribe` without it is ignored and gets no reply. Every field in it is optional (`{}` is valid), and an omitted field or an empty array means no filter on that dimension. `routeTypes` filters `packetObservation` events; `observerIds` filters `packetObservation` and `observerStatus`; `channelHashes` only filters `channelMessage`. The server replies with `subscribed`:
 
 ```json
 { "v": 1, "type": "subscribed", "id": "sub-1", "subscriptionId": "uuid" }
 ```
 
-**`unsubscribe`**, replied to with `unsubscribed` (same fields):
+**`unsubscribe`**, replied to with `unsubscribed` (same fields). It needs `subscriptionId`; without one it is ignored and gets no reply:
 
 ```json
 { "v": 1, "type": "unsubscribe", "id": "unsub-1", "subscriptionId": "uuid" }
@@ -2017,7 +2030,7 @@ Connections with `includeRepeats` also get repeats, which have `packet.isRepeat:
 }
 ```
 
-`lat`/`lng` omitted means the advert had no position (keep the one you have); `null` means the advert cleared it. `iatas` holds only the IATA that heard this advert, so merge it into what you have. `isPoller` is `true` when the node has a stored polling claim. `possiblyForeign` is only sent when `nodes.mark_foreign` is on. `defaultScope` and `radio` are omitted when unknown.
+`lat`/`lng` omitted means the advert had no position (keep the one you have); `null` means the advert cleared it. `iatas` holds only the IATA that heard this advert, so merge it into what you have. `isPoller` is `true` when the node has a stored polling claim. `possiblyForeign` is only sent when `nodes.mark_foreign` is on, and is omitted for a repeater advert with no position (keep the value you have). `defaultScope` and `radio` are omitted when unknown.
 
 **`channelMessage`**: a group text was decrypted into a new message. The `data` is the same shape as a REST message (see [Channels and messages](#channels-and-messages)) plus `channelId`, without `observationCount`.
 

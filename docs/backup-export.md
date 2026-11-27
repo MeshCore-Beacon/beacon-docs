@@ -16,7 +16,7 @@ Exactly three regular files:
 - `config.yaml`: the saved file byte-for-byte, read just before the snapshot. Avoid config
   edits during an export.
 
-**It is sensitive and unencrypted** (keys, message data); keep it private. It is not a full
+**It is sensitive and unencrypted** (keys, message data, user accounts and push device keys); keep it private. It is not a full
 recovery package: `.env` and environment variables, `borderFile` and TLS files, runtime-only
 changes, PostgreSQL roles and cluster settings, Redis and deployment files are not included.
 
@@ -48,7 +48,8 @@ changes, PostgreSQL roles and cluster settings, Redis and deployment files are n
 
 Failures, timeouts and interrupts clean up and publish nothing. A SIGKILL or power loss can
 leave a private staging dir: `.beacon-backup-*` next to the CLI output, or
-`beacon-download-*` in the server's temp dir, which Beacon sweeps on its next start.
+`beacon-download-*` in the server's temp dir, which Beacon sweeps on its next start once it is
+more than 20 minutes old.
 
 ## CLI export
 

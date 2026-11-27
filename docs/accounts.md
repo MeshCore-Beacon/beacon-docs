@@ -46,7 +46,7 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 | Key | Default | What it does |
 |---|---|---|
 | `mode` | `off` | `off`, `local` or `portal`. Anything else stops startup. The rest of the block is not checked while this is `off`. The rest of this page is about `local`; see [portal sign-in](portal-sign-in.md) for `portal`. |
-| `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
+| `public_url` | none | Required when `mode` is `local` or `portal`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
 | `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
 | `mail.host` | none | Required. |
 | `mail.port` | `587` | 1 to 65535. |
@@ -54,7 +54,7 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 | `mail.from` | none | Required, one address, for example `"Beacon <no-reply@example.org>"`. |
 | `mail.starttls` | `true` | When true the send fails if the server does not offer STARTTLS; Beacon never falls back to plain text. Set `false` only for a trusted local relay. |
 
-`BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment. A mistake in the
+In `local` mode `BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment; `portal` mode reads `BEACON_PORTAL_SECRET` instead. A mistake in the
 block stops startup with an error naming the key. An `smtp` block left under `accounts` stops startup
 too, with a message saying it moved to `mail`. Port 465 (implicit TLS) is not supported; use a
 submission port that offers STARTTLS.
@@ -102,7 +102,7 @@ cors:
 `allowed_origins` must list the web origin, not `*`: a browser refuses credentials with a wildcard,
 and Beacon's forgery check never accepts `*`. The default methods are read-only and the default
 headers lack `X-Beacon-CSRF`, so without these keys the preflight for a sign-in fails. The web
-client also has to send its requests with credentials. See [Configuration](configuration.md#accounts)
+client also has to send its requests with credentials. See [Configuration](configuration.md#user-accounts)
 and [Reverse proxy](reverse-proxy.md).
 
 The app does not use the cookie. It holds a bearer token (see below), so CORS does not apply to it.
@@ -210,7 +210,8 @@ Per client address, as `requests / window`:
 | `POST /auth/verify/resend`, `POST /auth/reset/request` | 5 / 5 min |
 | `POST /auth/reset/confirm` | 10 / 5 min |
 | `POST /auth/app/token` | 10 / 1 min |
-| Every other `/auth` and `/me` write | 60 / 1 min (one shared budget) |
+| `POST /auth/logout`, `POST /auth/app/code` | 60 / 1 min (one budget for the two) |
+| Every `/me` write | 60 / 1 min (one budget for all of them) |
 
 Over a limit the answer is `429 rate_limited` with `Retry-After`. These count the client address, so
 behind a proxy set `server.trusted_proxies` (see [Reverse proxy](reverse-proxy.md)) or every user
@@ -264,8 +265,9 @@ An hourly task (`users_cleanup`) deletes, once they are more than a week past th
 - sessions that were ended or have expired (including past their hard end);
 - one-time tokens that were used or have expired;
 - sign-ups nobody confirmed: local users never verified, created more than a week ago, with no live
-  verify link left. This frees the username and address;
-- stale portal sign-in states, in portal mode.
+  verify link left. This frees the username and address.
+
+In portal mode it also deletes portal sign-in states as soon as they expire, with no week's wait.
 
 A live session or token is never touched by it.
 

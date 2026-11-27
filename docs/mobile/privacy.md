@@ -24,7 +24,8 @@ token for that server.
   password (never the password itself), and your signed-in devices with a label, the IP address and
   app or browser name they connected from, and when they were last used. This is held by the
   operator of that server, under that operator's policies. The server sends you email to confirm your
-  address, reset a password, and tell you when a new app signs in.
+  address, reset a password, tell you when a new app signs in or your password or email address
+  changes, and deliver any email alerts you turn on.
 - **What the app stores:** the sign-in token, kept in the platform's secure storage (the iOS Keychain or
   Android Keystore) and removed when you sign out. The app does not keep your password.
 - **Ending it:** you can sign out of any device and delete your account in the app's profile screen or on

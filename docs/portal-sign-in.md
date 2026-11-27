@@ -75,7 +75,7 @@ Beacon logs a fixed reason and never the code, secret or portal answer. The stat
 database, so start and callback may reach different instances.
 
 A portal user's username and display name are refreshed from the portal at each sign-in. A username
-already used by another user gets a number added, and names are cut to 30 characters. There is no
+already used by another user gets a number added. Usernames are cut to 30 characters and display names to 40. There is no
 password and no email, so these local routes answer `404 portal_managed`: register, verify, resend,
 login, reset request, reset confirm, change password and change email. Deleting an account takes
 `{"confirmUsername": "<their username>"}` instead of a password.

@@ -57,7 +57,8 @@ Accounts are off by default; see [User accounts](accounts.md). When they are on:
   and stored only as SHA-256 hashes. None of them, and no request body on `/auth` or `/me`, is
   logged.
 - The session cookie is `HttpOnly`, `SameSite=Lax` and `Secure` (except for a localhost `public_url`).
-  Sessions end on logout, password change or reset, disabling the user, and expiry.
+  Sessions end on logout, a password change (every other session; the one that made it stays), a
+  password reset (every session), disabling the user, and expiry.
 - A request authenticated by the cookie that writes (`POST`, `PUT`, `PATCH`, `DELETE`) must send
   `X-Beacon-CSRF: 1`, and if it has an `Origin` header that must be the origin of
   `accounts.public_url` or one of `cors.allowed_origins` (never `*`). Otherwise it gets `403

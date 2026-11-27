@@ -59,7 +59,7 @@ assignment right now; the user is told to request telemetry for it first (see
 
 On an instance with `display.temperature_unit: f` ([Display units](configuration.md#display-units)), alert mail and the app's push text give temperatures in F, and clients take and show the temperature limits in whole degrees F. The API still stores and sends tenths of a degree C.
 
-A sixth announcement, `request_attention`, is not a rule. Every user who has a telemetry request
+One more announcement, `request_attention`, is not a rule. Every user who has a telemetry request
 gets one notice when it moves to `login_failed`, `admin_stopped` or `disabled`, and another if it
 recovers and fails again. It is sent whenever alerts are on.
 
