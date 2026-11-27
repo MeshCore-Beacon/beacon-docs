@@ -179,7 +179,10 @@ Every new feature is off by default, so an upgrade with no config change behaves
 | Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `6`) | `BEACON_SECRET_KEY` |
 | Alerts | `alerts.email.enabled` and/or `alerts.push.enabled` with `alerts.push.id`, with accounts on (email needs `local` mode) | `BEACON_PUSH_SECRET` for push |
 
-Telemetry requests hand guest passwords to observers. By default any observer with advert evidence
+Telemetry requests hand guest passwords to observers. Each password is encrypted for the one
+observer assigned to that repeater, using that observer's public key, and is stored encrypted on the
+server under `BEACON_SECRET_KEY`. The observer has to decrypt it to log in, so only guest passwords
+are accepted. By default any observer with advert evidence
 for the repeater can receive one; set `polling.request_observers: approved` to choose who does
 (see [Approve observers](telemetry-requests.md#approve-observers)). Secrets go in `.env`; see
 [`.env.example`](../app_config/.env.example). The full settings are in
