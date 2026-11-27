@@ -156,11 +156,11 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading to 2.3.0 from 2.2.0
 
-This release adds migrations `064` to `087` (polling, user accounts, telemetry requests, alert rules, their channels and outbox, an Atlas telemetry view and the Atlas 7 day
+This release adds migrations `064` to `088` (polling, user accounts, telemetry requests, alert rules, their channels and outbox, an Atlas telemetry view and the Atlas 7 day
 range). They run at startup and
 are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
 `081`, `082`) on tables this release creates, so they start empty. On the project's test server the
-whole set took seconds. The only data migrations are `065`, which marks readings of the empty
+whole set took seconds. The only data migrations are `065` and `088`, which mark readings of the still empty
 `repeater_readings` table, `073`, which removes duplicate rows from the still empty `user_devices`
 table, `078`, which copies one drift row per node into a new table, and `084` and `085`, which touch
 only alert tables that are still empty on a 2.2.0 database.
@@ -170,7 +170,15 @@ only alert tables that are still empty on a 2.2.0 database.
 seconds on a test table of 4 million packets and added about a quarter of the table's size; allow
 more time and disk on a larger database.
 
-Every new feature is off by default, so an upgrade with no config change behaves as before:
+One default changes for everyone: observer telemetry is now stored every 15 minutes instead of
+hourly, so battery and noise alerts react in about half an hour and the 24 hour charts are finer.
+A `config.yaml` copied from an older template still says `resolution: 1h` under `telemetry`, and
+that value wins. Change it to `15m`, or remove the line, to get the new behaviour. It stores about
+four times as many observer snapshots as hourly; see
+[`config.yaml.example`](../app_config/config.yaml.example) for the trade-off.
+
+Every new feature is off by default, so apart from that an upgrade with no config change behaves
+as before:
 
 | Feature | Turn it on with | Secret |
 |---|---|---|
@@ -214,6 +222,9 @@ before the release starts:
   shared columns. A notice queued before it keeps its attempts and retry time for push, and its mail,
   if not sent yet, starts with no attempts and is tried at once. A build from before `085` cannot
   read the outbox after it, so going back to one is not supported.
+- **Readings.** Nothing to do. Migration `088` marks stored readings of a repeater an observer polls
+  on its own as trusted where no assigned observer has advert evidence for it, so charts that were
+  empty can fill in after the upgrade. See [Trust](repeater-polling.md#trust).
 
 ## Upgrading to 2.1
 
