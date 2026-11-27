@@ -156,9 +156,9 @@ banned address could still reach the site over HTTP/3.
 
 ## Upgrading to 2.3.0 from 2.2.0
 
-This release adds migrations `064` to `087` and `089` (polling, user accounts, telemetry requests, alert rules, their channels and outbox, an Atlas telemetry view, the Atlas 7 day
-range and the Atlas poller view). There is no `088`. They run at startup and
-are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
+This release adds migrations `064` to `087` and `089`; there is no `088`. They cover polling, user
+accounts, telemetry requests, alerts and three Atlas additions (the telemetry view, the 7 day range
+and the poller view). They run at startup and are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
 `081`, `082`) on tables this release creates, so they start empty. On the project's test server the
 whole set took seconds. The only data migrations are `065`, which marks readings of the empty
 `repeater_readings` table, `073`, which removes duplicate rows from the still empty `user_devices`
@@ -173,8 +173,8 @@ more time and disk on a larger database.
 One default changes for everyone: observer telemetry is now stored every 15 minutes instead of
 hourly, so battery and noise alerts react in about half an hour and the 24 hour charts are finer.
 A `config.yaml` copied from an older template still says `resolution: 1h` under `telemetry`, and
-that value wins. Change it to `15m`, or remove the line, to get the new behaviour. It stores about
-four times as many observer snapshots as hourly; see
+that value wins. Change it to `15m` or remove the line to get the new default. 15 minutes stores about
+four times as many observer snapshots as `1h`; see
 [`config.yaml.example`](../app_config/config.yaml.example) for the trade-off.
 
 Every new feature is off by default, so apart from that an upgrade with no config change behaves
@@ -187,16 +187,16 @@ as before:
 | Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `6`) | `BEACON_SECRET_KEY` |
 | Alerts | `alerts.email.enabled` and/or `alerts.push.enabled` with `alerts.push.id`, with accounts on (email needs `local` mode) | `BEACON_PUSH_SECRET` for push |
 
-Telemetry requests hand guest passwords to observers. Each password is encrypted for the one
-observer assigned to that repeater, using that observer's public key, and is stored encrypted on the
-server under `BEACON_SECRET_KEY`. The observer has to decrypt it to log in, so only guest passwords
-are accepted. By default any observer with advert evidence
+Telemetry requests hand guest passwords to observers. Each password is sealed separately for each
+observer assigned to the repeater (at most three), with that observer's public key, and is stored
+encrypted on the server under `BEACON_SECRET_KEY`. The observer has to open it to log in, so users
+must enter guest passwords only. By default any observer with advert evidence
 for the repeater can receive one; set `polling.request_observers: approved` to choose who does
 (see [Approve observers](telemetry-requests.md#approve-observers)). Secrets go in `.env`; see
 [`.env.example`](../app_config/.env.example). The full settings are in
 [Configuration](configuration.md), and each feature has its own page:
 [Repeater polling](repeater-polling.md), [User accounts](accounts.md),
-[Telemetry requests](telemetry-requests.md) and [Alerts](alerts.md).
+[Requested telemetry](telemetry-requests.md) and [Alerts](alerts.md).
 
 Both client floors rise to 2.3.0. Beacon Web builds older than 2.3.0 show a reload screen, because
 they lack the alert channel switches. BEACON Mobile builds older than 2.3.0 show an update screen,

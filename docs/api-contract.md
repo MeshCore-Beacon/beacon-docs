@@ -590,7 +590,7 @@ The other side of [Node polling](#node-polling): what an observer that polls say
 |---|---|
 | `claim` | The observer's last stored claim, or `null` when it has none. |
 | `claim.receivedAt` | When Beacon received it, epoch ms. |
-| `claim.live` | True while the claim is within its 65 minutes. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
+| `claim.live` | True while the claim is under 65 minutes old. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
 | `claim.acceptsRequests` | The observer takes repeaters handed out by [telemetry requests](#telemetry-requests). |
 | `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is the free seats the claim reported, never more than `max` minus `used`. `used` plus `free` can be less than `max`. |
 | `readings24h` | Readings Beacon received from this observer in the last 24 hours, trusted or not. |
@@ -608,7 +608,7 @@ Each target:
 | `misses` | Failed polls in a row. |
 | `lastAttempt`, `lastOk` | Epoch ms, or `null` when never. |
 | `claimedSnr` | The SNR the observer reports for the repeater, or `null`. |
-| `evidenceSnr`, `evidenceCount` | Zero-hop adverts of the repeater that Beacon saw through this observer in the day before the last election: their mean SNR and how many. `null` and `0` for an unassigned repeater or one with no such adverts. |
+| `evidenceSnr`, `evidenceCount` | Zero-hop adverts of the repeater that Beacon saw through this observer within `polling.evidence_window` (7 days by default) before the last election: their mean SNR and how many. `null` and `0` for an unassigned repeater or one with no such adverts. |
 | `latestReadingAt` | `sampledAt` of the newest reading this observer delivered for the repeater, trusted or not. `null` when it has delivered none. |
 
 #### MeshMapper repeater details

@@ -45,13 +45,16 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 ## Reading a card
 
-A card's header is a status dot and its name, with icon buttons at the top right: the pin (on cards
-with more than one view), an x that removes the card, and the drag grip. A node card has a tag for
-its type, and Poller and Observer tags when the node has those roles. One tag sits beside the name;
-two or more get a row of their own under it, so a long name is shortened rather than wrapped.
+A card's header is a status dot and its name, with icon buttons at the top right: one that opens
+the node on the tab the card is showing, and the alert bell on a server with alerts. Press **Edit
+cards** in the toolbar and those are replaced by the pin (on cards with more than one tab), the drag
+grip and an x that removes the card, and the cards get a dashed border until you press Done. A node
+card has a tag for its type, and Poller and Observer tags when the node has those roles. One tag
+sits beside the name; two or more, or one on a narrow card, get a row of their own under it, so a
+long name is shortened rather than wrapped.
 
-On a card with more than one view, a row of tabs spans the card below the header, showing only the
-views that card has: Analytics, Heard by, Observer, Telemetry and Poller. Every tab is an icon and
+On a card with more than one tab, a row of tabs spans the card below the header, showing only the
+tabs that card has: Analytics, Heard by, Observer, Telemetry and Poller. Every tab is an icon and
 only the open one also shows its name, so the row fits a phone in any language. Hover or long-press
 an icon for its name.
 
@@ -144,30 +147,30 @@ view's tiles. A new card shows battery, noise floor, uptime and airtime. Both th
 tiles are saved with the card as `view: "telemetry"` and `telemetryTiles`. A card pinned to
 Telemetry that loses the tab opens on Analytics.
 
-A card for a node that is a poller (it has the Poller tag) gets a **Poller** tab on a server with
-polling on, once the server has a polling claim for it. Its four tiles are fixed: **Slots** (how
+On a server with polling on, a card for a node with the Poller tag gets a **Poller** tab, once the
+node is linked to its observer. Its four tiles are fixed: **Slots** (how
 many of its slots are used, split into its owner's own repeaters and requested ones, with a seat
 meter), **Answering** (how many of the repeaters it holds report `ok`, with a dot for each),
 **Readings** (readings Beacon received from it in the last 24 hours) and **Last claim** (when
 Beacon last received its claim and whether it accepts requests). The footer says how many repeaters
-it is the elected poller for and links to the node's Poller view. The tab is saved as
+it is the elected poller for. The card's open button opens the node on its Poller view. The tab is
+saved as
 `view: "poller"`, only to a server that reports `features.atlasPoller`; on another server the
 choice stays in the browser or app. A card pinned to Poller that loses the tab opens on Analytics.
 
-A card with more than one view has a pin button in its header. The pin is pressed while the card
-shows the tab it opens on. Pressing it on another tab
-makes that the tab the card opens on, and the choice is saved with the card.
+In edit mode a card with more than one tab shows a pin. It is lit on the tab the card opens on.
+Press it on another tab to make the card open there; the choice is saved with the card.
 
 Switching tabs without pressing the pin is temporary: only one card at a time is away from the
 tab it opens on, so switching a tab on another card sends the first one back.
 
 A card pinned to Observer whose node has no observer link opens on Analytics; the pin is kept
-and applies again once the link is there. An observer card has one view and no pin. When an
+and applies again once the link is there. An observer card has one tab and no pin. When an
 observer card becomes a node card, it keeps opening on Observer.
 
 ## Arranging cards
 
-Drag the grip at the top right of a card to another slot (mouse or touch). With the grip focused,
+In edit mode, drag the grip at the top right of a card to another slot (mouse or touch). With the grip focused,
 the arrow keys move it one slot; Up and Down work too, since a phone shows one column. The order is
 saved with the rest of the collection.
 
@@ -238,7 +241,7 @@ mobile app show the same cards. Signed out, nothing changes and the local copy i
 
 The routes are in the [API contract](api-contract.md#atlas-sync).
 
-## Polling
+## Refresh
 
 Cards refresh once a minute while the tab is open and the browser tab is visible. A node card's
 observer data loads only while its **Observer** view is open. Polling pauses while the server is

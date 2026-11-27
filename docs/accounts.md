@@ -43,7 +43,7 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 
 | Key | Default | What it does |
 |---|---|---|
-| `mode` | `off` | `off` or `local`. Anything else stops startup. The rest of the block is not checked while this is `off`. |
+| `mode` | `off` | `off` or `local` (`portal` is for the project's own instance, see [Configuration](configuration.md#user-accounts)). Anything else stops startup. The rest of the block is not checked while this is `off`. |
 | `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
 | `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
 | `mail.host` | none | Required. |

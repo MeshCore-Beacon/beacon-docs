@@ -158,6 +158,6 @@ if you enable it, contains everything the database holds, so keep archives priva
 ## Secrets in files
 
 `.env` holds the database password, broker credentials, admin key, MeshMapper API key, and, when those
-features are on, `BEACON_SECRET_KEY` and `BEACON_SMTP_PASSWORD`. It is gitignored in
+features are on, `BEACON_SECRET_KEY`, `BEACON_PUSH_SECRET` and `BEACON_SMTP_PASSWORD`. It is gitignored in
 the deployment folders; keep it that way, and keep its permissions tight on the host.
 `data/app/config.yaml` holds channel keys. Neither belongs in a public backup.
