@@ -468,16 +468,11 @@ cache:
 # A web app on another origin than the API also needs cors.allowed_methods, cors.allowed_headers
 # (with X-Beacon-CSRF) and cors.allow_credentials; same origin needs nothing.
 #accounts:
-#  mode: off                   # off, local or portal
+#  mode: off                   # off or local
 #  public_url: ""              # https URL of the web app, no path; used in mailed links
 #  registration: open          # open or closed
-#  # mode: portal signs people in through the MeshMapper portal: no mail, no registration.
-#  # The client secret comes from BEACON_PORTAL_SECRET, never from here.
-#  portal:
-#    url: ""                   # https base address of the portal; required when mode is portal
-#    client_id: ""             # required when mode is portal
 
-# Alerts: tell users when a radio on their Atlas needs attention. Needs accounts (local or portal). Off by default.
+# Alerts: tell users when a radio on their Atlas needs attention. Needs accounts. Off by default.
 # Each user picks which of the channels below reach them.
 #alerts:
 #  email:

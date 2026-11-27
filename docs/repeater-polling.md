@@ -77,8 +77,8 @@ Caddy, see [RSA certificate for observers](reverse-proxy.md#rsa-certificate-for-
 
 The device must be an ESP32 board with PSRAM running the MeshCore repeater observer firmware
 with repeater polling, with the MQTT bridge on, publishing to a broker Beacon reads. The polling
-firmware is in the [observer flasher](https://observer.gessaman.com) as a test build and is
-still in testing. The room server firmware has no polling. On the device:
+firmware is in the [observer flasher](https://observer.gessaman.com): pick the version tagged
+`-poll` when you flash. It is a test build and is still in testing. The room server firmware has no polling. On the device:
 
 ```text
 set poll.url https://beacon.example.com

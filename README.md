@@ -70,8 +70,8 @@ Set every `CHANGE_*` value. The ones you cannot skip:
 Everything else in the file is optional and explained in
 [Configuration](docs/configuration.md): the admin API key, log settings, Redis, and the
 web app's map view, tabs, themes, name and banner. The features added in 2.3.0 each take a
-secret here when you turn them on: `BEACON_SMTP_PASSWORD` (account mail), `BEACON_PORTAL_SECRET`
-(portal sign-in), `BEACON_SECRET_KEY` (telemetry requests) and `BEACON_PUSH_SECRET` (push alerts).
+secret here when you turn them on: `BEACON_SMTP_PASSWORD` (account mail), `BEACON_SECRET_KEY`
+(telemetry requests) and `BEACON_PUSH_SECRET` (push alerts).
 
 If you enable MeshMapper imports, also set `MESHMAPPER_API_KEY`. Your local MeshMapper
 regional or grouped-region admin can generate a regional key or a key covering multiple
@@ -148,7 +148,6 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 - [Getting packets in](docs/getting-packets-in.md): brokers, the account Beacon needs, topics.
 - [Repeater polling](docs/repeater-polling.md): observers asking repeaters for telemetry, and how Beacon coordinates them.
 - [User accounts](docs/accounts.md): optional sign-in, SMTP, CORS for a split deployment, limits and the operator user routes.
-- [Sign-in through the MeshMapper portal](docs/portal-sign-in.md): accounts through the portal instead of email and password.
 - [Requested telemetry](docs/telemetry-requests.md): users asking for a repeater to be polled, approving observers, guest passwords.
 - [Alerts](docs/alerts.md): rules on Atlas radios, email and push delivery.
 - [Configuration](docs/configuration.md): every environment variable and a map of `config.yaml`.

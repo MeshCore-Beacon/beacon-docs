@@ -713,9 +713,7 @@ Out-of-range intervals fail startup.
 Added in 2.3.0, all off by default. Each has its own page; this is only how they fit together.
 
 - **[User accounts](accounts.md).** `accounts.mode: local` gives sign-up by email, sessions and
-  password reset. `accounts.mode: portal` signs users in through the MeshMapper portal instead
-  ([Sign-in through the MeshMapper portal](portal-sign-in.md)). Routes are under `/api/v1/auth`
-  and `/api/v1/me`. Account mail goes out through the `mail` block.
+  password reset. Routes are under `/api/v1/auth` and `/api/v1/me`. Account mail goes out through the `mail` block.
 - **Atlas sync.** A signed-in user's Atlas is stored on the server and follows the account
   ([Atlas](atlas.md#sync-to-an-account)).
 - **[Repeater polling](repeater-polling.md).** Observer firmware asks Beacon for its policy and
@@ -763,7 +761,6 @@ BEACON_API_KEY=...            # optional admin bearer key
 MESHMAPPER_API_KEY=...        # optional, for MeshMapper imports
 BEACON_SECRET_KEY=...         # optional, seals guest passwords for telemetry requests
 BEACON_SMTP_PASSWORD=...      # optional, SMTP login for account and alert mail
-BEACON_PORTAL_SECRET=...      # optional, portal sign-in
 BEACON_PUSH_SECRET=...        # optional, push alerts
 LOG_LEVEL=info                # optional, overrides log.level
 LOG_FORMAT=text               # optional, overrides log.format

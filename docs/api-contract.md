@@ -1145,7 +1145,7 @@ Backup details are in [Backup and export](backup-export.md).
 
 ### User accounts
 
-Off unless `accounts.mode` is `local` ([User accounts](accounts.md)) or `portal` ([portal sign-in](portal-sign-in.md)). With it off every route below,
+Off unless `accounts.mode` is `local` ([User accounts](accounts.md)) or `portal` (the project's own MeshMapper instance only, see [Configuration](configuration.md#user-accounts)). With it off every route below,
 under `/api/v1/auth` and `/api/v1/me`, answers `404` with code `accounts_disabled`, and no cookie is set.
 These are separate from the operator records at `/admin/accounts`.
 
@@ -1261,7 +1261,7 @@ Notes:
   `beacon_session` set, or to `<public_url>/?view=signin&error=portal` on any failure including a
   cancel. Both answer `503 read_only` on a read-only server. In portal mode `register`, `verify`,
   `verify/resend`, `login`, `reset/request`, `reset/confirm`, `/me/password` and `/me/email` answer
-  `404 portal_managed`. See [Sign-in through the MeshMapper portal](portal-sign-in.md).
+  `404 portal_managed`.
 - **Mail.** Beacon mails the account address when a password is changed (by reset or from the
   profile), mails the old address when an email change is applied, and when an app signs in.
 - **Reset links** are bound to the address they were mailed to: after the address changes, an

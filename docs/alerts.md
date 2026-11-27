@@ -23,7 +23,7 @@ alerts:
 
 | Channel | What it needs |
 |---|---|
-| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Any other mode stops startup; portal users have no address. |
+| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Any other mode stops startup. |
 | `push.enabled` | A Push ID in `push.id` and the Push secret in `BEACON_PUSH_SECRET`, from registering the server with the push server. See [Push](#push). Without them Beacon does not start. |
 
 With both off (the default) every alert route answers `404 alerts_disabled`. With accounts off,

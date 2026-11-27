@@ -78,23 +78,6 @@ Accounts are off by default; see [User accounts](accounts.md). When they are on:
   does not discard a good token.
 - The SMTP password belongs in `BEACON_SMTP_PASSWORD`, not in `config.yaml`.
 
-### Portal sign-in
-
-With `accounts.mode: portal` (see [Sign-in through the MeshMapper portal](portal-sign-in.md)):
-
-- The client secret belongs in `BEACON_PORTAL_SECRET`, not in `config.yaml`. Startup stops without
-  it. Beacon sends it only to the portal's token call. It is never logged, and neither are the
-  code, the PKCE verifier or the portal's answer; failures log a fixed reason.
-- The sign-in uses PKCE (S256) and a state that is stored in the database for 10 minutes, tied to a
-  `beacon_portal` cookie, and used up on the first callback whatever its outcome. A callback without
-  the cookie, with the wrong state or with no code fails.
-- The token call has a 10 second timeout, follows no redirect, accepts only a `200` and reads at
-  most 64 KiB. The portal's `https` address is checked at startup.
-- The `return` path of a sign-in must be a relative path on the same site, so it cannot send people
-  to another host.
-- Portal users have no password and no email in Beacon. The portal's username and display name are
-  stripped of control characters and cut to length before they are stored.
-
 ## Guest passwords
 
 [Requested telemetry](telemetry-requests.md) lets a user give Beacon a guest password for a
@@ -175,6 +158,6 @@ if you enable it, contains everything the database holds, so keep archives priva
 ## Secrets in files
 
 `.env` holds the database password, broker credentials, admin key, MeshMapper API key, and, when those
-features are on, `BEACON_SECRET_KEY`, `BEACON_PORTAL_SECRET` and `BEACON_SMTP_PASSWORD`. It is gitignored in
+features are on, `BEACON_SECRET_KEY` and `BEACON_SMTP_PASSWORD`. It is gitignored in
 the deployment folders; keep it that way, and keep its permissions tight on the host.
 `data/app/config.yaml` holds channel keys. Neither belongs in a public backup.

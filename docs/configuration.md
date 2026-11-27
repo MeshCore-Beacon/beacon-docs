@@ -25,7 +25,6 @@ to open).
 | `BEACON_API_KEY` | unset | Bearer key for `/api/v1/admin/*`. When set, even to an empty string, it replaces `auth.api_key` from the config file. See [Admin API key](#admin-api-key). |
 | `MESHMAPPER_API_KEY` | unset | Regional or grouped-region key for enabled MeshMapper imports. When set, even to an empty string, it replaces `meshmapper.api_key`. Missing keys leave imports unconfigured while Beacon keeps running. See [MeshMapper API key](#meshmapper-api-key). |
 | `BEACON_SECRET_KEY` | unset | 32 random bytes in base64. Seals the guest passwords of [telemetry requests](telemetry-requests.md). See [BEACON_SECRET_KEY](#beacon_secret_key). |
-| `BEACON_PORTAL_SECRET` | unset | The client secret for sign-in through the MeshMapper portal. Required when `accounts.mode` is `portal`; has no YAML key. See [Sign-in through the MeshMapper portal](portal-sign-in.md). |
 | `BEACON_PUSH_SECRET` | unset | The Push secret from registering the server with the push server. Required when `alerts.push.enabled` is true; has no YAML key. See [Alerts](alerts.md#push). |
 | `BEACON_SMTP_PASSWORD` | unset | Password for `mail.username`. Read only when `accounts.mode` is `local`; it has no YAML key. See [User accounts](#user-accounts). |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Overrides `log.level`. Anything else stops startup. |
@@ -85,7 +84,7 @@ which ones to read.
 | `telemetry` | How long observer telemetry snapshots are kept and how often one is stored. | Disk is tight. |
 | `polling` | Repeater polling: whether Beacon coordinates observers polling repeaters, which broker hosts they publish to, and how long readings are kept. Off by default. | You want [Repeater polling](repeater-polling.md). See [Repeater polling](#repeater-polling). |
 | `mail` | The outgoing SMTP server for account mail and email alerts. The password is `BEACON_SMTP_PASSWORD`. | You use `accounts.mode: local`. See [User accounts](#user-accounts). |
-| `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. `local` needs the `mail` block; `portal` signs in through the MeshMapper portal. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
+| `accounts` | User accounts: sign-in for Beacon Web and BEACON Mobile. Off by default; with it off no account route is served. `local` needs the `mail` block. | You want people to have accounts. See [User accounts](#user-accounts) and [User accounts](accounts.md). |
 | `alerts` | The alert channels: `email.enabled` and `push.enabled`, with `push.id`. Off by default. Needs accounts. | You want [Alerts](alerts.md). See [Alerts](#alerts). |
 | `display` | The units clients show: `temperature_unit` and `distance_unit`. | You want Fahrenheit or miles. See [Display units](#display-units). |
 | `atlas` | `limit`: how many cards one Atlas holds. Default 20. | You want larger or smaller Atlases. See [Atlas size](#atlas-size). |
@@ -366,14 +365,12 @@ except a leftover `smtp` block, which always stops startup (it moved to the top-
 
 | Key | Default | What it does |
 |---|---|---|
-| `mode` | `off` | `off`, `local` or `portal`. |
-| `public_url` | none | Required with `local` and `portal`. The web app's address, `https` (plain `http` only for `localhost` and `127.0.0.1`), no path. Used for mailed links and the cookie's `Secure` flag. |
+| `mode` | `off` | `off` or `local`. |
+| `public_url` | none | Required with `local`. The web app's address, `https` (plain `http` only for `localhost` and `127.0.0.1`), no path. Used for mailed links and the cookie's `Secure` flag. |
 | `registration` | `open` | `open` or `closed`. |
-| `portal.url` | none | Required with `portal`. The portal's `https` base address, with no credentials, query or fragment. |
-| `portal.client_id` | none | Required with `portal`. The id the portal knows this instance by. |
 
-With `portal`, the `mail` block is not used and registration is always closed. The client secret is
-`BEACON_PORTAL_SECRET`, never in the file. See [Sign-in through the MeshMapper portal](portal-sign-in.md).
+A third mode, `portal`, exists for the project's own MeshMapper instance. It is not supported for
+other deployments.
 
 `local` sends its mail through the top-level `mail` block, which email alerts share. It is checked only
 when `accounts.mode` is `local`. An `smtp` block left under `accounts` stops startup with a message saying it
@@ -411,7 +408,7 @@ The `alerts` block turns on [Alerts](alerts.md). It needs [User accounts](accoun
 | Key | Default | What it does |
 |---|---|---|
 | `email.enabled` | `false` | Send alerts by email. Needs `accounts.mode: local` and the `mail` block; any other mode stops startup. |
-| `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs `accounts.mode` `local` or `portal`, `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
+| `push.enabled` | `false` | Send alerts as push notifications to the Beacon app, through the push server. Needs accounts on, `push.id` and `BEACON_PUSH_SECRET`; startup fails without them. |
 | `push.id` | empty | Required with `push.enabled`. The Push ID from registering the server at `https://push.meshcorebeacon.ca/register`: at most 64 characters, with no dot, space or non-ASCII character. |
 | `push.server` | `https://push.meshcorebeacon.ca` | The push server. You must use the official one: the Beacon app only receives notifications sent through it. Only change it if the project announces a new address. Must be https with no path, query or credentials; any other server logs a warning. |
 
