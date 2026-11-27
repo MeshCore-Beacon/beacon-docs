@@ -1,6 +1,6 @@
 # Atlas
 
-A per-browser watchlist of up to twelve radios, each shown as a card of recent activity and signal.
+A per-browser watchlist of radios, up to the server's [`atlas.limit`](configuration.md#atlas-size) (20 by default), each shown as a card of recent activity and signal.
 A card can follow a node, an observer, or a node that is also an observer. The tab sits just before
 **Analytics**, in the desktop row and under **More** on a phone; the URL is `?tab=Atlas`. Hide it for a deployment
 with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
@@ -8,16 +8,19 @@ with `VITE_DISABLED_TABS=Atlas` (see [Configuration](configuration.md)).
 ## What is stored, and where
 
 Cards live only in the visitor's browser, under the localStorage key `beacon-atlas-v2`: each
-card's kind, ID, last known name, card order and the activity window (24h or 3d). A node card also
+card's kind, ID, last known name, card order and the activity window (24h, 3d or 7d). A node card also
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
 A card whose Observer view tiles were changed also keeps its four tiles (see
 [Choosing the Observer tiles](#choosing-the-observer-tiles)), and a node card pinned to open on
-**Heard by** or **Observer** keeps that tab (see
-[The tab a card opens on](#the-tab-a-card-opens-on)).
+**Heard by**, **Observer** or **Telemetry** keeps that tab (see
+[The tab a card opens on](#the-tab-a-card-opens-on)). A node card whose Telemetry tiles were
+changed keeps those four tiles too.
 
-There is no account and no sync between browsers or devices; use
+Signed out, there is no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
-storage is unavailable, the page says so and edits last for the visit.
+storage is unavailable, the page says so and edits last for the visit. On a server with
+[accounts](accounts.md), a signed-in user's Atlas is kept on the account instead, see
+[Sync to an account](#sync-to-an-account).
 
 Node cards are keyed by the full public key. If a server reset changes a node's ID, the page looks
 the key up again before loading anything and saves the new ID; it never adopts a different node at
@@ -44,19 +47,26 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 A card's header is its name and badges, with icon buttons at the top right: the pin (on cards
 with more than one view), an x that removes the card, and the drag grip. On a card with more
-than one view, the Analytics / Heard by / Observer switch spans the card below the header.
+than one view, the Analytics / Heard by / Observer / Telemetry switch spans the card below the
+header, showing only the views that card has.
 
 The Analytics and Observer views end in a one-line footer. It never wraps: text that does not fit
 is cut short, and the info tip at its end lists every fact in full, with absolute times, followed
 by the help text. While a view's data is loading, or when it fails to load, the line says so.
+
+Clicking a tile's graph on the web, or tapping it in the app, opens a large graph of that metric
+with exact values and zoom.
+
+The window is 24 hours, 3 days or 7 days. 7 days is offered only on a server that reports
+`features.atlas7d`; on a server without it, an Atlas saved at 7 days shows 3 days.
 
 A node card opens on **Analytics** unless it is pinned to another tab (see
 [The tab a card opens on](#the-tab-a-card-opens-on)). Analytics is the Analytics Signal row for
 that node over the selected window:
 
 - **Observations**: stored receptions of packets originating from that key. The count and the
-  hourly bars come from hourly totals the server keeps for the selected window (24 hours or 3
-  days), so a busy node is counted in full rather than cut off at its newest receptions. Hours
+  hourly bars come from hourly totals the server keeps for the selected window (24 hours, 3
+  days or 7 days), so a busy node is counted in full rather than cut off at its newest receptions. Hours
   the server has not covered are left empty rather than drawn as zero, and the tile then says
   "Partial history" in place of the window.
 - **Mean SNR / Mean RSSI**: averages of the observers' last-hop measurements, with an hourly
@@ -120,6 +130,14 @@ the info tip says so.
 
 ### The tab a card opens on
 
+On a server with [repeater polling](repeater-polling.md) on (`features.polling`), a card for a
+repeater or room server gets a **Telemetry** tab when an observer is assigned to poll it, or when
+it has readings from the last 30 days. The tab keeps its own four tiles, chosen from battery,
+noise floor, uptime, airtime, temperature, packets, signal and errors, separate from the Observer
+view's tiles. A new card shows battery, noise floor, uptime and airtime. Both the tab and the
+tiles are saved with the card as `view: "telemetry"` and `telemetryTiles`. A card pinned to
+Telemetry that loses the tab opens on Analytics.
+
 A card with more than one view has a pin button in its header. The pin is pressed while the card
 shows the tab it opens on. Pressing it on another tab
 makes that the tab the card opens on, and the choice is saved with the card.
@@ -165,15 +183,44 @@ four different metric IDs, in tile order, from `airtime`, `battery`, `uptime`, `
 `tiles` is dropped on import and the card keeps the default layout; a build from before the tile
 picker ignores the field.
 
-`view` is optional on a node card: `heard` or `observer`, the tab the card opens on, left out
-when that is Analytics. Any other value is dropped on import and the card is kept, opening on
-Analytics. A build from before the pin ignores the field.
+`telemetryTiles` is optional on a node card and works the same way for the Telemetry tab: four
+different IDs, in tile order, from `battery`, `noise`, `uptime`, `airtime`, `temperature`,
+`packets`, `signal` and `errors`, left out for the default layout.
+
+`view` is optional on a node card: `heard`, `observer` or `telemetry`, the tab the card opens
+on, left out when that is Analytics. Any other value is dropped on import and the card is kept,
+opening on Analytics. A build from before the pin ignores the field.
 
 Imports go through the same checks as a saved collection: a file without the format tag is
-refused, malformed or duplicate cards are dropped, at most twelve are kept, and the page says how
+refused, malformed or duplicate cards are dropped, at most the server's limit are kept, and the page says how
 many were skipped. Files over 256 KB are refused. Node cards work on another Beacon server,
 because the public key finds the node there. Observer IDs belong to one server, so an observer
 card imported elsewhere shows as no longer known.
+
+## Sync to an account
+
+On a server with accounts on, a signed-in user's Atlas is stored on the server, so the web and the
+mobile app show the same cards. Signed out, nothing changes and the local copy is used as above.
+
+- The server keeps the range (24h, 3d or 7d) and ordered pins up to its configured limit. Each pin is
+  stored by public key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
+  observer pin whose key now has a node record is returned as a node pin; if that node is already
+  pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
+  tiles and, for a node pin, its four Telemetry tiles and the tab it opens on.
+- The Atlas is replaced as a whole, guarded by a revision number. The `200` answer to a save is the
+  document that save committed. A write that carries an older
+  revision is refused with `409 atlas_conflict` and the stored Atlas. The client then adopts the
+  server's copy, drops its own change and says so; it does not retry by itself.
+- On first sign-in the client merges the local cards into the account: the server's pins come first,
+  then local pins the server does not hold, up to the server's limit, and the page says how many did not fit.
+  The local copy remembers which user it was last synced to. If that is a different user, it is not
+  merged and the account's Atlas replaces it, so one person's cards never move into another
+  account on a shared device. Edits made while signed out keep that owner mark, so they are
+  replaced too when someone else signs in.
+- Taking a radio off the Atlas also deletes its [alert](alerts.md) rules.
+- Deleting the account deletes its Atlas.
+
+The routes are in the [API contract](api-contract.md#atlas-sync).
 
 ## Polling
 

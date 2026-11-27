@@ -20,7 +20,7 @@ address unless Beacon is told otherwise. Two things have to be true:
 2. The proxy overwrites `X-Real-IP` with the connecting client's address. The shipped Caddy,
    nginx and Apache configs do; see [Reverse proxy](reverse-proxy.md).
 
-Beacon logs a warning at startup when limits are on and no proxy is trusted. The same mistake
+Beacon logs a warning at startup whenever `server.trusted_proxies` is empty. The same mistake
 makes the WebSocket connection cap (5 per IP) hit for everyone at once.
 
 ## The page loads but nothing is live
@@ -65,6 +65,12 @@ Beacon refuses to run with a setting it cannot honour. The message names the key
 | `not a well-formed GeoJSON Feature`, `ring 0 is not closed`, `geometry must be Polygon or MultiPolygon` | The border file is invalid. It must be a single GeoJSON Feature with a closed Polygon or MultiPolygon in longitude, latitude order. |
 | `log level must be debug, info, warn or error` | Check `log.level` and `LOG_LEVEL`. `log format must be text or json` is the same for format. |
 | `auth.api_key / BEACON_API_KEY must be at least 16 characters` | Use a longer key, with no whitespace inside it. |
+| `invalid polling configuration`, for example `polling.mqtt_hosts: required when polling.enabled is true` | Fix the key the error names. See [Repeater polling](configuration.md#repeater-polling). |
+| `invalid accounts configuration`, for example `mail.host: required when accounts.mode is local` or `accounts.public_url: required when accounts.mode is local` | Fix the key the error names. See [User accounts](configuration.md#user-accounts). |
+| `accounts.smtp has moved: put those settings in a top-level mail block` | Move the block. It stops startup even with `accounts.mode: off`. |
+| `invalid alerts configuration`, for example `alerts.push.id: required when alerts.push.enabled is true` | Fix the key the error names. See [Alerts](alerts.md#turn-them-on). |
+| `alerts.delivery has been replaced: set alerts.email.enabled and alerts.push.enabled instead` | Replace the old key with the two switches. |
+| `invalid secret key` | `BEACON_SECRET_KEY` is set but not usable. See [Turn it on](telemetry-requests.md#turn-it-on). |
 
 ## No packets are arriving
 
@@ -76,9 +82,60 @@ Check `GET /api/v1/brokers` first.
   [Getting packets in](getting-packets-in.md).
 - **Connected but nothing stored.** No observers are publishing to that broker, or
   `ingest.allow_countries` / `allow_continents` in `config.yaml` is filtering them out.
+  `ingest.allow_iatas` lets in single IATA codes on top of those.
   `GET /api/v1/observers` shows who Beacon has heard from.
 - **Packets arrive but with no signal data.** The account is Role 3, which strips `snr` and
   `rssi`. Ask for a Role 2 account.
+
+## An observer cannot fetch its policy, or keeps dropping its broker connection
+
+Observers run on ESP32 chips, which are slow to check an ECDSA certificate chain. A device whose
+`get poll` stays on mode `unknown`, or a broker slot that connects and drops over TLS, can be
+running out of time in the TLS handshake. Serve an RSA certificate on the Beacon site the device
+polls and on the brokers; see
+[An RSA certificate for the devices](repeater-polling.md#an-rsa-certificate-for-the-devices) and
+[RSA certificate for observers](reverse-proxy.md#rsa-certificate-for-observers).
+
+For anything else about polling, see the Troubleshooting sections of
+[Repeater polling](repeater-polling.md#troubleshooting) and
+[Requested telemetry](telemetry-requests.md#troubleshooting).
+
+## Telemetry requests are off
+
+With polling on, startup logs either `telemetry requests` or `telemetry requests are off` with a
+`reason`:
+
+| Reason | Fix |
+|---|---|
+| `polling.requests_per_user is 0` | Set it above `0`, or leave it out for the default. |
+| `accounts are off` | Set `accounts.mode`. Requests belong to a signed-in user. |
+| `BEACON_SECRET_KEY is not set` | Add the key to `.env` and recreate `app`. |
+
+With polling off there is no line at all. See [Turn it on](telemetry-requests.md#turn-it-on).
+
+## Push notifications are not arriving
+
+Look for `component=alerts` in `docker compose logs app`.
+
+| Message | Meaning |
+|---|---|
+| `push server hello failed: alert push notifications will be retried` | Beacon could not reach the push server or was not accepted. Check `alerts.push.id` and `BEACON_PUSH_SECRET`, and that the host can reach the push server. |
+| `push server reports this server is <status>: alert push notifications cannot be sent` | The registration is not active. Check it where you registered the server. |
+| `this server is banned from the push server: alert push notifications cannot be sent` | Contact the push server's operator. |
+| `the push server terms have changed: review and accept them where you registered this server` | Accept the new terms. |
+| `push server rate limited this server: alert push notifications wait` | The server is over its quota. Notices are held, not dropped, until the time in `until`. |
+| `push server refused this server: alert push notifications will be retried`, `alert push not sent` | One send failed and is retried. The `err` field says why. |
+
+A startup `WARN` that `BEACON_PUSH_CREDENTIALS is unused since 2.3.0` means the old Firebase key
+is still in `.env`; remove it. A phone is registered for push when its user signs in on the
+app, so someone who has not signed in there gets none. See [Push](alerts.md#push).
+
+## Alert or account mail is not sent
+
+`alert mail not sent` (alerts) and `mail not sent` (confirmation, reset and notice mail) carry
+the SMTP error in `err`. Check the `mail` block and `BEACON_SMTP_PASSWORD`. `mail queue full,
+mail dropped` means account mail was queued faster than the mail server took it. Email alerts
+also need `accounts.mode: local`; see [Email](alerts.md#email).
 
 ## Every path hop says `"confidence": "none"`
 

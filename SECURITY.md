@@ -1,11 +1,14 @@
 # Security Policy
 
 This is the **documentation and deployment** repository for Beacon. If you have
-found a vulnerability in the Beacon application itself (server or web), please
+found a vulnerability in the Beacon application itself (server, web, mobile app or
+push server), please
 report it against the relevant code repository:
 
 - [beacon-server](https://github.com/MeshCore-Beacon/beacon-server)
 - [beacon-web](https://github.com/MeshCore-Beacon/beacon-web)
+- [beacon-flutter-app](https://github.com/MeshCore-Beacon/beacon-flutter-app)
+- [beacon-push](https://github.com/MeshCore-Beacon/beacon-push)
 
 ## Reporting a Vulnerability
 
@@ -28,7 +31,8 @@ repository.
 The Docker deployments in this repo expose `db`, `redis`, and `app` only on
 `127.0.0.1`, with Caddy terminating TLS on ports 80/443. Beacon's REST reads
 and WebSocket feed are public by design; only `/api/v1/admin/*` needs a bearer
-key (`BEACON_API_KEY`), and abuse is limited by per-IP rate limits. It is
+key (`BEACON_API_KEY`), and abuse is limited by per-IP rate limits. With user
+accounts on, the `/api/v1/auth` and `/api/v1/me` routes need a signed-in user. It is
 intended to sit behind that reverse proxy, listed in `server.trusted_proxies`.
 Keep this in mind when assessing the severity of any findings, and never expose
 the database, Redis, or the raw app port to the public internet.

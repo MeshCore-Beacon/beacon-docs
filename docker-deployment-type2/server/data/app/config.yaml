@@ -74,7 +74,7 @@ ratelimit:
 #  api_key: ""
 #  scopes:
 #    enabled: false
-#    refresh_interval: 1h  # 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
+#    refresh_interval: 24h # default; 1h-24h (MeshMapper allows one get_scopes.php per region per 55m); one source per 15s tick
 #
 # Region boundaries (Zones API). Every known IATA, including ones auto-created
 # from traffic, is looked up in its country's zone list, then its get_geojson.php
@@ -112,6 +112,20 @@ ratelimit:
 #  channels:
 #    enabled: false
 #    refresh_interval: 24h # 24h-168h (one get_channels.php per region per 23.5h)
+#
+# Repeater site details (get_repeaters.php). Every known IATA that MeshMapper
+# lists is fetched from its site, the same way as channels. Each repeater's
+# admin-entered site details (power, hardware, antenna, heights, power source,
+# notes), CARpeater flag, admin names, confirmed scopes and default scope are
+# shown on node detail as `meshmapper`, matched by full public key. Positions,
+# status and radio data are not imported. A failed refresh keeps the last good
+# list and retries after 1h (or Retry-After); an empty list clears the region.
+# Each request counts against the key's shared budget (1,000/day, 30/min), so
+# 6h costs 4 requests per IATA per day. Turning it off deletes the import on
+# restart. Logged under component=meshmapper.repeaters.
+#  repeaters:
+#    enabled: false
+#    refresh_interval: 6h # 1h-24h
 
 iatas:
   YVR:
@@ -362,11 +376,14 @@ cache:
 # Country codes are ISO 3166-1 alpha-2 (e.g. CA, US, GB).
 # Continent codes: AF (Africa), AN (Antarctica), AS (Asia),
 #                  EU (Europe), NA (North America), OC (Oceania), SA (South America).
-# If both are set an IATA passes if it matches either (OR semantics).
+# allow_iatas adds single IATA codes on top, for example one region across a
+# border without letting in the rest of its country.
+# An IATA passes if it matches any of the three (OR semantics).
 # Omit this section entirely to accept packets from all IATAs (default).
 ingest:
   allow_countries: [CA]
 #  allow_continents: [NA]
+#  allow_iatas: [PAE]
 
 # Background task intervals.
 # Shorter intervals are useful during initial deployment to confirm data is

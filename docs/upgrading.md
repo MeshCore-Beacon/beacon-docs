@@ -154,6 +154,67 @@ shows how to check it. If you enforce the [fail2ban jails](../app_config/fail2ba
 add `protocol="tcp,udp"` to the ban action as shown there: the default bans TCP only, so a
 banned address could still reach the site over HTTP/3.
 
+## Upgrading from 2.2.0: accounts, telemetry requests, alerts and portal sign-in
+
+This release adds migrations `064` to `087` (polling, user accounts, telemetry requests, the portal
+sign-in state, alert rules, their channels and outbox, an Atlas telemetry view and the Atlas 7 day
+range). They run at startup and
+are quick: new tables, a few small columns, and four indexes built `CONCURRENTLY` (`066`, `080`,
+`081`, `082`) on tables this release creates, so they start empty. On the project's test server the
+whole set took seconds. The only data migrations are `065`, which marks readings of the empty
+`repeater_readings` table, `073`, which removes duplicate rows from the still empty `user_devices`
+table, `078`, which copies one drift row per node into a new table, and `084` and `085`, which touch
+only alert tables that are still empty on a 2.2.0 database.
+
+`086` is the only index built on an existing table: it builds an index on `packets` (`origin_pubkey`,
+`last_heard_at`) with `CONCURRENTLY`, so ingest keeps running while it builds. It took about two
+seconds on a test table of 4 million packets and added about a quarter of the table's size; allow
+more time and disk on a larger database.
+
+Every new feature is off by default, so an upgrade with no config change behaves as before:
+
+| Feature | Turn it on with | Secret |
+|---|---|---|
+| Repeater polling | `polling.enabled: true` and `polling.mqtt_hosts` | none |
+| Accounts | `accounts.mode: local` (needs `accounts.public_url` and `mail.host` and `mail.from`) | `BEACON_SMTP_PASSWORD` if the mail server wants a login |
+| Portal sign-in | `accounts.mode: portal` (needs `accounts.public_url`, `accounts.portal.url` and `client_id`) | `BEACON_PORTAL_SECRET` |
+| Telemetry requests | polling and accounts on, and `polling.requests_per_user` not `0` (default `6`) | `BEACON_SECRET_KEY` |
+| Alerts | `alerts.email.enabled` and/or `alerts.push.enabled` with `alerts.push.id`, with accounts on (email needs `local` mode) | `BEACON_PUSH_SECRET` for push |
+
+Telemetry requests hand guest passwords to observers. By default any observer with advert evidence
+for the repeater can receive one; set `polling.request_observers: approved` to choose who does
+(see [Approve observers](telemetry-requests.md#approve-observers)). Secrets go in `.env`; see
+[`.env.example`](../app_config/.env.example). The full settings are in
+[Configuration](configuration.md), and each feature has its own page:
+[Repeater polling](repeater-polling.md), [User accounts](accounts.md),
+[Sign-in through the MeshMapper portal](portal-sign-in.md),
+[Telemetry requests](telemetry-requests.md) and [Alerts](alerts.md).
+
+Both client floors rise to 2.3.0. Beacon Web builds older than 2.3.0 show a reload screen, because
+they lack the alert channel switches. BEACON Mobile builds older than 2.3.0 show an update screen,
+because alert push now goes through the push server and older apps cannot register for it. Deploy the 2.3.0 web container with the
+server, and upgrade once the 2.3.0 app is out in the stores so users can update straight away.
+
+### From a 2.3.0 test build
+
+A server that ran a development build of 2.3.0 with accounts or alerts on needs these changes
+before the release starts:
+
+- **Mail.** The `accounts.smtp` block is now a top-level `mail` block with the same keys. An `smtp`
+  block left under `accounts` stops startup with a message saying it moved.
+- **Alert channels.** `alerts.delivery` is replaced by `alerts.email.enabled` and
+  `alerts.push.enabled`, and the old key stops startup. Push no longer uses a Firebase key: it goes
+  through the push server, with `alerts.push.id` and `BEACON_PUSH_SECRET` from
+  [registering the server](alerts.md#push). `BEACON_PUSH_CREDENTIALS` is no longer read, and
+  startup logs a warning while it is still set; remove it and its key file.
+- **Push devices.** Migration `084` deletes every registered push device, because a device now holds
+  a push server handle and a payload key. App users must sign in again on the 2.3.0 app to get push
+  alerts.
+- **Outbox.** Migration `085` gives email and push their own attempts and retry times and drops the
+  shared columns. A notice queued before it keeps its attempts and retry time for push, and its mail,
+  if not sent yet, starts with no attempts and is tried at once. A build from before `085` cannot
+  read the outbox after it, so going back to one is not supported.
+
 ## Upgrading to 2.1
 
 Server 2.1.0 is one upgrade from any 2.0.x release. It runs migrations `004` to `061` at startup,

@@ -69,7 +69,9 @@ Set every `CHANGE_*` value. The ones you cannot skip:
 
 Everything else in the file is optional and explained in
 [Configuration](docs/configuration.md): the admin API key, log settings, Redis, and the
-web app's map view, tabs, themes, name and banner.
+web app's map view, tabs, themes, name and banner. The features added in 2.3.0 each take a
+secret here when you turn them on: `BEACON_SMTP_PASSWORD` (account mail), `BEACON_PORTAL_SECRET`
+(portal sign-in), `BEACON_SECRET_KEY` (telemetry requests) and `BEACON_PUSH_SECRET` (push alerts).
 
 If you enable MeshMapper imports, also set `MESHMAPPER_API_KEY`. Your local MeshMapper
 regional or grouped-region admin can generate a regional key or a key covering multiple
@@ -144,11 +146,16 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 **Run it**
 
 - [Getting packets in](docs/getting-packets-in.md): brokers, the account Beacon needs, topics.
+- [Repeater polling](docs/repeater-polling.md): observers asking repeaters for telemetry, and how Beacon coordinates them.
+- [User accounts](docs/accounts.md): optional sign-in, SMTP, CORS for a split deployment, limits and the operator user routes.
+- [Sign-in through the MeshMapper portal](docs/portal-sign-in.md): accounts through the portal instead of email and password.
+- [Requested telemetry](docs/telemetry-requests.md): users asking for a repeater to be polled, approving observers, guest passwords.
+- [Alerts](docs/alerts.md): rules on Atlas radios, email and push delivery.
 - [Configuration](docs/configuration.md): every environment variable and a map of `config.yaml`.
-- [Reverse proxy](docs/reverse-proxy.md): Caddy, nginx, Apache, rate limits, split origins.
+- [Reverse proxy](docs/reverse-proxy.md): Caddy, nginx, Apache, rate limits, split origins, and an RSA certificate for observers.
 - [Securing a deployment](docs/security.md): the admin key, the listener, origins, bans.
 - [Day-to-day operations](docs/operations.md): health, logs, retention, backup and restore.
-- [Upgrading](docs/upgrading.md): 2.0.0 from 1.x, and routine upgrades.
+- [Upgrading](docs/upgrading.md): 2.0.0 from 1.x, 2.1, 2.3.0 from 2.2.0, and routine upgrades.
 - [Troubleshooting](docs/troubleshooting.md): symptom, cause, fix.
 - [Releases and versioning](docs/releases.md): image tags and how releases are cut.
 
@@ -156,7 +163,7 @@ gone private; see [Troubleshooting](docs/troubleshooting.md#docker-compose-up-fa
 
 - [High level design](docs/high-level-design.md): how it works, the schema, the ingest pipeline.
 - [API contract](docs/api-contract.md): REST, WebSocket, admin endpoints, errors.
-- [Atlas](docs/atlas.md): the per-browser watchlist of nodes and observers, what its cards mean, and its export file.
+- [Atlas](docs/atlas.md): the watchlist of nodes and observers (per browser, or synced to an account), what its cards mean, and its export file.
 - [Backup and export](docs/backup-export.md) and [CPU profiling](docs/profiling.md).
 
 **Change it**

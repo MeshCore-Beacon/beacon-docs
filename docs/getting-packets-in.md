@@ -22,6 +22,11 @@ observation per observer.
 - **Run your own** with [meshcore-mqtt-broker](https://github.com/michaelhart/meshcore-mqtt-broker)
   and point your observers at it. Beacon only needs a subscriber account on it.
 
+If you run the broker, serve it with an RSA certificate. Most observers are ESP32 devices,
+and an ESP32 verifies an RSA certificate chain much faster than an ECDSA one. The same goes
+for the Beacon site when observers poll repeaters, where it was measured, see
+[An RSA certificate for the devices](repeater-polling.md#an-rsa-certificate-for-the-devices).
+
 ## The account Beacon needs
 
 The broker defines three subscriber roles:
@@ -46,6 +51,9 @@ Observers publish under `meshcore/{IATA}/{observer public key}/`:
 | `packets` | Raw LoRa packets with SNR and RSSI | Decode, dedupe, store, stream |
 | `status` | Observer health, position and firmware | Update the observer record |
 | `neighbors` | The observer's neighbour list | Update neighbour links |
+| `polling` | An observer's claim: the repeaters it polls and how its polls went | Store it for [repeater polling](repeater-polling.md) and pick a poller per repeater. Ignored unless `polling.enabled` is true. |
+| `telemetry` | A repeater reading from an observer | Store it when the observer has a live claim for that repeater. Ignored unless polling is on. |
+| `battery` | The same reading in the older format | Handled like `telemetry`. |
 | `internal` | Owner details from the broker login | Ignored. A Role 2 account is not sent it anyway. |
 
 Beacon subscribes to `meshcore/#` and routes by subtopic. The IATA in the topic is where the

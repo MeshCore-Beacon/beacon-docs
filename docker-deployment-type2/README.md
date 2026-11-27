@@ -28,7 +28,8 @@ docker-deployment-type2/
    ```
 
 2. Create `.env` from the shared template and fill in every `CHANGE_*` value. Only the `app`
-   and `caddy` lines matter here; the `VITE_*` lines can be deleted. If you have one broker,
+   and `caddy` lines matter here; the `VITE_*` lines can be deleted, except `VITE_APP_NAME` if you
+   send account mail or alerts (the server names the instance with it). If you have one broker,
    clear `MQTT_BROKER_2_URL`.
 
    ```bash
@@ -43,7 +44,7 @@ docker-deployment-type2/
    WEB_DOMAIN=beacon.example.com
    ```
 
-   Caddy redirects anything that is not `/api/*` or `/ws` to that host. The password inside
+   Caddy redirects anything that is not `/api/*`, `/ws` or `/.well-known/beacon-push` to that host. The password inside
    `POSTGRES_DSN` must match `POSTGRES_PASSWORD` in `docker-compose.yml`.
 
    For MeshMapper imports, set `MESHMAPPER_API_KEY` in this server host's `.env`.
