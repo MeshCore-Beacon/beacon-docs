@@ -2,8 +2,11 @@
 
 A signed-in user can ask Beacon to have a repeater or room server polled, even when no observer
 owner has set it as a target. Beacon hands the job to an observer that can hear the repeater and
-that its operator approved. The user can give a guest password for the repeater; Beacon seals it
-for the observer that does the polling.
+whose owner turned requests on (and, if you require it, that you approved). The user can give a
+guest password for the repeater; Beacon seals it for the observer that does the polling.
+
+Beacon accepts requests for room servers, but the current polling firmware polls repeaters only,
+so a room server is not polled until firmware can reach one.
 
 This builds on [Repeater polling](repeater-polling.md) and [User accounts](accounts.md). Read
 those first. The routes and shapes are in the [API contract](api-contract.md#telemetry-requests).
@@ -101,9 +104,20 @@ repeater. When the password in use fails or is deleted, the next request takes o
 
 ## The firmware side
 
-The observer firmware needs request support. A claim from such firmware carries `accepts_requests`,
+The observer firmware needs request support, and its owner has to turn it on: requests are off
+by default. On the observer:
+
+```text
+set poll.requests on
+```
+
+The device accepts requests only while polling is on and its `poll.url` is an `https://` address.
+Until an observer that hears the repeater has done this, every request for it stays `waiting`
+with `no_observer`.
+
+A claim from a device that accepts requests carries `accepts_requests`,
 `request_slots` (free seats, at most 8) and `requested` on each node. Firmware without request
-support never reaches this path and its observer simply polls its own targets. The envelope format
+support, or with requests off, never reaches this path and its observer simply polls its own targets. The envelope format
 and the claim fields are in the [API contract](api-contract.md#firmware-polling). Beacon never sends
 a password to an observer in clear: only the envelope, which only that observer's key opens.
 
@@ -226,9 +240,12 @@ blank or hello login are not affected. See [Configuration](configuration.md#beac
 
 ## Troubleshooting
 
-- **Every request stays `waiting`.** If `request_observers` is `approved`, approve an observer that hears the
-  repeater. Check `GET /admin/polling/targets` for the candidates, their evidence and whether each
-  is approved. Check the observer's firmware supports requests and has free seats.
+- **Every request stays `waiting`.** An observer takes requests only after its owner ran
+  `set poll.requests on` (off by default; it needs an `https://` `poll.url`). If
+  `request_observers` is `approved`, approve an observer that hears the
+  repeater. Check `GET /api/v1/admin/polling/targets` for the candidates, their evidence and whether each
+  is approved. Check the observer's firmware supports requests and has free seats. A room server
+  is not polled with the current firmware, which polls repeaters only.
 - **`no_seat`.** Every observer that can reach the repeater already polls as many requested
   repeaters as its claim allows.
 - **Requests are off.** Look for "telemetry requests are off" in the startup log. It names the

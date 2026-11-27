@@ -64,10 +64,21 @@ Then recreate the app container. A change to `config.yaml` is read at startup on
   policy says `paused: true` and the observer stays idle. A missing route would make the
   firmware fall back to a different mode, so do not block them.
 
+### An RSA certificate for the devices
+
+Observers and pollers run on ESP32 chips, which verify an RSA certificate chain much faster
+than an ECDSA one. On the project's test server the polling firmware needed 9.5 to 9.9 seconds
+of its 12 second limit for the HTTPS request against the default ECDSA P-384 chain, and an RSA
+certificate fixed it. Serve an RSA certificate on the host observers put in `poll.url`. The
+same reasoning applies to the MQTT brokers they connect to, though that was not measured. For
+Caddy, see [RSA certificate for observers](reverse-proxy.md#rsa-certificate-for-observers).
+
 ## What an observer owner does
 
-The device must be an ESP32 board with PSRAM, with the MQTT bridge on, publishing to a broker
-Beacon reads. It needs MeshCore observer firmware with repeater polling. On the device:
+The device must be an ESP32 board with PSRAM running the MeshCore repeater observer firmware
+with repeater polling, with the MQTT bridge on, publishing to a broker Beacon reads. The polling
+firmware is in the [observer flasher](https://observer.gessaman.com) as a test build and is
+still in testing. The room server firmware has no polling. On the device:
 
 ```text
 set poll.url https://beacon.example.com
@@ -77,13 +88,30 @@ set poll on
 
 - `poll.url` is the Beacon site, with `https://` and no path. Changing it makes the device wait
   for a fresh policy before it polls again.
-- `poll add` takes the repeater's 64 character public key. Repeat it for each repeater, up to 8.
-  The repeater must be a direct neighbour that the observer heard in the last day. The observer
-  never floods to reach one.
+- `poll add` takes the repeater's 64 character public key, or a key prefix that matches exactly
+  one neighbour the device has heard. Repeat it for each repeater, up to 8. The repeater must be
+  a direct neighbour that the observer heard in the last day. The observer never floods to reach
+  one. The firmware's neighbour table holds repeaters only, so this build cannot poll a room
+  server.
+- The device logs in to the repeater as a guest. It tries a blank password, then `hello`. For a
+  repeater with another guest password run `poll pw <key> set <password>` (1 to 15 printable
+  characters); that is then the only one tried. `poll pw <key> auto` goes back to blank and
+  `hello`. Never give it an admin password.
+- If a repeater answers the login with admin access, the device stops polling it, discards a
+  password you set, and removes the access it was given. The repeater stays stopped, across
+  reboots, until you run `poll enable <key>`.
 - `set poll.slot` is optional. It names the MQTT slot the device uses when it has several. Leave
   it out and the device picks the slot whose host is in Beacon's `mqtt_hosts`.
+- Beacon's window (`polling.direct_window`, sent to the device as `direct_s`) is the shortest
+  time between polls of one repeater. The device's own `set poll.interval` (30 to 1440 minutes,
+  default 60) can only make it slower. With `direct_window: 30m` a device still polls hourly
+  until its owner runs `set poll.interval 30`.
+- Nothing is polled until the device has set its clock from NTP after a boot.
 
-The poll interval comes from Beacon's policy (`direct_window`), so the owner does not set one.
+To check it works: `get poll` shows the switch, the mode (`telemetry` with Beacon), the slot,
+the target count and the clock. `get poll.status` has one line per target with its last result,
+and `get poll.status <n>` the details of target n. `poll now <key>` sends one poll right away,
+at most once a minute per target.
 
 ## What Beacon stores
 
@@ -120,7 +148,10 @@ Beacon accepts a reading only when all of these hold:
 ## Seeing the readings
 
 With polling enabled, a repeater's or room server's detail view in Beacon Web and in the mobile
-app shows charts of its readings. Atlas cards show a one-line battery and temperature summary instead of charts, using the latest hourly average. With polling off, none of them appear.
+app shows charts of its readings. An Atlas card for a repeater that is polled, or that has
+readings from the last 30 days, gets a Telemetry tab with four tiles, see
+[Atlas](atlas.md#the-tab-a-card-opens-on). With polling off, none of them appear. Beacon stores
+and shows readings for room servers too, but the current polling firmware polls repeaters only.
 
 Only trusted readings are charted. A reading is trusted when its observer was assigned to the
 repeater and Beacon had itself heard the repeater directly through that observer when the reading
@@ -159,8 +190,9 @@ curl -X PUT -H "Authorization: Bearer $BEACON_API_KEY" -H "Content-Type: applica
   route's list are added together, and the two may name at most 16 different repeaters, which is
   all the firmware takes. A `PUT` that would go over answers `400` and changes nothing. A key
   already in the config adds nothing to the count. If you later add keys to the config and the
-  two lists go over 16 at startup, Beacon logs an error and sends only the first 16, config
-  first. Shorten one of the lists.
+  two lists go over 16, Beacon sends only the first 16, config first, and logs the error
+  `polling exclusions do not fit the policy` each time it builds a policy. Shorten one of the
+  lists.
 - A repeater that is also an observer, with status sent in the last 7 days, is not polled. It
   reports its own readings over MQTT.
 - A blocked observer is ignored. Beacon drops its claims and readings, its owners answer is empty
@@ -226,7 +258,21 @@ are then dropped, and the election moves its repeaters to other observers.
   ingest filter. The filter drops claims and readings as well as packets. Add its country to
   `ingest.allow_countries` or its code to `ingest.allow_iatas`, then restart.
 - **The device polls nothing.** No MQTT slot on the device matches `mqtt_hosts`. Compare the
-  host in the slot with the list, and set `poll.slot` if needed.
+  host in the slot with the list, and set `poll.slot` if needed. `get poll` on the device shows
+  the mode, the slot and whether the clock is set. Nothing is polled before the clock is set
+  from NTP, and a repeater the device has not heard directly in the last day shows `not_direct`
+  in `get poll.status`.
+- **The policy request times out.** The device has 12 seconds for it, and an ECDSA certificate
+  chain can use nearly all of that on an ESP32. See
+  [An RSA certificate for the devices](#an-rsa-certificate-for-the-devices).
+- **The device polls but the charts stay empty.** Only trusted readings are charted, and a
+  reading is trusted only when its observer was assigned to the repeater and Beacon had advert
+  evidence for the pair when the reading was stored. `GET /api/v1/admin/polling/targets` shows
+  each observer's rank and evidence. Add `include=untrusted` to the node telemetry request to
+  see the readings that were left out.
+- **A repeater is never polled after a login.** It answered the device with admin access, so
+  the device stopped. Fix the repeater's guest password, then run `poll enable <key>` on the
+  device.
 - **The device acts like it never got a policy.** Open
   `https://<your-domain>/api/guest-polling/policy` in a browser. It must answer `200` with
   `"reading_format":"telemetry"`. A `404` means the proxy is not forwarding `/api/*`, and the

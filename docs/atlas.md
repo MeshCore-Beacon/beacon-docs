@@ -12,8 +12,9 @@ card's kind, ID, last known name, card order and the activity window (24h, 3d or
 keeps the node's full public key and, when the node is also an observer, that observer's ID.
 A card whose Observer view tiles were changed also keeps its four tiles (see
 [Choosing the Observer tiles](#choosing-the-observer-tiles)), and a node card pinned to open on
-**Heard by** or **Observer** keeps that tab (see
-[The tab a card opens on](#the-tab-a-card-opens-on)).
+**Heard by**, **Observer** or **Telemetry** keeps that tab (see
+[The tab a card opens on](#the-tab-a-card-opens-on)). A node card whose Telemetry tiles were
+changed keeps those four tiles too.
 
 Signed out, there is no sync between browsers or devices; use
 [Export and import](#export-and-import) to move a collection. Clearing site data removes it. If
@@ -46,7 +47,8 @@ An observer saved on its own becomes a node card by itself once its radio starts
 
 A card's header is its name and badges, with icon buttons at the top right: the pin (on cards
 with more than one view), an x that removes the card, and the drag grip. On a card with more
-than one view, the Analytics / Heard by / Observer switch spans the card below the header.
+than one view, the Analytics / Heard by / Observer / Telemetry switch spans the card below the
+header, showing only the views that card has.
 
 The Analytics and Observer views end in a one-line footer. It never wraps: text that does not fit
 is cut short, and the info tip at its end lists every fact in full, with absolute times, followed
@@ -128,10 +130,13 @@ the info tip says so.
 
 ### The tab a card opens on
 
-On a server that reports `features.atlasTelemetry`, a node card can also open on its **Telemetry**
-tab. The tab keeps its own four tiles, chosen from battery, noise floor, uptime, airtime,
-temperature, packets, signal and errors, separate from the Observer view's tiles. Both the tab and
-the tiles are saved with the card as `view: "telemetry"` and `telemetryTiles`.
+On a server with [repeater polling](repeater-polling.md) on (`features.polling`), a card for a
+repeater or room server gets a **Telemetry** tab when an observer is assigned to poll it, or when
+it has readings from the last 30 days. The tab keeps its own four tiles, chosen from battery,
+noise floor, uptime, airtime, temperature, packets, signal and errors, separate from the Observer
+view's tiles. A new card shows battery, noise floor, uptime and airtime. Both the tab and the
+tiles are saved with the card as `view: "telemetry"` and `telemetryTiles`. A card pinned to
+Telemetry that loses the tab opens on Analytics.
 
 A card with more than one view has a pin button in its header. The pin is pressed while the card
 shows the tab it opens on. Pressing it on another tab
@@ -178,9 +183,13 @@ four different metric IDs, in tile order, from `airtime`, `battery`, `uptime`, `
 `tiles` is dropped on import and the card keeps the default layout; a build from before the tile
 picker ignores the field.
 
-`view` is optional on a node card: `heard` or `observer`, the tab the card opens on, left out
-when that is Analytics. Any other value is dropped on import and the card is kept, opening on
-Analytics. A build from before the pin ignores the field.
+`telemetryTiles` is optional on a node card and works the same way for the Telemetry tab: four
+different IDs, in tile order, from `battery`, `noise`, `uptime`, `airtime`, `temperature`,
+`packets`, `signal` and `errors`, left out for the default layout.
+
+`view` is optional on a node card: `heard`, `observer` or `telemetry`, the tab the card opens
+on, left out when that is Analytics. Any other value is dropped on import and the card is kept,
+opening on Analytics. A build from before the pin ignores the field.
 
 Imports go through the same checks as a saved collection: a file without the format tag is
 refused, malformed or duplicate cards are dropped, at most the server's limit are kept, and the page says how
@@ -197,7 +206,7 @@ mobile app show the same cards. Signed out, nothing changes and the local copy i
   stored by public key, so a node or observer record can come and go. Ids are looked up when the Atlas is read. An
   observer pin whose key now has a node record is returned as a node pin; if that node is already
   pinned, the two merge at the node pin's place. A pin keeps its saved name, its four Observer
-  tiles and, for a node pin, the tab it opens on.
+  tiles and, for a node pin, its four Telemetry tiles and the tab it opens on.
 - The Atlas is replaced as a whole, guarded by a revision number. The `200` answer to a save is the
   document that save committed. A write that carries an older
   revision is refused with `409 atlas_conflict` and the stored Atlas. The client then adopts the

@@ -74,6 +74,27 @@ directly with `curl --http3-only -sI https://beacon.example.com/`.
 Nothing breaks where UDP is blocked, by your firewall or the visitor's network: browsers fall
 back to HTTP/2. The nginx and Apache setups below have no HTTP/3.
 
+### RSA certificate for observers
+
+Observers that [poll repeaters](repeater-polling.md) call this site over HTTPS from an ESP32
+chip, which verifies an RSA certificate chain much faster than an ECDSA one. Caddy asks for
+an ECDSA certificate by default. If you run polling, ask for RSA in the site block:
+
+```caddy
+beacon.example.com {
+	tls {
+		key_type rsa2048
+	}
+	# handle blocks as above
+}
+```
+
+Caddy keeps the certificate it already has, so on a site that is already running the setting
+alone changes nothing. Remove the stored certificate for that site from Caddy's data
+directory and restart the Caddy container. A reload is not enough. See
+[An RSA certificate for the devices](repeater-polling.md#an-rsa-certificate-for-the-devices)
+for why. With nginx or Apache, issue the certificate with an RSA key in your ACME client.
+
 ## Behind a CDN
 
 Behind Cloudflare or another CDN, `{remote_host}` is the CDN, not the visitor. The comment at
@@ -131,7 +152,7 @@ ProxyPassReverse /.well-known/beacon-push http://127.0.0.1:8080/.well-known/beac
 
 ## Rate limits and connection caps
 
-REST requests under `/api/v1` are rate limited per client IP, 300 a minute by default. IPv6
+REST requests under `/api/v1` are rate limited per client IP, 600 a minute by default. IPv6
 clients share one budget per /64. A client over the limit gets `429` with `rate_limited` in the
 body and a `Retry-After` header.
 

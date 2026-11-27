@@ -22,6 +22,11 @@ observation per observer.
 - **Run your own** with [meshcore-mqtt-broker](https://github.com/michaelhart/meshcore-mqtt-broker)
   and point your observers at it. Beacon only needs a subscriber account on it.
 
+If you run the broker, serve it with an RSA certificate. Most observers are ESP32 devices,
+and an ESP32 verifies an RSA certificate chain much faster than an ECDSA one. The same goes
+for the Beacon site when observers poll repeaters, where it was measured, see
+[An RSA certificate for the devices](repeater-polling.md#an-rsa-certificate-for-the-devices).
+
 ## The account Beacon needs
 
 The broker defines three subscriber roles:
