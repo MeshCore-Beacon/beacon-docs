@@ -592,7 +592,7 @@ The other side of [Node polling](#node-polling): what an observer that polls say
 | `claim.receivedAt` | When Beacon received it, epoch ms. |
 | `claim.live` | True while the claim is under 65 minutes old. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
 | `claim.acceptsRequests` | The observer takes repeaters handed out by [telemetry requests](#telemetry-requests). |
-| `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is the free seats the claim reported, never more than `max` minus `used`. `used` plus `free` can be less than `max`. |
+| `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is how many more requested repeaters Beacon could hand it now: the free seats the claim reported, never more than `max` minus `used`, less any seats Beacon has handed out that the claim does not list yet. It is `0` when the claim is not live or does not accept requests. `used` plus `free` can be less than `max`. |
 | `readings24h` | Readings Beacon received from this observer in the last 24 hours, trusted or not. |
 | `targets` | One entry for each repeater in the claim. Assigned ones first in rank order, then the rest; within a tie by name, with unnamed ones last. An empty array when there are none. |
 
@@ -687,9 +687,12 @@ Before, it came from the last status message and was missing when the last row h
 walk by `cursor` skipped most observers. Paging by `cursor` alone can still skip observers that
 share a millisecond (presence updates often stamp many at once); `pageCursor` reaches all of them.
 
-Telemetry response is a time-bucketed array suitable for direct chart consumption. `airtimeTxSecs` and
+The telemetry response is an array ordered by time. `interval=1h` returns the stored snapshots as they
+are: one per `telemetry.resolution` window (15 minutes by default), plus one stored at once when the
+observer reboots, so points are not evenly spaced. `6h` and `24h` return buckets. `airtimeTxSecs` and
 `airtimeRxSecs` are seconds of radio time as reported by the observer: cumulative since boot on
-`interval=1h` points, and the per-bucket delta on `6h`/`24h`. Divide by the bucket length for a percentage.
+`interval=1h` points, and the per-bucket delta on `6h`/`24h`. For a percentage, divide by the time
+between two points on `1h`, or by the bucket length on `6h`/`24h`.
 Fields the observer did not report are omitted.
 
 ```json

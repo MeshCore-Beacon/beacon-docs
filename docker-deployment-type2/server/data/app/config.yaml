@@ -254,7 +254,7 @@ telemetry:
   retention: 744h   # 31 days
   # How often an observer's status is stored as a snapshot (default 15m). Observers report
   # every 5 minutes by default; reports inside one window are dropped, except the first after
-  # a reboot. Observer alerts and charts read these snapshots:
+  # a reboot (one per window). Observer alerts and charts read these snapshots:
   #   - battery and noise alerts need two snapshots in a row, so they react after about two windows
   #   - a shorter window stores more rows (5m is about 3x the rows of 15m, 1h about a quarter)
   #   - below the observers' report interval nothing more is stored
