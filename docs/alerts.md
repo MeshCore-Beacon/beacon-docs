@@ -23,7 +23,7 @@ alerts:
 
 | Channel | What it needs |
 |---|---|
-| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Any other mode stops startup; portal users have no address. |
+| `email.enabled` | `accounts.mode: local` with the [`mail` block](configuration.md#user-accounts) set. Any other mode stops startup. |
 | `push.enabled` | A Push ID in `push.id` and the Push secret in `BEACON_PUSH_SECRET`, from registering the server with the push server. See [Push](#push). Without them Beacon does not start. |
 
 With both off (the default) every alert route answers `404 alerts_disabled`. With accounts off,
@@ -52,7 +52,7 @@ assignment right now; the user is told to request telemetry for it first (see
 | `clock` | repeaters, room servers | Seconds of drift: 300, 3600 or 86400. Fires after two adverts in a row beyond it. Beacon keeps the drift of each repeater's last 16 adverts, so a breach that came and went between two passes still fires once. |
 | `battery_low` | with a battery reading | Millivolts, 2500 to 5000. |
 | `battery_falling` | with a battery reading | Millivolts per day: 100, 200 or 300. |
-| `rebooted` | with an uptime reading | None. Notifies on each new reboot seen. Every reading since the rule's last pass is examined, not only the newest few. |
+| `rebooted` | with an uptime reading | None. Notifies on each new reboot seen. Every reading since the rule's last pass is examined, not only the newest few. An observer's reboot is stored as soon as it reports, at most once per `telemetry.resolution` window, so a radio in a boot loop notifies about once per window, not once per boot. |
 | `temperature` | with a temperature reading | Tenths of a degree C, -500 to 1500. A low limit (`threshold`), a high limit (`thresholdHigh`) or both; low must be below high. With both set on a rule that is on, the high limit must be at least 20 tenths (2.0 degrees C) above the low one, or the change is refused with `422 invalid_threshold`; a rule being turned off is not held to it. |
 | `noise_high` | with a noise floor reading | dBm, -130 to -50. |
 | `observer_offline` | observers | Minutes without a status report: 30, 60, 180 or 360. |

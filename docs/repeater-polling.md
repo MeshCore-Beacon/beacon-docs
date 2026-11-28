@@ -18,9 +18,9 @@ for where the readings show up.
    answer (`GET /api/guest-polling/owners`). Until it has a policy it neither polls nor reports.
 3. The observer publishes a claim to the MQTT broker, listing its targets and how its last
    polls went.
-4. Every minute Beacon ranks the observers that claimed each repeater. Observers it saw hear the
-   repeater's zero-hop adverts in the last 24 hours (advert evidence) come first, by mean SNR,
-   then by number of adverts. Observers without evidence come after, by the signal they claim.
+4. Every minute Beacon ranks the observers that claimed each repeater. Observers that Beacon saw hear
+   the repeater's zero-hop adverts come first, by mean SNR and then by number of adverts. This is
+   advert evidence. It counts adverts from the last 7 days (`polling.evidence_window`). Observers without evidence come after, by the signal they claim.
    One observer is the poller. The others are standbys. With `polling.authority: approved` only
    observers you approved take part (see [Trust](#trust)).
 5. The observer reads its role from the owners answer. The poller asks the repeater when the
@@ -77,8 +77,9 @@ Caddy, see [RSA certificate for observers](reverse-proxy.md#rsa-certificate-for-
 
 The device must be an ESP32 board with PSRAM running the MeshCore repeater observer firmware
 with repeater polling, with the MQTT bridge on, publishing to a broker Beacon reads. The polling
-firmware is in the [observer flasher](https://observer.gessaman.com) as a test build and is
-still in testing. The room server firmware has no polling. On the device:
+firmware is in the [observer flasher](https://observer.gessaman.com): pick the version tagged
+`-poll` when you flash. It is still a test build.
+The room server firmware has no polling. On the device:
 
 ```text
 set poll.url https://beacon.example.com
@@ -112,6 +113,26 @@ To check it works: `get poll` shows the switch, the mode (`telemetry` with Beaco
 the target count and the clock. `get poll.status` has one line per target with its last result,
 and `get poll.status <n>` the details of target n. `poll now <key>` sends one poll right away,
 at most once a minute per target.
+
+## Fixed limits
+
+Some limits are built into the observer firmware and the server. They have no setting.
+
+| Limit | Value |
+|---|---|
+| Repeaters one observer polls | 8. This counts the repeaters its owner added and the ones Beacon hands it through [telemetry requests](telemetry-requests.md). |
+| Observers assigned to one requested repeater | 3: one poller and two standbys. |
+| Repeaters an operator can exclude | 16, across the config and the admin route. |
+
+A requested repeater is only
+handed to an observer that reports a free seat, so an observer whose owner filled all 8 takes no
+requests. To change how much polling happens, use these instead (see
+[Configuration](configuration.md#repeater-polling)):
+
+- `direct_window` sets how often each repeater is polled.
+- `max_requests` sets how many poll attempts a repeater gets in each window.
+- `requests_per_user` sets how many repeaters one user may ask for.
+- `request_observers: approved` limits which observers take requests at all.
 
 ## What Beacon stores
 
@@ -162,6 +183,20 @@ readings it left out. See the [API contract](api-contract.md#node-telemetry).
 
 A Poller tag means a stored claim exists for that observer, whether or not it is assigned a repeater. The hourly cleanup removes a claim about a day after the last one received, and the tag goes with it. Claims from a blocked observer are not stored. An observer blocked after claiming keeps the tag until its claim is cleaned up. With polling off no new claims are stored, so existing tags clear within about a day. The API carries it as `isPoller` on nodes, and `GET /nodes` takes `poller=true|false`.
 
+An observer with the Poller tag also has a Poller view on its node, beside Node and Observer, in
+Beacon Web and the mobile app. It shows:
+
+- how many of its 8 slots are used, split into its owner's repeaters and requested ones, and how
+  many are free
+- when Beacon last received its claim
+- one row for each repeater: poller, standby or not assigned, the state it reports, its last reply
+  and SNR, and how many of the repeater's adverts Beacon heard through it
+
+Anyone who can open the node sees this, including which repeaters are requested and a
+`login_failed` or `admin_stop` state. On the web the observer's dashboard shows the same, and an
+Atlas card for the node has a Poller tab, see [Atlas](atlas.md#the-tab-a-card-opens-on). The route
+is `GET /nodes/{nodeId}/poller`, see the [API contract](api-contract.md#node-poller).
+
 A gap in a chart means there is no usable value for that series in that bucket. The cause can be the poll cadence (status values arrive every few hours), a field the repeater does not report, a counter that was inconsistent and was dropped, or a missed poll. It does not mean the repeater was down.
 
 ## Pause, exclude and block
@@ -172,7 +207,7 @@ Otherwise they answer `503`. The same shapes are in the [API contract](api-contr
 
 | Route | What it does |
 |---|---|
-| `GET /api/v1/admin/polling` | Returns the pause state, the excluded repeaters and every observer with a flag set. `paused` turns `false` once `pausedUntil` has passed. `configPaused`, `configExcludedNodes` and `authority` show `polling.paused`, `polling.excluded_nodes` and `polling.authority` from the config. |
+| `GET /api/v1/admin/polling` | Returns the pause state, the excluded repeaters and every observer with a flag set. `paused` turns `false` once `pausedUntil` has passed. `configPaused`, `configExcludedNodes` and `authority` show `polling.paused`, `polling.excluded_nodes` and `polling.authority` from the config, and `evidenceWindowSeconds` shows `polling.evidence_window`. |
 | `GET /api/v1/admin/polling/targets` | Lists up to 500 repeaters, newest claim first, with every observer that claims each one, its rank (`null` when it has none), its advert evidence, whether you approved it, its state and misses, and the newest trusted and newest overall reading times. Use it to see who polls what. |
 | `PUT /api/v1/admin/polling/state` | Replaces the pause state and the excluded repeaters. |
 | `PUT /api/v1/admin/polling/observers/{publicKey}` | Replaces one observer's `blocked`, `approved` and `note`. |

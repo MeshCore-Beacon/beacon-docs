@@ -17,7 +17,7 @@ Requests run only when all of these hold:
 
 - `polling.enabled` is `true`.
 - `polling.requests_per_user` is not `0`.
-- User accounts are on, in `local` or `portal` mode.
+- User accounts are on.
 - `BEACON_SECRET_KEY` is set and valid. It seals the guest passwords. See
   [Configuration](configuration.md#beacon_secret_key).
 

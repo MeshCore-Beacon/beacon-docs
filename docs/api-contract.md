@@ -362,6 +362,7 @@ Adverts with a bad signature are not decoded and have no `parsedPayload`.
 | `GET /nodes/{nodeId}/telemetry?range=168h&interval=6h` | Repeater readings of a polled node, bucketed for charts. See [Node telemetry](#node-telemetry). |
 | `GET /nodes/telemetry/latest` | The newest battery and temperature of every polled node, for map labels. See [Latest node telemetry](#latest-node-telemetry). |
 | `GET /nodes/{nodeId}/polling` | Which observer polls the node and when it last got a trusted reading. See [Node polling](#node-polling). |
+| `GET /nodes/{nodeId}/poller` | For a node that is a poller: how many of its slots are used and the repeaters it polls. See [Node poller](#node-poller). |
 
 `/nodes` params: `type` (1 companion, 2 repeater, 3 room server, 4 sensor) or `typeName`, the location filters, `name` (partial, case-insensitive), `scope`, `pubkey` (exact hex), `pubkeyPrefix`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `poller` (`true` keeps only nodes with a stored polling claim, `false` drops them, omit for no filter; a value that is not a boolean answers `400`), `neighbors` (adds `neighborIds`), `sort`, `order`, `cursor`, `pageCursor`, `limit`. Summaries include `lastSeen` (when the node was last heard, epoch ms; list rows carry it from 2.1.1, node detail always has), `stale` (not seen within `nodes.stale_threshold`), `isPoller` (`true` when the node's public key has a stored polling claim, so it is an observer running polling firmware, assigned to a repeater or not; see [repeater polling](repeater-polling.md#seeing-the-readings)), `defaultScope` (the transport scope last matched from the node's adverts, omitted when none; list rows carry it from 2.1.0, node detail always has) and, when `nodes.mark_foreign` is on, `possiblyForeign`. To list one scope's nodes, send `scope` rather than filtering rows: a server before 2.1.0 leaves `defaultScope` off list rows.
 
@@ -547,6 +548,69 @@ Who polls this node right now. A `400` for a `nodeId` that is not a UUID and a `
 
 `name` is the observer's display name, or the first 8 hex characters of its public key when it has none.
 
+#### Node poller
+
+```
+GET /api/v1/nodes/{nodeId}/poller
+```
+
+The other side of [Node polling](#node-polling): what an observer that polls says it holds, read from its last stored [claim](#claim-message). A `400` for a `nodeId` that is not a UUID and a `404` for an unknown node. A node with no stored claim answers `{"claim":null,"readings24h":0,"targets":[]}`. With polling off the route still checks the node (an unknown node is a `404`) and then gives that same answer. Not cached.
+
+```json
+{
+  "claim": {
+    "receivedAt": 1795800000000,
+    "live": true,
+    "acceptsRequests": true,
+    "slots": { "max": 8, "used": 5, "own": 3, "requested": 2, "free": 3 }
+  },
+  "readings24h": 212,
+  "targets": [
+    {
+      "nodeId": "3d0a8a8e-1c55-4c0b-9f0e-6a1f0b7f2c11",
+      "publicKey": "5be1c07a...",
+      "name": "Hilltop R2",
+      "requested": false,
+      "role": "poller",
+      "rank": 0,
+      "state": "ok",
+      "misses": 0,
+      "lastAttempt": 1795799000000,
+      "lastOk": 1795799000000,
+      "claimedSnr": 9.5,
+      "evidenceSnr": 8.1,
+      "evidenceCount": 14,
+      "latestReadingAt": 1795799000000
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `claim` | The observer's last stored claim, or `null` when it has none. |
+| `claim.receivedAt` | When Beacon received it, epoch ms. |
+| `claim.live` | True while the claim is under 65 minutes old. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
+| `claim.acceptsRequests` | The observer takes repeaters handed out by [telemetry requests](#telemetry-requests). |
+| `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is how many more requested repeaters Beacon could hand it now: the free seats the claim reported, never more than `max` minus `used`, less any seats Beacon has handed out that the claim does not list yet. It is `0` when the claim is not live or does not accept requests. `used` plus `free` can be less than `max`. |
+| `readings24h` | Readings Beacon received from this observer in the last 24 hours, trusted or not. |
+| `targets` | One entry for each repeater in the claim. Assigned ones first in rank order, then the rest; within a tie by name, with unnamed ones last. An empty array when there are none. |
+
+Each target:
+
+| Field | Notes |
+|---|---|
+| `nodeId`, `name` | The repeater's node, when Beacon has one for the key. Otherwise both are `null`. `name` is also `null` for a node without a name. |
+| `publicKey` | The repeater's key, 64 lowercase hex. |
+| `requested` | True when the observer was given the repeater by a telemetry request, false when its owner set it up. |
+| `role`, `rank` | From the last election: `poller` with rank `0`, `standby` with rank `1` and up, or `unassigned` with `rank` `null`. |
+| `state` | As the observer reported it: `pending`, `ok`, `no_reply`, `login_failed`, `admin_stop` or `not_direct`. Empty from firmware without request support. A newer firmware may send other values. |
+| `misses` | Failed polls in a row. |
+| `lastAttempt`, `lastOk` | Epoch ms, or `null` when never. |
+| `claimedSnr` | The SNR the observer reports for the repeater, or `null`. |
+| `evidenceSnr`, `evidenceCount` | Zero-hop adverts of the repeater that Beacon saw through this observer within `polling.evidence_window` (7 days by default) before the last election: their mean SNR and how many. `null` and `0` for an unassigned repeater or one with no such adverts. |
+| `latestReadingAt` | `sampledAt` of the newest reading this observer delivered for the repeater, trusted or not. `null` when it has delivered none. |
+
 #### MeshMapper repeater details
 
 With `meshmapper.repeaters.enabled`, node detail carries `meshmapper` when MeshMapper's repeater
@@ -623,9 +687,12 @@ Before, it came from the last status message and was missing when the last row h
 walk by `cursor` skipped most observers. Paging by `cursor` alone can still skip observers that
 share a millisecond (presence updates often stamp many at once); `pageCursor` reaches all of them.
 
-Telemetry response is a time-bucketed array suitable for direct chart consumption. `airtimeTxSecs` and
+The telemetry response is an array ordered by time. `interval=1h` returns the stored snapshots as they
+are: one per `telemetry.resolution` window (15 minutes by default), plus one stored at once when the
+observer reboots, so points are not evenly spaced. `6h` and `24h` return buckets. `airtimeTxSecs` and
 `airtimeRxSecs` are seconds of radio time as reported by the observer: cumulative since boot on
-`interval=1h` points, and the per-bucket delta on `6h`/`24h`. Divide by the bucket length for a percentage.
+`interval=1h` points, and the per-bucket delta on `6h`/`24h`. For a percentage, divide by the time
+between two points on `1h`, or by the bucket length on `6h`/`24h`.
 Fields the observer did not report are omitted.
 
 ```json
@@ -956,7 +1023,7 @@ Public, no key. Counts against the normal rate limit and is sent with `Cache-Con
 ```json
 {
   "minAppVersion": "2.3.0", "minWebVersion": "2.3.0", "serverVersion": "2.3.0",
-  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "atlas7d": true, "mapTelemetry": true, "appDeviceLabel": true },
+  "features": { "polling": true, "accounts": "off", "registration": false, "telemetryRequests": false, "alerts": false, "alertChannels": { "email": false, "push": false }, "atlasTelemetry": true, "atlasPoller": true, "atlas7d": true, "mapTelemetry": true, "appDeviceLabel": true },
   "display": { "temperatureUnit": "c", "distanceUnit": "metric" },
   "limits": { "atlas": 20 }
 }
@@ -984,6 +1051,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 | `alertChannels` | `{"email": bool, "push": bool}`: the channels this server sends alerts by. Always present. |
 | `push` | `{"server": "https://push.meshcorebeacon.ca", "pushId": "inst_…"}`: the push server the app gets a device handle from, and this server's Push ID there. Present only while `alertChannels.push` is true. See [Push delivery](#push-delivery). |
 | `atlasTelemetry` | True when the server accepts the `telemetry` Atlas view and `telemetryTiles` on node pins, and the `72h` [node telemetry](#node-telemetry) range. Always true on servers that have it. |
+| `atlasPoller` | True when the server accepts the `poller` Atlas view on node pins. Always true on servers that have it. |
 | `atlas7d` | True when the server accepts the `7d` range on [`/me/atlas`](#atlas-sync). Always true on servers that have it. |
 | `mapTelemetry` | True when the server has [latest node telemetry](#latest-node-telemetry). Always true on servers that have it. It stays true when polling is off. A client shows its map telemetry toggle only when both `mapTelemetry` and `polling` are true. |
 | `appDeviceLabel` | True when `POST /auth/app/token` takes a `deviceLabel`. Always true on servers that have it. The app sends one only when this is true: an older server refuses the unknown field. |
@@ -1003,7 +1071,7 @@ Swagger shows. Servers older than this endpoint return `404`. See
 
 The API itself stays in Celsius and metric whatever `display` says. Alert temperature limits are still stored and sent as tenths of a degree C. Clients convert for display.
 
-A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `atlas7d` as `false` (do not offer `7d` or send it; a saved `7d` Atlas shows and sends `3d`), a missing `mapTelemetry` as `false` (hide the toggle), a missing `appDeviceLabel` as `false`, a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
+A client must treat a missing `features`, as sent by an older server, as all off, a missing `registration` as `false`, and a missing `portalUrl` or `push` as none, a missing `alertChannels` as both off, a missing `atlasTelemetry` as `false`, a missing `atlasPoller` as `false` (keep a `poller` view local and do not send it), a missing `atlas7d` as `false` (do not offer `7d` or send it; a saved `7d` Atlas shows and sends `3d`), a missing `mapTelemetry` as `false` (hide the toggle), a missing `appDeviceLabel` as `false`, a missing `display` as `c` and `metric`, and a missing `limits.atlas` as 12, the cap before it was configurable. A client that does not know an `accounts` value other than `"off"` and `"local"` should treat it as `"off"`.
 
 Beacon Web calls `/info` on load and again when the tab regains focus (at most once a minute). When
 its own version is lower than `minWebVersion` it shows a full-screen "reload" screen instead of the
@@ -1041,7 +1109,7 @@ All under `/api/v1/admin/`, bearer key required (see [Auth](#auth)).
 | `GET /admin/users`, `PUT /admin/users/{id}`, `DELETE /admin/users/{id}` | Manage [user accounts](#operator-user-routes). `503` while accounts are off or the server is read-only. |
 | `GET /admin/accounts`, `POST /admin/accounts` | List or create operator account records (name only; not logins). |
 | `GET /admin/accounts/{id}`, `DELETE /admin/accounts/{id}` | Fetch or deactivate one. |
-| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `noPasswordBlocked` is a list of repeater keys (64 hex) that gave admin access to a blank login, and `adminStops` lists `{targetPublicKey, observerPublicKey, reportedAt}`. `503` unless `polling.enabled` is true and the server is not read-only. |
+| `GET /admin/polling` | Repeater polling settings: `paused`, `pausedUntil` (epoch ms or `null`), `configPaused`, `excludedNodes` (64 hex each), `configExcludedNodes`, `authority`, `evidenceWindowSeconds` and `observers`, each `{publicKey, blocked, approved, note}`. `paused` is the stored pause and reads `false` once `pausedUntil` has passed; `configPaused` is `polling.paused` from config, which pauses every observer whatever the stored state says. `configExcludedNodes` is `polling.excluded_nodes`; the policy excludes the union of both lists. `authority` is `polling.authority`, `evidence` or `approved`. `evidenceWindowSeconds` is `polling.evidence_window`. `noPasswordBlocked` is a list of repeater keys (64 hex) that gave admin access to a blank login, and `adminStops` lists `{targetPublicKey, observerPublicKey, reportedAt}`. `503` unless `polling.enabled` is true and the server is not read-only. |
 | `GET /admin/polling/targets` | Who polls what. `{targets: [...]}`, at most 500 repeaters with a live claim or an assignment, newest claim first. Each is `{publicKey, latestTrustedReading, latestReading, candidates}`; the two times are epoch ms or `null`, `latestTrustedReading` follows the same rule as `latest_ts` in [Owners](#owners) and `latestReading` counts every observer. Each candidate is `{observerPublicKey, rank, evidenceSnr, evidenceCount, keyMode, state, misses, lastOk, approved}`: `rank` is `0` for the poller, `1` and up for standbys and `null` when unassigned; `evidenceSnr` and `evidenceCount` come from the last election; `keyMode`, `state`, `misses` and `lastOk` come from the observer's live claim and are empty, `0` or `null` when it has none; `lastOk` is epoch ms or `null`; `approved` is the operator's flag for the observer. Each target also has `requested` (a telemetry request is in use for it) and `requests` (how many requests name it). Same `503` rule as above. |
 | `PUT /admin/polling/targets/{target}` | `{"noPasswordBlocked": false}` lifts the block on passwordless [telemetry requests](#telemetry-requests) for one repeater (64 hex characters in the path). Only `false` is accepted (`400` otherwise). Returns the body, or `404` for a repeater Beacon has no record of. Body up to 4 KiB. |
 | `DELETE /admin/polling/admin-stops/{target}/{observer}` | Clears one admin stop so the observer can be offered the requested repeater again. `204`, or `404`. Both keys are 64 hex characters. |
@@ -1145,7 +1213,7 @@ Backup details are in [Backup and export](backup-export.md).
 
 ### User accounts
 
-Off unless `accounts.mode` is `local` ([User accounts](accounts.md)) or `portal` ([portal sign-in](portal-sign-in.md)). With it off every route below,
+Off unless `accounts.mode` is `local` ([User accounts](accounts.md)) or `portal` (the project's own MeshMapper instance only, see [Configuration](configuration.md#user-accounts)). With it off every route below,
 under `/api/v1/auth` and `/api/v1/me`, answers `404` with code `accounts_disabled`, and no cookie is set.
 These are separate from the operator records at `/admin/accounts`.
 
@@ -1261,7 +1329,7 @@ Notes:
   `beacon_session` set, or to `<public_url>/?view=signin&error=portal` on any failure including a
   cancel. Both answer `503 read_only` on a read-only server. In portal mode `register`, `verify`,
   `verify/resend`, `login`, `reset/request`, `reset/confirm`, `/me/password` and `/me/email` answer
-  `404 portal_managed`. See [Sign-in through the MeshMapper portal](portal-sign-in.md).
+  `404 portal_managed`.
 - **Mail.** Beacon mails the account address when a password is changed (by reset or from the
   profile), mails the old address when an email change is applied, and when an app signs in.
 - **Reset links** are bound to the address they were mailed to: after the address changes, an
@@ -1338,7 +1406,7 @@ client reads `168h` in hourly buckets: `/nodes/{id}/activity?range=168h`, and
 `/observers/{id}/activity`, `/observers/{id}/telemetry` and `/nodes/{id}/telemetry` with
 `range=168h&interval=1h`. A node pin has `publicKey` and `id`; an observer pin has
 `observerPublicKey`. `observerId` is the observer record with that key, or `null`. `tiles` (exactly
-four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard`, `observer` or `telemetry`, node pins only) are left out when not set.
+four distinct metric ids, see [Atlas](atlas.md#choosing-the-observer-tiles)) and `view` (`heard`, `observer`, `telemetry` or `poller`, node pins only) are left out when not set.
 `telemetryTiles` (node pins only) is exactly four distinct ids from `battery`, `noise`, `uptime`,
 `airtime`, `temperature`, `packets`, `signal` and `errors`; it holds the Telemetry view's tiles,
 apart from `tiles`, which stay the Observer view's. It is left out when the default applies. A client
@@ -1746,7 +1814,7 @@ Every answer carries every field.
 | `owner_hops` | int | `0`. |
 | `requested` | bool | Present and `true` only for a repeater given to this observer by a [telemetry request](telemetry-requests.md). |
 | `pw` | object | Only on a requested entry that has a guest password in use: `{"epk","ct","tag","ver"}`, lower hex, `ver` an integer. The password sealed to this observer's public key. Sent fresh on every answer; `ver` changes when the password in use changes. An entry whose password cannot be sealed is left out of the answer. |
-| `latest_ts` | string or `null` | `sampled_at` of the newest trusted reading for the repeater. A reading is trusted when its observer is ranked for the repeater (poller or standby) and Beacon saw it hear the repeater's own adverts directly (zero hops) in the day before the last election. Other readings, including a poller's without that evidence, are stored but do not count here, so claiming a repeater alone does not hold anyone back. Advert evidence comes from the observer's own packet uplink, so it is not proof; with `polling.authority: approved` only approved observers are ranked. |
+| `latest_ts` | string or `null` | `sampled_at` of the newest trusted reading for the repeater. A reading is trusted when its observer is ranked for the repeater (poller or standby) and Beacon saw it hear the repeater's own adverts directly (zero hops) within `polling.evidence_window` (7 days by default) before the last election. Other readings, including a poller's without that evidence, are stored but do not count here, so claiming a repeater alone does not hold anyone back. Advert evidence comes from the observer's own packet uplink, so it is not proof; with `polling.authority: approved` only approved observers are ranked. |
 
 ### Claim message
 

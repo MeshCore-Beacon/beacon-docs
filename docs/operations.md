@@ -65,8 +65,8 @@ Everything persistent is under `data/` next to `docker-compose.yml`:
   the next start, which counts against Let's Encrypt rate limits.
 - `data/app/config.yaml` and `.env` are your configuration. Keep copies of both somewhere
   else; no backup below includes `.env`. With the optional features on, `.env` also holds
-  `BEACON_SECRET_KEY`, `BEACON_PUSH_SECRET`, `BEACON_SMTP_PASSWORD` and `BEACON_PORTAL_SECRET`,
-  which exist nowhere else.
+  `BEACON_SECRET_KEY`, `BEACON_PUSH_SECRET` and `BEACON_SMTP_PASSWORD`, which exist nowhere
+  else.
 
 ## Channel message backfill
 
@@ -141,7 +141,6 @@ sign-ups never confirmed); see [Cleanup](accounts.md#cleanup).
 ## Accounts, polling, requests and alerts
 
 These features are off by default and each has its own page: [User accounts](accounts.md),
-[Sign-in through the MeshMapper portal](portal-sign-in.md),
 [Repeater polling](repeater-polling.md), [Requested telemetry](telemetry-requests.md) and
 [Alerts](alerts.md). What they add to day-to-day running is a set of background jobs. Their
 names are the `job` label on `beacon_job_duration_seconds` and the `task` in a `task failed`

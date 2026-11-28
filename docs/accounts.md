@@ -6,9 +6,7 @@ with code `accounts_disabled`, no cookie is ever set, `features.accounts` in
 [`/api/v1/info`](api-contract.md#server-info) is `"off"`, and both clients show no sign-in entry.
 Nothing that works signed out changes either way. Everything public stays public.
 
-There are two ways to turn them on. `local` is this page: username, email and password, with mail.
-`portal` lets people sign in with their MeshMapper portal account instead, see
-[Sign-in through the MeshMapper portal](portal-sign-in.md). Signed-in users also get the synced
+Accounts are username, email and password, with mail. Signed-in users also get the synced
 [Atlas](atlas.md), and, when the operator turns them on, [requested telemetry](telemetry-requests.md)
 and [alerts](alerts.md).
 
@@ -45,8 +43,8 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 
 | Key | Default | What it does |
 |---|---|---|
-| `mode` | `off` | `off`, `local` or `portal`. Anything else stops startup. The rest of the block is not checked while this is `off`. The rest of this page is about `local`; see [portal sign-in](portal-sign-in.md) for `portal`. |
-| `public_url` | none | Required when `mode` is `local` or `portal`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
+| `mode` | `off` | `off` or `local` (`portal` is for the project's own instance, see [Configuration](configuration.md#user-accounts)). Anything else stops startup. The rest of the block is not checked while this is `off`. |
+| `public_url` | none | Required when `mode` is `local`. The address people use for the web app: `http` or `https`, no path, query, fragment or credentials. Plain `http` is allowed only for `localhost` and `127.0.0.1`. Every link in a mail is built from it, never from a request header. |
 | `registration` | `open` | `open` or `closed`. When closed, `POST /auth/register` answers `403 registration_closed` and `features.registration` is `false`. People who already have an account keep signing in. |
 | `mail.host` | none | Required. |
 | `mail.port` | `587` | 1 to 65535. |
@@ -54,7 +52,7 @@ In the Docker stacks that is the `.env` of the host that runs the server. Then r
 | `mail.from` | none | Required, one address, for example `"Beacon <no-reply@example.org>"`. |
 | `mail.starttls` | `true` | When true the send fails if the server does not offer STARTTLS; Beacon never falls back to plain text. Set `false` only for a trusted local relay. |
 
-In `local` mode `BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment; `portal` mode reads `BEACON_PORTAL_SECRET` instead. A mistake in the
+`BEACON_SMTP_PASSWORD` is the only account secret that comes from the environment. A mistake in the
 block stops startup with an error naming the key. An `smtp` block left under `accounts` stops startup
 too, with a message saying it moved to `mail`. Port 465 (implicit TLS) is not supported; use a
 submission port that offers STARTTLS.
@@ -266,8 +264,6 @@ An hourly task (`users_cleanup`) deletes, once they are more than a week past th
 - one-time tokens that were used or have expired;
 - sign-ups nobody confirmed: local users never verified, created more than a week ago, with no live
   verify link left. This frees the username and address.
-
-In portal mode it also deletes portal sign-in states as soon as they expire, with no week's wait.
 
 A live session or token is never touched by it.
 
