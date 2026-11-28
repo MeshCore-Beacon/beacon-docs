@@ -562,6 +562,7 @@ The other side of [Node polling](#node-polling): what an observer that polls say
     "receivedAt": 1795800000000,
     "live": true,
     "acceptsRequests": true,
+    "pollIntervalMinutes": 60,
     "slots": { "max": 8, "used": 5, "own": 3, "requested": 2, "free": 3 }
   },
   "readings24h": 212,
@@ -592,7 +593,8 @@ The other side of [Node polling](#node-polling): what an observer that polls say
 | `claim.receivedAt` | When Beacon received it, epoch ms. |
 | `claim.live` | True while the claim is under 65 minutes old. A claim is kept for about a day after that, so `false` means the observer has stopped claiming. `isPoller` on the node does not check this. |
 | `claim.acceptsRequests` | The observer takes repeaters handed out by [telemetry requests](#telemetry-requests). |
-| `claim.slots` | `max` is the most repeaters one observer holds (8). `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is how many more requested repeaters Beacon could hand it now: the free seats the claim reported, never more than `max` minus `used`, less any seats Beacon has handed out that the claim does not list yet. It is `0` when the claim is not live or does not accept requests. `used` plus `free` can be less than `max`. |
+| `claim.pollIntervalMinutes` | How often the observer polls each repeater, in minutes, from the claim's `poll_interval`. `null` when its firmware does not report it. |
+| `claim.slots` | `max` is the most repeaters this observer holds: the claim's `max_slots`, or 8 when its firmware does not report one. `used` is how many the claim lists, split into `own` (set up by the observer's owner) and `requested`. `free` is how many more requested repeaters Beacon could hand it now: the free seats the claim reported, never more than `max` minus `used`, less any seats Beacon has handed out that the claim does not list yet. It is `0` when the claim is not live or does not accept requests. `used` plus `free` can be less than `max`. |
 | `readings24h` | Readings Beacon received from this observer in the last 24 hours, trusted or not. |
 | `targets` | One entry for each repeater in the claim. Assigned ones first in rank order, then the rest; within a tie by name, with unnamed ones last. An empty array when there are none. |
 
@@ -1824,7 +1826,7 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
 ```json
 {"v": 2, "origin": "Name", "origin_id": "<UPPER hex>", "timestamp": "2026-11-13T22:13:20Z",
  "plugin": "meshcore.observer_fw/<fw>", "policy_version": "a1b2", "community": true,
- "accepts_requests": true, "request_slots": 3,
+ "accepts_requests": true, "request_slots": 3, "max_slots": 8, "poll_interval": 60,
  "nodes": [{"node_id": "<lower hex>", "reply_hops": 0, "via": null, "key": "own", "snr": 6.5,
             "state": "ok", "misses": 2,
             "last_attempt": "2026-11-13T22:11:40Z", "last_ok": "2026-11-13T22:12:30Z"}]}
@@ -1838,23 +1840,28 @@ not retained, and refreshes it about every 30 minutes. Each claim replaces the p
   below healthy observers with the same kind of evidence. An observer with advert evidence ranks
   above one without, failing or not.
 - `accepts_requests` says the observer takes requested repeaters, and `request_slots` is how many
-  free seats it has (clamped to 8). A node entry with `"requested": true` is one the observer was
+  free seats it has (clamped to the observer's limit). A node entry with `"requested": true` is one the observer was
   given by a request. A report of `admin_stop` or `login_failed` for a requested repeater counts only
   from the observer that was assigned it. A `login_failed` report does not count while that observer
   has a trusted reading of the repeater stored after the current option became active and within the
   last 4 hours (the default; four times `polling.direct_window`, at most 48 hours). A claim and the state reports in it are stored in one
   transaction, so a report that fails to store rolls the claim back and the device's next claim
   repeats it.
+- `max_slots` is how many repeaters the observer can hold, set on the device. Beacon uses it as the
+  observer's limit when it hands out requested repeaters, and never believes more than 32. Without
+  it the limit is 8. `poll_interval` is how often the observer polls each repeater, in minutes;
+  zero or a negative number counts as absent. Both are absent from firmware that does not report
+  them.
 - `accepts_requests`, `request_slots`, `requested`, `state`, `misses`, `last_attempt` and
   `last_ok` are absent from claims sent by clients without request support. Those still send
   `"v": 2`; there is no v1 claim.
-- At most 32 repeaters per claim; a longer claim is dropped whole. The firmware sends up to 8.
+- At most 32 repeaters per claim; a longer claim is dropped whole. The firmware sends up to its `max_slots`.
 - A claim is ignored when its `timestamp` is not newer than the stored one or is more than
   10 minutes ahead of Beacon's clock. It is live for 65 minutes after Beacon receives it.
 - A claim that arrives less than 30 seconds after Beacon received the observer's last one is
   dropped. The check is made where the claim is stored, so two claims arriving together cannot
   both pass it. The firmware claims at most once a minute.
-- `misses` and `request_slots` are clamped (0 to 255, 0 to 8). A number too large for a 64-bit
+- `misses`, `request_slots` and `max_slots` are clamped (0 to 255, 0 to the observer's limit, 0 to 32). A number too large for a 64-bit
   integer counts as absent.
 - The whole claim is also dropped when it is over 16384 bytes, `v` is not `2`, a node's
   `reply_hops` is not `0` or `1`, its `snr` is not a finite number, or its `last_attempt` or

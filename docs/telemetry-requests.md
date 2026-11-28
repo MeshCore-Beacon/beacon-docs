@@ -116,7 +116,7 @@ Until an observer that hears the repeater has done this, every request for it st
 with `no_observer`.
 
 A claim from a device that accepts requests carries `accepts_requests`,
-`request_slots` (free seats, at most 8) and `requested` on each node. Firmware without request
+`request_slots` (free seats, at most the device's `max_slots`, 8 when it reports none) and `requested` on each node. Firmware without request
 support, or with requests off, never reaches this path and its observer simply polls its own targets. The envelope format
 and the claim fields are in the [API contract](api-contract.md#firmware-polling). Beacon never sends
 a password to an observer in clear: only the envelope, which only that observer's key opens.

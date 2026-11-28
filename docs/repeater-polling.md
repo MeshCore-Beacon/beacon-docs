@@ -13,7 +13,7 @@ for where the readings show up.
 ## How it works
 
 1. The owner sets a repeater as a target on the observer. The observer can poll direct
-   neighbours only, up to 8 targets.
+   neighbours only, up to the observer's target limit (8 unless changed on the device).
 2. The observer asks Beacon for its policy (`GET /api/guest-polling/policy`) and its owners
    answer (`GET /api/guest-polling/owners`). Until it has a policy it neither polls nor reports.
 3. The observer publishes a claim to the MQTT broker, listing its targets and how its last
@@ -186,9 +186,10 @@ A Poller tag means a stored claim exists for that observer, whether or not it is
 An observer with the Poller tag also has a Poller view on its node, beside Node and Observer, in
 Beacon Web and the mobile app. It shows:
 
-- how many of its 8 slots are used, split into its owner's repeaters and requested ones, and how
+- how many of its slots are used, split into its owner's repeaters and requested ones, and how
   many are free
-- when Beacon last received its claim
+- when Beacon last received its claim, and how often it polls each repeater when its firmware
+  reports that
 - one row for each repeater: poller, standby or not assigned, the state it reports, its last reply
   and SNR, and how many of the repeater's adverts Beacon heard through it
 
